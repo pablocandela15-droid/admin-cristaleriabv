@@ -92,16 +92,16 @@ export function AppSidebar() {
           {/* Versión y entorno arriba, bien a la vista (2026-11-03); con el menú plegado, solo el número. */}
           {isCollapsed && <VersionPanel colapsado />}
           {!isCollapsed && (
-            <div className="flex min-w-0 flex-1 items-center gap-2.5">
-              {/* La cúpula de la marca (manual, página 05: «Símbolo» sobre marino). A 32 px de alto, por encima
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              {/* La cúpula de la marca (manual, página 05: «Símbolo» sobre marino). A 28 px de alto, por encima
                   del mínimo de 24 px; el nombre va escrito al lado, así que es decorativa. */}
-              <Logotipo variante="simbolo" decorativo className="h-8 shrink-0" />
+              <Logotipo variante="simbolo" decorativo className="h-7 shrink-0" />
               <div className="min-w-0 flex-1">
                 {/* Versión a la derecha del título, en pequeño (dueño, 04/11/2026): solo el
                     número, en el color del entorno (ámbar demo, verde producción); el entorno va
                     en el tooltip y para el lector de pantalla. */}
-                <div className="flex min-w-0 items-center gap-2">
-                  <h2 className="min-w-0 truncate text-base font-semibold text-sidebar-foreground">Admin Panel</h2>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <h2 className="min-w-0 truncate text-[15px] font-semibold tracking-tight text-sidebar-foreground">Admin Panel</h2>
                   <VersionPanel colapsado className="font-medium" />
                 </div>
                 <p
