@@ -1,0 +1,410 @@
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
+import { Activity, AlertTriangle, Bot, Loader2, RefreshCw, Server, Settings2, Wallet } from "lucide-react";
+import { toast } from "sonner";
+import { SuperAdminLayout } from "@/components/SuperAdminLayout";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PestanasPagina } from "@/components/panel/PestanasPagina";
+import { calcularAvisosCostes, DIAS_SIN_REGISTRO } from "@/components/costes/calculos";
+import { useVentanaModelos } from "@/components/costes/CostesIa";
+import { type CosteMesEditando, DialogoCosteMes } from "@/components/servicios/DialogoCosteMes";
+import { DialogoConfirmarPrecio } from "@/components/servicios/DialogoConfirmarPrecio";
+import { DialogoEditarServicio } from "@/components/servicios/DialogoEditarServicio";
+import { MESES_INFORME } from "@/components/servicios/InformeMensual";
+import { PestanaConfigurar } from "@/components/servicios/PestanaConfigurar";
+import { PestanaCostes } from "@/components/servicios/PestanaCostes";
+import { PestanaEstado } from "@/components/servicios/PestanaEstado";
+import { PestanaModelos } from "@/components/servicios/PestanaModelos";
+import { PestanaServicios } from "@/components/servicios/PestanaServicios";
+import { TarjetaTelegram } from "@/components/servicios/TarjetaTelegram";
+import { PESTANA_POR_DEFECTO, type PestanaServicios as Pestana, pestanaDeUrl } from "@/components/servicios/pestanas";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { useCostePorModelo, useFuncionesSinRegistro } from "@/hooks/useCostes";
+import {
+  CLAVE_RESUMEN_MES,
+  type ResultadoResumenMes,
+  useActualizarLecturas,
+  useConfigServicios,
+  useLecturasServicios,
+  useResumenesMes,
+  useServiciosContratados,
+} from "@/hooks/useServicios";
+import { avisosPlan as calcularAvisosPlan, inventarioServicios } from "@/lib/costesServicios";
+import { type FilaResumenMes, MESES_REVISADOS, costesFaltantes, cuentaFaltantes, informeMes, textoMes, textoMesCorto, ultimosMeses } from "@/lib/informeServicios";
+import {
+  CAMBIO_POR_DEFECTO,
+  type DestinoPendiente,
+  type Importe,
+  type LecturaServicio,
+  type ServicioContratado,
+  estadoInstalacion,
+  haceCuanto,
+  ordenarServicios,
+  pendientesServicios,
+  proximasRenovaciones,
+  resumirCostes,
+  servicioNuevo,
+} from "@/lib/servicios";
+import { cn } from "@/lib/utils";
+import { VERSION_APP } from "@/lib/version";
+
+/**
+ * En la demo y en las previews las claves de los proveedores (Vercel, GitHub,
+ * Hostinger, Resend, Stripe…) no están, a propósito: «falta la clave» no es un
+ * aviso allí (13/11/2026).
+ */
+const CLAVES_SOLO_EN_PRODUCCION = VERSION_APP.entorno === "demo" || VERSION_APP.entorno === "preview";
+
+/** Suelo (px) del alto: por debajo (teclado abierto, ventana muy baja) vuelve el scroll de página. */
+const ALTURA_MINIMA_SERVICIOS = 360;
+
+/**
+ * Contenido de cada pestaña: ocupa el alto que queda bajo la barra y hace scroll por dentro.
+ * `data-[state=inactive]:hidden` imprescindible (como en las demás páginas con pestañas): una clase `flex` le gana al
+ * atributo `hidden` con el que Radix deja las pestañas inactivas.
+ */
+// `relative`: los textos `sr-only` de dentro son `position: absolute`; sin un antepasado posicionado
+// se colocaban respecto a la página, el scroll de la pestaña no los recortaba y alargaban el
+// documento entero. Al ir de Estado a la tarjeta de un servicio (`scrollIntoView`) el navegador
+// desplazaba también la página: cabecera y pestañas fuera de la vista y media pantalla en blanco
+// (17/11/2026, el dueño: «cuando clicas un servicio en Estado y redirige se ve mal, peta»).
+const CONTENIDO_PESTANA = "relative mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
+
+/**
+ * Super Admin › Servicios: el sitio único de lo contratado y de lo que cuesta
+ * (desde el 04/11/2026 también la antigua pantalla «Costes»; su ruta redirige
+ * a la pestaña Costes). Cuatro pestañas, en la URL (`?tab=`):
+ *   · Estado (06/11/2026, antes «Resumen»): el semáforo de toda la instalación,
+ *     una ficha visual por servicio con lectura automática (desde el 10/11/2026
+ *     también Google Drive y Mapbox; los que no tienen, como Google Maps o
+ *     Loading, ya no salen aquí: se ven en Servicios y Costes) y, si hay algo,
+ *     una línea por cosa que mirar.
+ *   · Servicios: una tarjeta por servicio en uso con su consumo.
+ *   · Costes: desde el 13/11/2026 («Pasos para saber el precio de todos los
+ *     servicios y de las IAs») el mes en euros con previsión y mes anterior,
+ *     los límites de los planes gratis, lo que falta por meter, el coste del
+ *     mes por proveedor (con lo metido a mano), qué tenemos contratado con
+ *     «Confirmar precio», cuánto cuesta cada cosa, la IA función por función,
+ *     la IA por proceso (OpenAI), el informe mensual y los ajustes a mano.
+ *   · Modelos (07/11/2026): qué modelo de OpenAI usa cada función, cambiarlo
+ *     y probarlo; modelos de la cuenta (nuevos marcados) e historial.
+ *   · Configurar: añadir, quitar, borrar y editar servicios; tipo de cambio.
+ * Las lecturas las hace la Edge Function `servicios-uso` (caché de 15 min);
+ * «Actualizar» (arriba) la fuerza para todos.
+ */
+export default function SuperAdminServicios() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pestana = pestanaDeUrl(searchParams.get("tab"));
+  const cambiarPestana = useCallback(
+    (v: string) => {
+      setSearchParams(
+        (actual) => {
+          const next = new URLSearchParams(actual);
+          if (v === PESTANA_POR_DEFECTO) next.delete("tab");
+          else next.set("tab", v);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const servicios = useServiciosContratados();
+  const disponible = servicios.data?.disponible === true;
+  const costes = servicios.data?.disponible === true ? servicios.data.costes : false;
+  const inventarioDisponible = servicios.data?.disponible === true ? servicios.data.inventario : false;
+  const lecturas = useLecturasServicios(disponible);
+  const config = useConfigServicios(disponible && costes);
+  const actualizar = useActualizarLecturas();
+  // Avisos de la IA para el Resumen (mismas consultas, y misma caché, que la pestaña Costes).
+  const { desde, hasta } = useVentanaModelos();
+  const sinRegistroQ = useFuncionesSinRegistro(DIAS_SIN_REGISTRO);
+  const porModeloQ = useCostePorModelo(desde, hasta);
+
+  const [editando, setEditando] = useState<ServicioContratado | null>(null);
+  const [creando, setCreando] = useState<ServicioContratado | null>(null);
+  const [actualizando, setActualizando] = useState<string | null>(null);
+  const [foco, setFoco] = useState<string | null>(null);
+  const [costeMes, setCosteMes] = useState<CosteMesEditando | null>(null);
+  const [confirmando, setConfirmando] = useState<ServicioContratado | null>(null);
+  const clienteConsultas = useQueryClient();
+  // Costes por meter: este mes y los dos anteriores (meses fijos mientras la pantalla está abierta).
+  const [hoy] = useState(() => new Date());
+  const mesesRevisados = useMemo(() => ultimosMeses(hoy, MESES_REVISADOS), [hoy]);
+  const mesesElegibles = useMemo(() => ultimosMeses(hoy, MESES_INFORME), [hoy]);
+  const resumenesQ = useResumenesMes(mesesRevisados, disponible && costes);
+  const quitarFoco = useCallback(() => setFoco(null), []);
+  // Alto de la pantalla (regla del dueño, 2026-10-07): la cabecera y las pestañas quedan fijas y cada pestaña
+  // hace scroll por dentro. Sin medida (jsdom, primer pintado) cae al layout con scroll de página.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_SERVICIOS);
+
+  const todos = useMemo(() => (servicios.data?.disponible ? ordenarServicios(servicios.data.servicios) : []), [servicios.data]);
+  const enUso = useMemo(() => todos.filter((s) => s.activo !== false), [todos]);
+  const quitados = useMemo(
+    () => todos.filter((s) => s.activo === false).sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+    [todos],
+  );
+  const porProveedor = useMemo(() => new Map<string, LecturaServicio>((lecturas.data?.lecturas ?? []).map((l) => [l.proveedor, l])), [lecturas.data]);
+  const sinLector = useMemo(() => new Set(lecturas.data?.sinLector ?? []), [lecturas.data]);
+  const eurPorUsd = config.data?.eurPorUsd ?? CAMBIO_POR_DEFECTO;
+  // Lo metido a mano para el mes en curso manda sobre cuota + uso (13/11/2026): Estado y Costes dicen lo mismo.
+  const resumenActual = resumenesQ[0]?.data;
+  const manuales = useMemo(() => {
+    const m = new Map<string, Importe>();
+    if (resumenActual?.disponible) {
+      for (const f of resumenActual.filas) if (f.manual_importe != null) m.set(f.proveedor, { importe: f.manual_importe, moneda: f.manual_moneda ?? "EUR" });
+    }
+    return m;
+  }, [resumenActual]);
+  const resumen = useMemo(() => resumirCostes(enUso, porProveedor, eurPorUsd, undefined, manuales), [enUso, porProveedor, eurPorUsd, manuales]);
+  const renovaciones = useMemo(() => proximasRenovaciones(enUso, porProveedor), [enUso, porProveedor]);
+  // Estado solo enseña los servicios con lectura automática («controles», petición del dueño del
+  // 10/11/2026: Drive y Mapbox sí, los demás fuera). Los que no la tienen siguen en Servicios y Costes.
+  const conControl = useMemo(() => enUso.filter((s) => !sinLector.has(s.proveedor)), [enUso, sinLector]);
+  const estadoGeneral = useMemo(
+    () => estadoInstalacion({ servicios: conControl, lecturas: porProveedor, renovaciones, sinLector, clavesSoloEnProduccion: CLAVES_SOLO_EN_PRODUCCION }),
+    [conControl, porProveedor, renovaciones, sinLector],
+  );
+  const costesMesDisponible = !resumenesQ.some((q) => q.data?.disponible === false);
+  const cargandoFaltantes = resumenesQ.some((q) => q.isLoading);
+  // Sin useMemo: son 3 meses × los servicios en uso (poco cálculo) y useQueries da un array nuevo en cada render.
+  const resumenes = new Map<string, FilaResumenMes[]>();
+  resumenesQ.forEach((q, i) => {
+    if (q.data?.disponible) resumenes.set(mesesRevisados[i], q.data.filas);
+  });
+  const faltantes = costesFaltantes({ servicios: enUso, resumenes, meses: mesesRevisados, eurPorUsd });
+  // El mes anterior, para comparar (mismo cálculo que el informe mensual).
+  const [mesActual, mesPasado] = mesesRevisados;
+  const anteriorEur = resumenes.has(mesActual)
+    ? informeMes({ mes: mesActual, servicios: enUso, resumen: resumenes.get(mesActual)!, resumenAnterior: resumenes.get(mesPasado) ?? null, eurPorUsd }).totalAnteriorEur
+    : null;
+  const avisosDelPlan = useMemo(
+    () => calcularAvisosPlan({ servicios: enUso, lecturas: porProveedor, eurPorUsd, clavesSoloEnProduccion: CLAVES_SOLO_EN_PRODUCCION }),
+    [enUso, porProveedor, eurPorUsd],
+  );
+  const inventario = useMemo(() => (inventarioDisponible ? inventarioServicios(enUso, eurPorUsd) : null), [inventarioDisponible, enUso, eurPorUsd]);
+  const sinLectura = useMemo(
+    () => enUso.filter((s) => sinLector.has(s.proveedor) && s.ciclo === "por_uso").map((s) => ({ proveedor: s.proveedor, nombre: s.nombre })),
+    [enUso, sinLector],
+  );
+  const porMeter = cargandoFaltantes ? 0 : cuentaFaltantes(faltantes);
+  const avisosIa = useMemo(() => {
+    const a = calcularAvisosCostes({ sinRegistro: sinRegistroQ.data, modelos: porModeloQ.data, fijos: [], fijosSinVerificarRpc: null });
+    // Solo las que de verdad NO apuntan su gasto. Las que lo apuntan pero llevan días sin usarse
+    // («mudas») no son un fallo: salían como «7 funciones de IA no registran su gasto» (17/11/2026)
+    // cuando solo estaban sin usar; en Costes ya salen como «Sin usar este mes».
+    return { sinRegistro: a.sinInstrumentar.length, modelosSinTarifa: a.modelosSinTarifa.length };
+  }, [sinRegistroQ.data, porModeloQ.data]);
+  const pendientes = useMemo(
+    () => pendientesServicios({
+      servicios: enUso, lecturas: porProveedor, renovaciones, resumen, sinLector, ia: avisosIa, costesPorMeter: porMeter, clavesSoloEnProduccion: CLAVES_SOLO_EN_PRODUCCION,
+      // Los límites que se pasarían pronto (pendientesDePlan) ya no se repiten aquí (17/11/2026, el
+      // dueño: «quita esos avisos, ya se ve claro»): la ficha del servicio va en ámbar con su % y el
+      // detalle (cuándo llegaría, qué pasaría) está en Costes › «Planes gratis».
+    }),
+    [enUso, porProveedor, renovaciones, resumen, sinLector, avisosIa, porMeter],
+  );
+  // Servicios en rojo, como el titular de Estado («1 servicio necesita atención»): antes contaba
+  // líneas de «Qué mirar» y un servicio con dos métricas al límite sumaba 2 (09/11/2026).
+  const urgentes = estadoGeneral.cuenta.rojo;
+  const ultima = useMemo(() => {
+    const fechas = (lecturas.data?.lecturas ?? []).map((l) => l.tomado_en).filter(Boolean).sort();
+    return fechas.length ? fechas[fechas.length - 1] : null;
+  }, [lecturas.data]);
+
+  const pedirActualizacion = async (servicio?: ServicioContratado) => {
+    setActualizando(servicio?.proveedor ?? "todos");
+    try {
+      const r = await actualizar.mutateAsync(servicio?.proveedor);
+      if (r.errorFuncion) toast.error(r.errorFuncion);
+      else toast.success(servicio ? `${servicio.nombre}: consumo actualizado` : "Consumo actualizado");
+    } catch {
+      toast.error("No se pudo actualizar el consumo.");
+    } finally {
+      setActualizando(null);
+    }
+  };
+
+  const irA = (d: DestinoPendiente) => {
+    cambiarPestana(d.pestana);
+    setFoco(d.pestana === "servicios" && d.proveedor ? d.proveedor : null);
+  };
+  const abrirServicio = (proveedor: string) => irA({ pestana: "servicios", proveedor });
+  const ponerPrecio = (proveedor: string) => {
+    const s = todos.find((x) => x.proveedor === proveedor);
+    if (s) setEditando(s);
+  };
+  const confirmarPrecio = (proveedor: string) => {
+    const s = todos.find((x) => x.proveedor === proveedor);
+    if (s) setConfirmando(s);
+  };
+  const meterCoste = (proveedor: string, mes: string) => {
+    const s = todos.find((x) => x.proveedor === proveedor);
+    if (!s) return;
+    const resumenMes = clienteConsultas.getQueryData<ResultadoResumenMes>([...CLAVE_RESUMEN_MES, mes]);
+    const fila = resumenMes?.disponible ? resumenMes.filas.find((f) => f.proveedor === proveedor) : undefined;
+    setCosteMes({
+      proveedor,
+      nombre: s.nombre,
+      mes,
+      meses: mesesElegibles.includes(mes) ? mesesElegibles : [mes, ...mesesElegibles],
+      moneda: s.moneda,
+      actual: fila?.manual_importe != null ? { importe: fila.manual_importe, moneda: fila.manual_moneda ?? "EUR", nota: fila.manual_nota } : null,
+    });
+  };
+  const anadir = () => setCreando(servicioNuevo(Math.max(0, ...todos.map((s) => s.orden ?? 0)) + 10));
+
+  // Cargando, error o sin migración: lo dicen las pestañas que dependen de los servicios.
+  let estado: ReactNode = null;
+  if (servicios.isLoading) {
+    estado = (
+      <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground" role="status">
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> Cargando los servicios…
+      </p>
+    );
+  } else if (servicios.isError) {
+    estado = (
+      <div role="alert" className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+        <p>No se pudieron cargar los servicios: {servicios.error instanceof Error ? servicios.error.message : "error desconocido"}.</p>
+        <Button type="button" variant="outline" className="h-11" onClick={() => void servicios.refetch()}>Reintentar</Button>
+      </div>
+    );
+  } else if (!disponible) {
+    estado = (
+      <p role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+        Falta aplicar en Supabase la migración de Servicios (20261103120000_servicios_contratados). Cuando esté, aquí saldrán los servicios.
+      </p>
+    );
+  }
+
+  return (
+    <SuperAdminLayout>
+      <div ref={setRaiz} data-testid="servicios" className="flex min-w-0 flex-col gap-3" style={alto ? { height: alto } : undefined}>
+        <header className="flex min-w-0 shrink-0 flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Server className="h-6 w-6 shrink-0 text-destructive sm:h-8 sm:w-8" aria-hidden="true" />
+            <h1 className="min-w-0 text-2xl font-bold text-foreground">Servicios</h1>
+          </div>
+          {disponible && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 gap-2"
+              onClick={() => void pedirActualizacion()}
+              disabled={actualizando !== null || lecturas.isLoading}
+              title={lecturas.isLoading ? "Leyendo el consumo…" : `Última lectura ${haceCuanto(ultima)}`}
+            >
+              <RefreshCw className={cn("h-4 w-4", actualizando === "todos" && "animate-spin")} aria-hidden="true" />
+              Actualizar
+            </Button>
+          )}
+        </header>
+
+        {lecturas.data?.errorFuncion && (
+          <p role="alert" className="flex shrink-0 items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>
+              {lecturas.data.errorFuncion}
+              {lecturas.data.lecturas.length > 0 ? " Se muestran las últimas lecturas guardadas." : ""}
+            </span>
+          </p>
+        )}
+
+        <Tabs value={pestana} onValueChange={(v) => cambiarPestana(v as Pestana)} className="flex min-h-0 flex-1 flex-col">
+          {/* Sin iconos en el móvil: así caben a 320 px sin hacer scroll. */}
+          <PestanasPagina
+            iconosSoloEscritorio
+            pestanas={[
+              { valor: "estado", etiqueta: "Estado", icono: <Activity />, contador: urgentes, tonoContador: "crema", etiquetaContador: `${urgentes} ${urgentes === 1 ? "urgente" : "urgentes"}` },
+              { valor: "servicios", etiqueta: "Servicios", icono: <Server />, contador: disponible ? enUso.length : undefined },
+              { valor: "costes", etiqueta: "Costes", icono: <Wallet />, contador: porMeter || undefined, tonoContador: "crema", etiquetaContador: `${porMeter} ${porMeter === 1 ? "coste por meter" : "costes por meter"}` },
+              { valor: "modelos", etiqueta: "Modelos", icono: <Bot /> },
+              { valor: "configurar", etiqueta: "Configurar", icono: <Settings2 /> },
+            ]}
+          />
+          <TabsContent value="estado" className={CONTENIDO_PESTANA}>
+            {estado ?? (
+              <PestanaEstado
+                estado={estadoGeneral}
+                resumen={resumen}
+                pendientes={pendientes}
+                ultima={ultima}
+                cargandoLecturas={lecturas.isLoading}
+                onAbrir={abrirServicio}
+                onIr={irA}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="servicios" className={CONTENIDO_PESTANA}>
+            {estado ?? (
+              <PestanaServicios
+                enUso={enUso}
+                quitados={quitados.length}
+                porProveedor={porProveedor}
+                sinLector={sinLector}
+                eurPorUsd={eurPorUsd}
+                cargando={lecturas.isLoading}
+                actualizando={actualizando}
+                onActualizar={(s) => void pedirActualizacion(s)}
+                onEditar={setEditando}
+                foco={foco}
+                onFocoHecho={quitarFoco}
+                onIrConfigurar={() => cambiarPestana("configurar")}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="costes" className={CONTENIDO_PESTANA}>
+            <PestanaCostes
+              resumen={estado ? null : resumen}
+              estadoServicios={estado}
+              eurPorUsd={eurPorUsd}
+              costesDisponibles={costes}
+              enUso={enUso}
+              faltantes={faltantes}
+              cargandoFaltantes={cargandoFaltantes}
+              costesMesDisponible={costesMesDisponible}
+              onPonerPrecio={ponerPrecio}
+              onMeterCoste={meterCoste}
+              anteriorEur={anteriorEur}
+              cargandoAnterior={!!resumenesQ[1]?.isLoading}
+              mesActual={mesActual}
+              textoMes={textoMes(mesActual)}
+              textoMesAnterior={textoMesCorto(mesPasado)}
+              avisosPlan={avisosDelPlan}
+              inventario={inventario}
+              sinLectura={sinLectura}
+              onConfirmarPrecio={confirmarPrecio}
+            />
+          </TabsContent>
+          <TabsContent value="modelos" className={CONTENIDO_PESTANA}>
+            {pestana === "modelos" && <PestanaModelos />}
+          </TabsContent>
+          <TabsContent value="configurar" className={CONTENIDO_PESTANA}>
+            <div className="flex min-w-0 flex-col gap-4 pb-2">
+              {estado ?? (
+                <PestanaConfigurar
+                  enUso={enUso}
+                  quitados={quitados}
+                  costes={costes}
+                  config={config.data ?? null}
+                  onEditar={setEditando}
+                  onAnadir={anadir}
+                />
+              )}
+              {/* Avisos por Telegram (20261126001000): no depende de la tabla de servicios. */}
+              {pestana === "configurar" && <TarjetaTelegram />}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+      <DialogoEditarServicio servicio={editando} onCerrar={() => setEditando(null)} costes={costes} inventario={inventarioDisponible} />
+      <DialogoCosteMes editando={costeMes} onCerrar={() => setCosteMes(null)} />
+      <DialogoConfirmarPrecio servicio={confirmando} onCerrar={() => setConfirmando(null)} costes={costes} inventario={inventarioDisponible} />
+      <DialogoEditarServicio servicio={creando} onCerrar={() => setCreando(null)} costes={costes} inventario={inventarioDisponible} nuevo existentes={todos.map((s) => s.proveedor)} />
+    </SuperAdminLayout>
+  );
+}

@@ -1,0 +1,172 @@
+import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PestanasPagina } from "../PestanasPagina";
+
+function montar(props: Partial<React.ComponentProps<typeof PestanasPagina>> = {}) {
+  return render(
+    <Tabs defaultValue="a">
+      <PestanasPagina
+        pestanas={[
+          { valor: "a", etiqueta: "Primera", icono: <svg data-testid="icono-a" />, contador: 12 },
+          { valor: "b", etiqueta: "Segunda", contador: 0 },
+          { valor: "c", etiqueta: "Tercera", contador: 3, tonoContador: "crema", contadorEnMovil: true, etiquetaContador: "3 en curso" },
+        ]}
+        {...props}
+      />
+      <TabsContent value="a">Contenido A</TabsContent>
+      <TabsContent value="b">Contenido B</TabsContent>
+    </Tabs>,
+  );
+}
+
+describe("PestanasPagina", () => {
+  it("pinta las pestañas, marca la activa rellena (Fase 3) y cambia de contenido", () => {
+    montar();
+    const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
+    expect(tabs.map((t) => t.textContent)).toEqual(["Primera12", "Segunda", "Tercera3"]);
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(tabs[0].className).toContain("data-[state=active]:bg-primary");
+    expect(screen.getByText("Contenido A")).toBeInTheDocument();
+    fireEvent.mouseDown(tabs[1], { button: 0 });
+    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Contenido B")).toBeInTheDocument();
+  });
+
+  it("mide 40 px con ratón y 44 px con dedo, sin barra de scroll", () => {
+    montar();
+    const tab = screen.getByRole("tab", { name: /^Primera/ });
+    expect(tab.className).toContain("h-10");
+    expect(tab.className).toContain("pointer-coarse:min-h-11");
+    expect(screen.getByRole("tablist").className).toContain("[&::-webkit-scrollbar]:hidden");
+  });
+
+  it("contador: solo si es mayor que 0, SIEMPRE visible (también en el móvil, Fase 3) y con nombre accesible", () => {
+    montar();
+    expect(screen.getByRole("tab", { name: /^Segunda$/ })).toBeInTheDocument(); // contador 0: no se pinta
+    expect(screen.getByText("12").className).not.toContain("hidden");
+    expect(screen.getByText("12").className).toContain("tabular-nums");
+    const c = screen.getByLabelText("3 en curso");
+    expect(c.className).not.toContain("hidden");
+    expect(c.className).toContain("text-marca-marino");
+  });
+
+  it("icono: se pinta dentro de la pestaña y es decorativo", () => {
+    montar();
+    const icono = screen.getByTestId("icono-a");
+    expect(screen.getByRole("tab", { name: /^Primera/ })).toContainElement(icono);
+    expect(icono.parentElement).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("acciones: van en la barra, a la derecha y fuera del tablist", () => {
+    montar({ acciones: <button>Nueva reserva</button> });
+    const boton = screen.getByRole("button", { name: "Nueva reserva" });
+    expect(within(screen.getByRole("tablist")).queryByRole("button")).not.toBeInTheDocument();
+    expect(boton.parentElement).toHaveClass("ml-auto", "shrink-0");
+    expect(boton.closest("[data-testid=pestanas-pagina]")).toBe(screen.getByRole("tablist").closest("[data-testid=pestanas-pagina]"));
+  });
+
+  it("sin acciones no pinta el hueco; la fila lleva la línea fina de abajo", () => {
+    montar();
+    const barra = screen.getByTestId("pestanas-pagina");
+    expect(barra).toHaveClass("border-b");
+    expect(barra.querySelector(".ml-auto")).toBeNull();
+  });
+
+  it("degradados: aparecen cuando las pestañas no caben y según el scroll", () => {
+    montar();
+    const lista = screen.getByRole("tablist");
+    expect(screen.queryByTestId("degradado-der")).not.toBeInTheDocument(); // jsdom: todo mide 0
+    Object.defineProperty(lista, "scrollWidth", { configurable: true, value: 500 });
+    Object.defineProperty(lista, "clientWidth", { configurable: true, value: 200 });
+    fireEvent.scroll(lista);
+    expect(screen.getByTestId("degradado-der")).toBeInTheDocument();
+    expect(screen.queryByTestId("degradado-izq")).not.toBeInTheDocument();
+    lista.scrollLeft = 300;
+    fireEvent.scroll(lista);
+    expect(screen.getByTestId("degradado-izq")).toBeInTheDocument();
+    expect(screen.queryByTestId("degradado-der")).not.toBeInTheDocument();
+  });
+
+  it("con accionesDebajoEnMovil las pestañas van arriba con su línea y los botones bajan a una fila a todo el ancho; desde sm, una sola fila (F-47)", () => {
+    montar({ acciones: <button type="button">Añadir</button>, accionesDebajoEnMovil: true });
+    const barra = screen.getByTestId("pestanas-pagina");
+    expect(barra.className).toContain("flex-wrap");
+    expect(barra.className).toContain("sm:flex-nowrap");
+    // La línea: bajo las pestañas en el móvil y bajo toda la barra desde sm.
+    expect(barra.className).toContain("border-b-0");
+    expect(barra.className).toContain("sm:border-b");
+    const envoltorioPestanas = screen.getByRole("tablist").parentElement!;
+    expect(envoltorioPestanas.className).toContain("basis-full");
+    expect(envoltorioPestanas.className).toContain("border-b");
+    expect(envoltorioPestanas.className).toContain("sm:border-b-0");
+    const acciones = screen.getByRole("button", { name: "Añadir" }).parentElement!;
+    expect(acciones.className).toContain("w-full");
+    expect(acciones.className).toContain("sm:w-auto");
+    expect(acciones.className).not.toContain("order-first");
+    // Los botones, DESPUÉS de las pestañas (orden visual = orden de lectura).
+    expect(envoltorioPestanas.compareDocumentPosition(acciones) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("con accionesDebajoEnMovil=\"xl\" los botones siguen en su propia fila hasta 1280 px (Gestor Web › Carta)", () => {
+    montar({ acciones: <button type="button">Añadir</button>, accionesDebajoEnMovil: "xl" });
+    const barra = screen.getByTestId("pestanas-pagina");
+    expect(barra.className).toContain("flex-wrap");
+    expect(barra.className).toContain("xl:flex-nowrap");
+    expect(barra.className).toContain("xl:border-b");
+    expect(barra.className).not.toContain("sm:flex-nowrap");
+    const envoltorioPestanas = screen.getByRole("tablist").parentElement!;
+    expect(envoltorioPestanas.className).toContain("sm:basis-full");
+    expect(envoltorioPestanas.className).toContain("xl:basis-auto");
+    const acciones = screen.getByRole("button", { name: "Añadir" }).parentElement!;
+    expect(acciones.className).toContain("w-full");
+    expect(acciones.className).toContain("xl:w-auto");
+    expect(acciones.className).not.toContain("sm:w-auto");
+  });
+
+  it("sin accionesDebajoEnMovil la barra es una sola fila", () => {
+    montar({ acciones: <button type="button">Añadir</button> });
+    const barra = screen.getByTestId("pestanas-pagina");
+    expect(barra.className).not.toContain("flex-wrap");
+    expect(barra.className).not.toContain("border-b-0");
+    expect(screen.getByRole("button", { name: "Añadir" }).parentElement!.className).not.toContain("w-full");
+  });
+
+  it("soloIconosEnMovil: en el móvil solo el icono (la etiqueta sigue siendo el nombre accesible) y un punto por contador", () => {
+    montar({ soloIconosEnMovil: true });
+    const primera = screen.getByRole("tab", { name: /^Primera/ });
+    expect(within(primera).getByText("Primera").className).toContain("sr-only sm:not-sr-only");
+    expect(primera).toHaveAttribute("title", "Primera");
+    expect(primera.className).toContain("min-w-11");
+    expect(screen.getByTestId("punto-a").className).toContain("sm:hidden");
+    // Sin icono, la etiqueta se ve igual que siempre.
+    expect(within(screen.getByRole("tab", { name: /^Segunda/ })).getByText("Segunda").className).not.toContain("sr-only");
+  });
+});
+
+describe("PestanasPagina · contadores grandes (Fase 3)", () => {
+  it("con separador de miles y en una píldora de ancho mínimo", async () => {
+    const { Tabs } = await import("@/components/ui/tabs");
+    render(
+      <Tabs value="a">
+        <PestanasPagina pestanas={[{ valor: "a", etiqueta: "Documentos", contador: 1903 }]} />
+      </Tabs>,
+    );
+    const c = screen.getByText("1.903");
+    expect(c).toHaveClass("min-w-5", "tabular-nums", "justify-center");
+  });
+});
+
+describe("PestanasPagina · segundo nivel (Fase 3)", () => {
+  it("nivel 2: píldoras claras como los chips, no la pestaña rellena", () => {
+    render(
+      <Tabs value="a">
+        <PestanasPagina nivel={2} pestanas={[{ valor: "a", etiqueta: "Platos", contador: 5 }, { valor: "b", etiqueta: "Vinos" }]} />
+      </Tabs>,
+    );
+    const tab = screen.getByRole("tab", { name: /Platos/ });
+    expect(tab.className).toContain("rounded-full");
+    expect(tab.className).not.toContain("data-[state=active]:bg-primary ");
+    expect(screen.getByText("5").className).not.toContain("group-data-[state=active]");
+  });
+});

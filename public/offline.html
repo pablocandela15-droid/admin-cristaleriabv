@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#062C4C" />
+    <title>Sin conexión · Cristalería Baix Vinalopó</title>
+    <!-- Página de respaldo del service worker (public/sw.js). Estática, sin
+         JavaScript ni datos de usuario; CSS en línea para no depender del build.
+         Colores del manual de marca: marfil, marino y crema. -->
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        padding: 24px; background: #fbf8ef; color: #0b1a2a;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        line-height: 1.55; -webkit-font-smoothing: antialiased;
+      }
+      main { width: 100%; max-width: 26rem; text-align: center; }
+      img { width: 88px; height: 88px; margin: 0 auto 20px; display: block; border-radius: 22px; }
+      h1 { margin: 0 0 10px; font-family: Lexend, Inter, Arial, sans-serif; font-size: 1.5rem; line-height: 1.25; font-weight: 600; color: #062c4c; }
+      p { margin: 0; font-size: 1rem; color: #56687a; }
+      .actions { margin-top: 24px; }
+      a.button {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 44px; padding: 0 24px; border-radius: 8px;
+        background: #062c4c; color: #ffffff; font-size: 1rem; font-weight: 600; text-decoration: none;
+      }
+      a.button:focus-visible { outline: 2px solid #062c4c; outline-offset: 3px; }
+      .firma { margin-top: 32px; font-size: 0.75rem; color: #56687a; letter-spacing: 0.04em; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/icon-192.png" alt="" />
+      <h1>Sin conexión</h1>
+      <p>No hemos podido cargar el panel. Comprueba la conexión a internet e inténtalo de nuevo.</p>
+      <div class="actions"><a class="button" href="/">Reintentar</a></div>
+      <p class="firma">Cristalería Baix Vinalopó · Panel de gestión</p>
+    </main>
+  </body>
+</html>

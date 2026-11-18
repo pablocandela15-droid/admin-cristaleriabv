@@ -1,0 +1,233 @@
+/**
+ * Lógica pura de los permisos por sección de la pantalla Usuarios
+ * (`src/components/usuarios/permisosSecciones.ts`), compartida por el diálogo
+ * «Permisos» (ListaUsuarios), el alta (InvitarUsuario) y los roles
+ * preconfigurados (ConfigurarRolesModal).
+ *
+ * Contexto (2026-10-01): hasta hoy las tres pantallas forzaban `can_edit: false`
+ * en cada cambio y al cargar, así que el permiso de EDICIÓN no se podía dar desde
+ * el panel y cualquier guardado borraba el que se hubiera puesto por SQL.
+ *
+ * Hoy el panel solo tiene dos secciones: «Dashboard» («Ver» y «Puede editar», la
+ * fila normal) y «Usuarios» (un solo interruptor, «Puede ver»).
+ */
+import { describe, it, expect } from "vitest";
+import {
+  AYUDA_EDICION,
+  NECESITA_VER,
+  SECCIONES_CONFIGURABLES,
+  SECCIONES_UN_INTERRUPTOR,
+  cambiarEditar,
+  cambiarVer,
+  interruptorUnico,
+  mismosPermisos,
+  permisosParaEditar,
+  rolAlGuardar,
+  rolSegunPermisos,
+  seccionesConPermisos,
+  sinEdicion,
+  type PermisoSeccion,
+} from "@/components/usuarios/permisosSecciones";
+
+const permiso = (section_key: string, can_view: boolean, can_edit: boolean): PermisoSeccion => ({
+  section_key,
+  can_view,
+  can_edit,
+});
+
+const de = (permisos: PermisoSeccion[], clave: string) => permisos.find((p) => p.section_key === clave);
+
+describe("SECCIONES_CONFIGURABLES", () => {
+  it("son todas las secciones del panel, «usuarios» incluida (configurable desde el 06/11/2026)", () => {
+    expect(SECCIONES_CONFIGURABLES.map((s) => [s.key, s.label])).toEqual([
+      ["dashboard", "Dashboard"],
+      ["usuarios", "Usuarios"],
+    ]);
+  });
+});
+
+describe("AYUDA_EDICION", () => {
+  it("tiene un texto para cada sección configurable (y ninguno de más)", () => {
+    expect(Object.keys(AYUDA_EDICION).sort()).toEqual(SECCIONES_CONFIGURABLES.map((s) => s.key).sort());
+    for (const seccion of SECCIONES_CONFIGURABLES) {
+      expect(AYUDA_EDICION[seccion.key], seccion.key).toEqual(expect.any(String));
+      expect(AYUDA_EDICION[seccion.key].length, seccion.key).toBeGreaterThan(10);
+    }
+  });
+
+  it("en Dashboard dice que «Editar» no hace nada: con «Ver» se entra", () => {
+    expect(AYUDA_EDICION.dashboard).toMatch(/sin efecto/);
+    expect(AYUDA_EDICION.dashboard).toMatch(/con «Ver» se entra/);
+  });
+
+  it("en Usuarios dice que solo se consulta: gestionar es del super admin", () => {
+    expect(AYUDA_EDICION.usuarios).toMatch(/consultar/);
+    expect(AYUDA_EDICION.usuarios).toMatch(/solo del super admin/);
+  });
+});
+
+describe("permisosParaEditar", () => {
+  it("conserva el can_edit real guardado (no lo fuerza a false)", () => {
+    expect(de(permisosParaEditar([permiso("dashboard", true, true)]), "dashboard")).toEqual(permiso("dashboard", true, true));
+    expect(de(permisosParaEditar([permiso("dashboard", true, false)]), "dashboard")).toEqual(permiso("dashboard", true, false));
+  });
+
+  it("devuelve todas las secciones configurables; las que faltan, sin ver ni editar", () => {
+    const permisos = permisosParaEditar([permiso("dashboard", true, true)]);
+
+    expect(permisos.map((p) => p.section_key)).toEqual(SECCIONES_CONFIGURABLES.map((s) => s.key));
+    expect(de(permisos, "usuarios")).toEqual(permiso("usuarios", false, false));
+    expect(permisosParaEditar([])).toEqual([permiso("dashboard", false, false), permiso("usuarios", false, false)]);
+  });
+
+  it("editar implica ver (una fila con solo can_edit se muestra con las dos)", () => {
+    const permisos = permisosParaEditar([permiso("dashboard", false, true)]);
+    expect(de(permisos, "dashboard")).toEqual(permiso("dashboard", true, true));
+  });
+
+  it("ignora secciones retiradas (las del panel de restaurante, «trabajadores»…)", () => {
+    const permisos = permisosParaEditar([
+      permiso("reservas", true, true),
+      permiso("facturas", true, true),
+      permiso("trabajadores", true, true),
+    ]);
+    expect(permisos.map((p) => p.section_key)).toEqual(["dashboard", "usuarios"]);
+    expect(permisos.every((p) => !p.can_view && !p.can_edit)).toBe(true);
+  });
+});
+
+describe("«Usuarios»: un solo interruptor («Puede ver», en can_view)", () => {
+  it("solo «Usuarios» lo tiene; Dashboard lleva «Ver» y «Puede editar»", () => {
+    expect(Object.keys(SECCIONES_UN_INTERRUPTOR)).toEqual(["usuarios"]);
+    expect(interruptorUnico("usuarios")).toBe("Puede ver");
+    expect(interruptorUnico("dashboard")).toBeNull();
+    expect(interruptorUnico("facturas_subida")).toBeNull();
+  });
+
+  it("lo guardado en can_view o en can_edit (por SQL) es «sí», y se guarda en can_view sin edición", () => {
+    expect(de(permisosParaEditar([permiso("usuarios", true, false)]), "usuarios")).toEqual(permiso("usuarios", true, false));
+    expect(de(permisosParaEditar([permiso("usuarios", false, true)]), "usuarios")).toEqual(permiso("usuarios", true, false));
+    expect(de(permisosParaEditar([permiso("usuarios", true, true)]), "usuarios")).toEqual(permiso("usuarios", true, false));
+  });
+
+  it("«Puede editar» no se activa nunca; «Ver» (= «Puede ver») sí, y va por libre del Dashboard", () => {
+    let permisos = cambiarVer(permisosParaEditar([]), "usuarios", true);
+    permisos = cambiarEditar(permisos, "usuarios", true);
+    expect(de(permisos, "usuarios")).toEqual(permiso("usuarios", true, false));
+    expect(de(permisos, "dashboard")).toEqual(permiso("dashboard", false, false));
+  });
+
+  it("en «Ver permisos» / «Mi cuenta» sale con su interruptor y su ayuda", () => {
+    const filas = seccionesConPermisos({ is_super_admin: false, role: "staff", permissions: [permiso("usuarios", true, false)] } as never);
+    expect(filas.find((f) => f.key === "usuarios")).toMatchObject({
+      label: "Usuarios", unInterruptor: "Puede ver", ver: true, editar: true, ayuda: `Puede ver: ${AYUDA_EDICION.usuarios}`,
+    });
+    expect(filas.find((f) => f.key === "dashboard")).toMatchObject({
+      ver: false, editar: false, ayuda: `Editar: ${AYUDA_EDICION.dashboard}`,
+    });
+    expect(filas.find((f) => f.key === "dashboard")?.unInterruptor).toBeUndefined();
+    const sa = seccionesConPermisos({ is_super_admin: true, role: "admin", permissions: [] } as never);
+    expect(sa.find((f) => f.key === "usuarios")).toMatchObject({ ver: true });
+    expect(sa.find((f) => f.key === "dashboard")).toMatchObject({ ver: true, editar: true });
+  });
+});
+
+describe("NECESITA_VER", () => {
+  it("hoy ninguna sección depende de otra: dar «Ver» en una no toca la otra", () => {
+    expect(NECESITA_VER).toEqual({});
+    const permisos = cambiarVer(permisosParaEditar([]), "usuarios", true);
+    expect(de(permisos, "dashboard")).toEqual(permiso("dashboard", false, false));
+  });
+});
+
+describe("cambiarVer", () => {
+  it("al quitar «Ver» se quita también «Puede editar»", () => {
+    const permisos = cambiarVer(permisosParaEditar([permiso("dashboard", true, true)]), "dashboard", false);
+    expect(de(permisos, "dashboard")).toEqual(permiso("dashboard", false, false));
+  });
+
+  it("al dar «Ver» no se concede la edición", () => {
+    const permisos = cambiarVer(permisosParaEditar([]), "dashboard", true);
+    expect(de(permisos, "dashboard")).toEqual(permiso("dashboard", true, false));
+  });
+
+  it("no toca el resto de secciones", () => {
+    const antes = permisosParaEditar([permiso("dashboard", true, true), permiso("usuarios", true, false)]);
+    const despues = cambiarVer(antes, "dashboard", false);
+    expect(de(despues, "usuarios")).toEqual(permiso("usuarios", true, false));
+  });
+});
+
+describe("cambiarEditar", () => {
+  it("concede la edición si la sección tiene «Ver»", () => {
+    const permisos = cambiarEditar(permisosParaEditar([permiso("dashboard", true, false)]), "dashboard", true);
+    expect(de(permisos, "dashboard")).toEqual(permiso("dashboard", true, true));
+  });
+
+  it("retira la edición y deja «Ver» como estaba", () => {
+    const permisos = cambiarEditar(permisosParaEditar([permiso("dashboard", true, true)]), "dashboard", false);
+    expect(de(permisos, "dashboard")).toEqual(permiso("dashboard", true, false));
+  });
+
+  it("no se puede activar sin «Ver»", () => {
+    const permisos = cambiarEditar(permisosParaEditar([]), "dashboard", true);
+    expect(de(permisos, "dashboard")).toEqual(permiso("dashboard", false, false));
+  });
+});
+
+describe("sinEdicion", () => {
+  it("quita la edición de todas las secciones sin tocar «Ver»", () => {
+    const permisos = sinEdicion(permisosParaEditar([permiso("dashboard", true, true), permiso("usuarios", true, false)]));
+    expect(de(permisos, "dashboard")).toEqual(permiso("dashboard", true, false));
+    expect(de(permisos, "usuarios")).toEqual(permiso("usuarios", true, false));
+  });
+});
+
+describe("mismosPermisos", () => {
+  it("compara ver Y editar de cada sección configurable", () => {
+    const a = permisosParaEditar([permiso("dashboard", true, true)]);
+    expect(mismosPermisos(a, permisosParaEditar([permiso("dashboard", true, true)]))).toBe(true);
+    expect(mismosPermisos(a, permisosParaEditar([permiso("dashboard", true, false)]))).toBe(false);
+    expect(mismosPermisos(a, permisosParaEditar([permiso("dashboard", true, true), permiso("usuarios", true, false)]))).toBe(false);
+    expect(mismosPermisos(a, permisosParaEditar([]))).toBe(false);
+  });
+
+  it("no distingue lo que no se gestiona aquí: secciones retiradas o «Puede editar» en Usuarios", () => {
+    expect(mismosPermisos([permiso("dashboard", true, false), permiso("reservas", true, true)], [permiso("dashboard", true, false)])).toBe(true);
+    expect(mismosPermisos([permiso("usuarios", true, true)], [permiso("usuarios", true, false)])).toBe(true);
+  });
+});
+
+describe("rol que sigue a los permisos (06/11/2026)", () => {
+  // Quien puede gestionar Usuarios es admin (la gestión del equipo exige ese rol en el panel). Dashboard no
+  // cuenta para el resto de la regla («Editar» no hace nada).
+  it("ve todas las secciones → admin (con o sin «Editar» en Dashboard)", () => {
+    expect(rolSegunPermisos(SECCIONES_CONFIGURABLES.map((s) => permiso(s.key, true, true)))).toBe("admin");
+    expect(rolSegunPermisos([permiso("dashboard", true, false), permiso("usuarios", true, false)])).toBe("admin");
+    // «Puede ver» de Usuarios guardado en can_edit (por SQL) cuenta igual.
+    expect(rolSegunPermisos([permiso("dashboard", true, false), permiso("usuarios", false, true)])).toBe("admin");
+  });
+
+  it("gestiona Usuarios → admin; edita en algo → manager; solo ve (o nada) → staff", () => {
+    expect(rolSegunPermisos([permiso("usuarios", true, false)])).toBe("admin");
+    expect(rolSegunPermisos([permiso("dashboard", true, true)])).toBe("manager");
+    expect(rolSegunPermisos([permiso("dashboard", true, false)])).toBe("staff");
+    expect(rolSegunPermisos([permiso("dashboard", true, false), permiso("usuarios", false, false)])).toBe("staff");
+    expect(rolSegunPermisos([])).toBe("staff");
+  });
+
+  it("las secciones retiradas no cuentan para el rol", () => {
+    expect(rolSegunPermisos([permiso("dashboard", true, false), permiso("reservas", true, true)])).toBe("staff");
+  });
+
+  it("con un rol preconfigurado elegido, su rol; a mano, el de un preconfigurado igual o el calculado", () => {
+    const presets = [{ id: "p1", base_role: "manager" as const, permissions: [permiso("dashboard", true, false)] }];
+    expect(rolAlGuardar([permiso("usuarios", true, false)], presets, "p1")).toBe("manager");
+    expect(rolAlGuardar([permiso("dashboard", true, false)], presets, null)).toBe("manager");
+    expect(rolAlGuardar([permiso("usuarios", true, false)], presets, null)).toBe("admin");
+    expect(rolAlGuardar([permiso("dashboard", true, true)], presets, null)).toBe("manager");
+    expect(rolAlGuardar([permiso("dashboard", true, false), permiso("usuarios", true, false)], presets, null)).toBe("admin");
+    // Un id que ya no existe se ignora: manda lo marcado.
+    expect(rolAlGuardar([permiso("dashboard", true, true)], presets, "p-borrado")).toBe("manager");
+  });
+});

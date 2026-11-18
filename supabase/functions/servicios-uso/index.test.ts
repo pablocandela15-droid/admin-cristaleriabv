@@ -1,0 +1,911 @@
+// servicios-uso: autorización (solo super admin), caché de 15 min, «falta
+// configurar la clave X» por proveedor, lectura de cada API (simulada: no sale
+// nada a Internet), coste variable del mes (IA, Stripe, GitHub, Vercel),
+// proveedores sin lector o que no se usan, y que ningún secreto llegue nunca
+// al navegador.
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { olvidarTokenDrive } from "../_shared/google-drive.ts";
+import {
+  CACHE_MS,
+  GITHUB_OWNER_POR_DEFECTO,
+  GITHUB_REPOS_POR_DEFECTO,
+  LECTORES,
+  VERCEL_TEAM_POR_DEFECTO,
+  aplicarLimites,
+  crearManejador,
+  metricasBd,
+  modoStripe,
+  ocultarSecretos,
+  refDeUrl,
+  resumirFacturacionVercel,
+  resumirSuscripcionesHostinger,
+  resumirUsoGithub,
+  resumirUsoVercel,
+  type LecturaGuardada,
+  type LecturaRespuesta,
+} from "./servicios.ts";
+
+const AHORA = new Date("2026-11-03T12:00:00Z");
+const SECRETOS = {
+  SERVICIOS_VERCEL_TOKEN: "vercel-token-supersecreto-123",
+  SERVICIOS_SUPABASE_TOKEN: "sbp_token-de-gestion-secreto-456",
+  SERVICIOS_GITHUB_TOKEN: "github_pat_secreto_789",
+  RESEND_API_KEY: "re_clave_resend_secreta_000",
+  STRIPE_SECRET_KEY: "sk_test_clave_stripe_secreta_111",
+  SERVICIOS_HOSTINGER_TOKEN: "hostinger-token-secreto-333",
+};
+/** Equipo de Vercel del panel: no es un secreto, pero no hay ninguno por defecto (sin él, la tarjeta lo pide). */
+const EQUIPO_VERCEL = "team_cristaleriabv_pruebas";
+const BASE_ENV: Record<string, string> = {
+  SUPABASE_URL: "https://sfonaclosuafvlhutkon.supabase.co",
+  SUPABASE_ANON_KEY: "anon-jwt-publico",
+  SUPABASE_SERVICE_ROLE_KEY: "service-role-secreta",
+  SERVICIOS_VERCEL_TEAM_ID: EQUIPO_VERCEL,
+};
+const USUARIOS: Record<string, { id: string; email: string; superadmin: boolean; admin?: boolean }> = {
+  "jwt-super": { id: "11111111-1111-4111-8111-111111111111", email: "dueno@cristaleriabv.test", superadmin: true },
+  "jwt-admin": { id: "22222222-2222-4222-8222-222222222222", email: "admin@cristaleriabv.test", superadmin: false, admin: true },
+  "jwt-staff": { id: "33333333-3333-4333-8333-333333333333", email: "staff@cristaleriabv.test", superadmin: false },
+};
+
+const LIMITES: Record<string, unknown> = {
+  vercel: { peticiones_cdn: { limite: 1000000, unidad: "peticiones" }, transferencia_rapida: { limite: 100, unidad: "GB" }, despliegues_24h: { limite: 100, unidad: "despliegues" } },
+  supabase: { bd_tamano: { limite: 500, unidad: "MB" }, almacenamiento: { limite: 1, unidad: "GB" }, usuarios_activos_mes: { limite: 50000, unidad: "usuarios" } },
+  github: { actions_computo: { limite: 12, unidad: "USD" }, almacenamiento_artefactos: { limite: 500, unidad: "MB" } },
+  resend: { correos_mes: { limite: 3000, unidad: "correos" }, correos_hoy: { limite: 100, unidad: "correos" }, contactos_marketing: { limite: 1000, unidad: "contactos" }, dominios: { limite: 3, unidad: "dominios" } },
+  stripe: {},
+  // El límite del gasto de IA lo pone la lectura (tope de Costes): sin «limite».
+  openai: { gasto_ia_mes: { unidad: "EUR", limite_desde: "Tope de gasto de IA de Super Admin › Costes" } },
+  hostinger: {},
+  // Sin lector (no hay API razonable): sale en sin_lector.
+  google: { consultas_ficha_resenas: { limite: 1000, unidad: "consultas" } },
+  loading: {},
+  // «No lo usamos»: ni se lee ni sale en sin_lector.
+  perplexity: {},
+};
+const NO_SE_USAN = new Set(["perplexity"]);
+const CON_LECTOR = ["github", "hostinger", "openai", "resend", "stripe", "supabase", "vercel"];
+const METRICAS_BD = {
+  bd_bytes: 50_632_371, storage_bytes: 120_083_232, storage_objetos: 501, usuarios_activos_mes: 2, usuarios_total: 9,
+  eur_por_usd: 0.9, eur_por_usd_bce: 0.893815, eur_por_usd_bce_fecha: "2026-10-26",
+  openai_usd_mes_real: 2.5, openai_ultimo_dia_real: "2026-11-02", ia_usd_mes_estimado: 0.5, ia_usd_estimado_sin_real: 0.4, tope_ia_mes_eur: 8,
+};
+
+type Estado = {
+  previas: LecturaGuardada[];
+  insertadas: LecturaGuardada[];
+  borrados: string[];
+  rpcs: string[];
+  errorServicios: { message: string; code?: string } | null;
+  errorInsert: { message: string } | null;
+  /** Simula una base sin la columna coste_variable (antes de 20261103160000). */
+  errorInsertColumna?: boolean;
+  errorMetricas: boolean;
+  metricasExtra: Record<string, unknown>;
+};
+let estado: Estado;
+
+function crearCliente(_url: string, _key: string) {
+  return {
+    auth: {
+      getUser: async (token: string) => {
+        const u = USUARIOS[token];
+        return u ? { data: { user: { id: u.id, email: u.email } }, error: null } : { data: { user: null }, error: { message: "invalid JWT" } };
+      },
+    },
+    rpc: async (fn: string, args: Record<string, unknown> = {}) => {
+      estado.rpcs.push(fn);
+      const u = Object.values(USUARIOS).find((x) => x.id === args._user_id);
+      if (fn === "is_super_admin") return { data: !!u?.superadmin, error: null };
+      if (fn === "is_admin") return { data: !!u?.admin, error: null };
+      if (fn === "servicios_uso_ultimas") return { data: estado.previas, error: null };
+      if (fn === "servicios_metricas_supabase") return estado.errorMetricas ? { data: null, error: { message: "no existe" } } : { data: { ...METRICAS_BD, ...estado.metricasExtra }, error: null };
+      return { data: null, error: { message: `rpc ${fn} no simulada` } };
+    },
+    from: (tabla: string) => ({
+      select: async () => (estado.errorServicios
+        ? { data: null, error: estado.errorServicios }
+        : { data: Object.entries(LIMITES).map(([proveedor, limites]) => ({ proveedor, limites, activo: !NO_SE_USAN.has(proveedor) })), error: null }),
+      insert: async (fila: LecturaGuardada) => {
+        if (tabla !== "servicios_uso") throw new Error(`insert en ${tabla}`);
+        if (estado.errorInsertColumna && "coste_variable" in fila) {
+          return { error: { message: "Could not find the 'coste_variable' column of 'servicios_uso' in the schema cache" } };
+        }
+        if (!estado.errorInsert) estado.insertadas.push(fila);
+        return { error: estado.errorInsert };
+      },
+      delete: () => ({ lt: async (_c: string, corte: string) => { estado.borrados.push(corte); return { error: null }; } }),
+    }),
+  };
+}
+
+// ─── fetch simulado ─────────────────────────────────────────────────────────
+type Ruta = (url: URL, init?: RequestInit) => Response | Promise<Response>;
+const resp = (cuerpo: unknown, status = 200, cabeceras: Record<string, string> = {}) =>
+  new Response(JSON.stringify(cuerpo), { status, headers: { "Content-Type": "application/json", ...cabeceras } });
+
+function fetchSimulado(rutas: Record<string, Ruta>) {
+  const llamadas: Array<{ url: URL; auth: string | null }> = [];
+  const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+    llamadas.push({ url, auth: new Headers(init?.headers).get("Authorization") });
+    const clave = url.host + url.pathname;
+    const ruta = rutas[clave];
+    if (!ruta) throw new Error(`ruta no simulada: ${clave}`);
+    return ruta(url, init);
+  });
+  return { fn: fn as unknown as typeof fetch, llamadas };
+}
+
+const USO_VERCEL = {
+  data: [
+    { timestamp: "2026-11-01T00:00:00Z", request_hit_count: 1000, request_miss_count: 500, bandwidth_outgoing_bytes: 2 * 1024 ** 3, bandwidth_incoming_bytes: 999, function_invocation_successful_count: 300, function_invocation_error_count: 2 },
+    { timestamp: "2026-11-02T00:00:00Z", request_hit_count: 2000, request_miss_count: 100, bandwidth_outgoing_bytes: 1024 ** 3, function_invocation_successful_count: 100 },
+  ],
+};
+const GITHUB_RESUMEN = {
+  usageItems: [
+    { product: "Actions", sku: "actions_linux", unitType: "minutes", pricePerUnit: 0.006, grossQuantity: 1000, grossAmount: 6, discountQuantity: 1000, discountAmount: 6, netQuantity: 0, netAmount: 0 },
+    { product: "Actions", sku: "actions_windows", unitType: "Minutes", pricePerUnit: 0.01, grossQuantity: 100, grossAmount: 1, netAmount: 1 },
+    { product: "Actions", sku: "actions_storage", unitType: "GigabyteHours", grossQuantity: 3.6, grossAmount: 0.001 },
+    { product: "Copilot", sku: "copilot", unitType: "requests", grossQuantity: 50, grossAmount: 2 },
+  ],
+};
+
+const SUSCRIPCIONES_HOSTINGER = [
+  { id: "s1", name: "Premium Web Hosting", status: "active", billing_period: 1, billing_period_unit: "year", currency_code: "EUR", total_price: 4788, renewal_price: 9588, is_auto_renewed: true, created_at: "2025-11-20T10:00:00Z", expires_at: "2026-11-20T10:00:00Z", next_billing_at: "2026-11-20T10:00:00Z" },
+  { id: "s2", name: ".es Domain", status: "active", billing_period: 1, billing_period_unit: "year", currency_code: "EUR", total_price: 999, renewal_price: 1199, is_auto_renewed: false, created_at: "2025-01-15T10:00:00Z", expires_at: "2027-01-15T10:00:00Z", next_billing_at: null },
+  { id: "s3", name: "Email Starter", status: "cancelled", billing_period: 1, billing_period_unit: "month", currency_code: "EUR", total_price: 100, renewal_price: 100, is_auto_renewed: false, created_at: "2025-01-15T10:00:00Z", expires_at: "2025-02-15T10:00:00Z", next_billing_at: null },
+];
+
+function rutasCompletas(extra: Partial<Record<string, Ruta>> = {}): Record<string, Ruta> {
+  return {
+    "api.vercel.com/v6/deployments": () => resp({ deployments: Array.from({ length: 12 }, (_, i) => ({ uid: `dpl_${i}` })) }),
+    "api.vercel.com/v2/usage": () => resp(USO_VERCEL),
+    "api.supabase.com/v1/projects/sfonaclosuafvlhutkon/analytics/endpoints/usage.api-counts": () =>
+      resp({ result: [{ timestamp: "2026-11-02T00:00:00", total_auth_requests: 10, total_realtime_requests: 5, total_rest_requests: 100, total_storage_requests: 85 }, { total_rest_requests: 800 }] }),
+    "api.supabase.com/v1/projects/sfonaclosuafvlhutkon/analytics/endpoints/logs": () => resp({ result: [{ invocaciones: 1959 }] }),
+    "api.github.com/users/oficiososia/settings/billing/usage/summary": () => resp(GITHUB_RESUMEN),
+    "api.github.com/user": () => resp({ login: "oficiososia", plan: { name: "free" } }),
+    "api.resend.com/domains": () => resp({ data: [{ id: "d1", name: "cristaleriabv.es", status: "verified" }] }, 200, { "x-resend-monthly-quota": "321", "x-resend-daily-quota": "17" }),
+    "api.stripe.com/v1/balance": () => resp({ available: [{ amount: 12345, currency: "eur" }], pending: [{ amount: 500, currency: "eur" }, { amount: 99, currency: "usd" }] }),
+    "api.stripe.com/v1/balance_transactions": (url) => url.searchParams.get("starting_after")
+      ? resp({ data: [{ id: "txn_3", type: "refund", amount: -1000, fee: 0, currency: "eur" }], has_more: false })
+      : resp({ data: [
+        { id: "txn_1", type: "charge", amount: 5000, fee: 100, currency: "eur" },
+        { id: "txn_2", type: "payment", amount: 2500, fee: 63, currency: "eur" },
+        { id: "txn_x", type: "charge", amount: 9999, fee: 9, currency: "usd" },
+      ], has_more: true }),
+    "developers.hostinger.com/api/billing/v1/subscriptions": () => resp(SUSCRIPCIONES_HOSTINGER),
+    "developers.hostinger.com/api/domains/v1/portfolio": () => resp([
+      { id: 1, domain: "otro-dominio.es", type: "domain", status: "active", created_at: "2025-01-01T00:00:00Z", expires_at: "2027-06-01T00:00:00Z" },
+      { id: 2, domain: "cristaleriabv.es", type: "domain", status: "active", created_at: "2024-01-01T00:00:00Z", expires_at: "2027-01-15T00:00:00Z" },
+      { id: 3, domain: null, type: "free_domain", status: "requested", created_at: "2025-01-01T00:00:00Z", expires_at: null },
+    ]),
+    ...extra,
+  } as Record<string, Ruta>;
+}
+
+function manejador(opciones: { env?: Record<string, string>; rutas?: Record<string, Ruta>; ahora?: Date } = {}) {
+  const env = { ...BASE_ENV, ...(opciones.env ?? {}) };
+  const f = fetchSimulado(opciones.rutas ?? rutasCompletas());
+  const h = crearManejador({ crearCliente, env: (n) => env[n], fetch: f.fn, ahora: () => opciones.ahora ?? AHORA });
+  return { h, llamadas: f.llamadas, env };
+}
+
+async function llamar(h: (r: Request) => Promise<Response>, token?: string, query = "", cuerpo?: unknown) {
+  const res = await h(new Request(`https://sfonaclosuafvlhutkon.supabase.co/functions/v1/servicios-uso${query}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+  }));
+  const texto = await res.text();
+  return { status: res.status, texto, cuerpo: texto ? JSON.parse(texto) : null };
+}
+const lectura = (cuerpo: { lecturas: LecturaRespuesta[] }, p: string) => cuerpo.lecturas.find((l) => l.proveedor === p)!;
+
+beforeEach(() => {
+  estado = { previas: [], insertadas: [], borrados: [], rpcs: [], errorServicios: null, errorInsert: null, errorMetricas: false, metricasExtra: {} };
+});
+
+describe("autorización", () => {
+  it.each([undefined, BASE_ENV.SUPABASE_ANON_KEY, "sb_publishable_x", BASE_ENV.SUPABASE_SERVICE_ROLE_KEY, "jwt-falso"])("token %s → 401 sin leer nada", async (token) => {
+    const { h, llamadas } = manejador({ env: SECRETOS });
+    expect((await llamar(h, token)).status).toBe(401);
+    expect(llamadas).toEqual([]);
+    expect(estado.insertadas).toEqual([]);
+  });
+  it.each(["jwt-staff", "jwt-admin"])("%s (no super admin) → 403 sin leer nada", async (token) => {
+    const { h, llamadas } = manejador({ env: SECRETOS });
+    const r = await llamar(h, token);
+    expect(r.status).toBe(403);
+    expect(llamadas).toEqual([]);
+    expect(estado.rpcs).not.toContain("servicios_uso_ultimas");
+  });
+  it("OPTIONS responde CORS y PUT → 405", async () => {
+    const { h } = manejador();
+    const op = await h(new Request("https://x.test/servicios-uso", { method: "OPTIONS" }));
+    expect(op.headers.get("Access-Control-Allow-Methods")).toContain("POST");
+    expect((await h(new Request("https://x.test/servicios-uso", { method: "PUT" }))).status).toBe(405);
+  });
+});
+
+describe("sin ningún secreto (como la demo)", () => {
+  it("cada proveedor dice qué clave falta y Supabase mide con la clave de servicio", async () => {
+    const { h, llamadas } = manejador();
+    const r = await llamar(h, "jwt-super");
+    expect(r.status).toBe(200);
+    expect(llamadas).toEqual([]); // ninguna API externa
+    expect(r.cuerpo.lecturas.map((l: LecturaRespuesta) => l.proveedor).sort()).toEqual(CON_LECTOR);
+    // Sin API razonable: se dice; lo que no se usa, ni se lee ni se nombra.
+    expect(r.cuerpo.sin_lector).toEqual(["google", "loading"]);
+    expect(estado.rpcs.filter((f) => f === "servicios_metricas_supabase")).toHaveLength(1); // una sola vez por petición
+    expect(lectura(r.cuerpo, "vercel")).toMatchObject({ error: "falta_secreto", secreto: "SERVICIOS_VERCEL_TOKEN", metricas: {}, coste_variable: null });
+    expect(lectura(r.cuerpo, "github")).toMatchObject({ error: "falta_secreto", secreto: "SERVICIOS_GITHUB_TOKEN" });
+    expect(lectura(r.cuerpo, "hostinger")).toMatchObject({ error: "falta_secreto", secreto: "SERVICIOS_HOSTINGER_TOKEN", metricas: {} });
+    // Stripe y Resend solo leen su API: sin clave, ni cifras ni coste (nada sale de nuestra base de datos).
+    expect(lectura(r.cuerpo, "stripe")).toMatchObject({ error: "falta_secreto", secreto: "STRIPE_SECRET_KEY", metricas: {}, coste_variable: null });
+    expect(lectura(r.cuerpo, "resend")).toMatchObject({ error: "falta_secreto", secreto: "RESEND_API_KEY", metricas: {}, coste_variable: null });
+    // OpenAI: todo de la base de datos, frente al tope de Costes (en euros).
+    const ia = lectura(r.cuerpo, "openai");
+    expect(ia.error).toBeNull();
+    expect(ia.metricas.gasto_ia_mes).toMatchObject({ valor: 2.61, unidad: "EUR", limite: 8, unidad_limite: "EUR" });
+    expect(ia.coste_variable).toMatchObject({ importe: 2.9, moneda: "USD" });
+    const supa = lectura(r.cuerpo, "supabase");
+    expect(supa.error).toBeNull();
+    expect(supa.metricas.bd_tamano).toMatchObject({ valor: 50_632_371, unidad: "bytes", limite: 500, unidad_limite: "MB" });
+    expect(supa.metricas.almacenamiento).toMatchObject({ valor: 120_083_232, limite: 1, unidad_limite: "GB" });
+    expect(supa.metricas.usuarios_activos_mes).toMatchObject({ valor: 2, limite: 50000 });
+    expect(supa.detalles.secreto_opcional).toBe("SERVICIOS_SUPABASE_TOKEN");
+    expect(estado.insertadas).toHaveLength(CON_LECTOR.length);
+    expect(estado.insertadas.find((f) => f.proveedor === "openai")?.coste_variable).toMatchObject({ importe: 2.9 });
+    expect(estado.borrados).toHaveLength(1); // limpieza del histórico (> 400 días)
+  });
+});
+
+describe("caché", () => {
+  const previa = (p: string, minutos: number): LecturaGuardada => ({
+    proveedor: p, tomado_en: new Date(AHORA.getTime() - minutos * 60_000).toISOString(), metricas: { x: { etiqueta: "x", valor: 1, unidad: "u" } }, error: null, detalles: {},
+  });
+  it("< 15 min: no llama a la API ni guarda; > 15 min: vuelve a leer", async () => {
+    estado.previas = [previa("vercel", 5), previa("github", 5), previa("stripe", 5), previa("resend", 5), previa("supabase", 20),
+      previa("openai", 5), previa("hostinger", 5)];
+    const { h, llamadas } = manejador({ env: SECRETOS });
+    const r = await llamar(h, "jwt-super");
+    expect(lectura(r.cuerpo, "vercel")).toMatchObject({ desde_cache: true, metricas: { x: { valor: 1 } } });
+    expect(lectura(r.cuerpo, "supabase").desde_cache).toBe(false);
+    expect(llamadas.every((l) => l.url.host === "api.supabase.com")).toBe(true);
+    expect(estado.insertadas.map((f) => f.proveedor)).toEqual(["supabase"]);
+  });
+  it("?forzar=1 (o { forzar: true }) vuelve a leer, pero nunca más de una vez por minuto", async () => {
+    estado.previas = [previa("vercel", 5), previa("github", 0.5)];
+    const { h, llamadas } = manejador({ env: SECRETOS });
+    const r = await llamar(h, "jwt-super", "?forzar=1");
+    expect(r.cuerpo.forzado).toBe(true);
+    expect(lectura(r.cuerpo, "vercel").desde_cache).toBe(false);
+    expect(lectura(r.cuerpo, "github").desde_cache).toBe(true);
+    expect(llamadas.some((l) => l.url.host === "api.github.com")).toBe(false);
+    estado.insertadas = [];
+    estado.previas = [previa("vercel", 5)];
+    const r2 = await llamar(manejador({ env: SECRETOS }).h, "jwt-super", "", { forzar: true });
+    expect(lectura(r2.cuerpo, "vercel").desde_cache).toBe(false);
+  });
+  it("{ forzar, proveedor } solo vuelve a leer ese proveedor; los demás, aunque viejos, salen de lo guardado", async () => {
+    estado.previas = [previa("vercel", 5), previa("github", 60), previa("stripe", 60), previa("resend", 60), previa("supabase", 60),
+      previa("openai", 60), previa("hostinger", 60)];
+    const { h, llamadas } = manejador({ env: SECRETOS });
+    const r = await llamar(h, "jwt-super", "", { forzar: true, proveedor: "vercel" });
+    expect(r.cuerpo.proveedor).toBe("vercel");
+    expect(r.cuerpo.lecturas.filter((l: LecturaRespuesta) => !l.desde_cache).map((l: LecturaRespuesta) => l.proveedor)).toEqual(["vercel"]);
+    expect(new Set(llamadas.map((l) => l.url.host))).toEqual(new Set(["api.vercel.com"]));
+    expect(estado.insertadas.map((f) => f.proveedor)).toEqual(["vercel"]);
+  });
+  it("la caché dura 15 minutos", () => expect(CACHE_MS).toBe(15 * 60_000));
+});
+
+describe("con todos los secretos", () => {
+  it("lee todas las APIs, pone los límites y nunca devuelve ni guarda un secreto", async () => {
+    const { h, llamadas } = manejador({ env: SECRETOS });
+    const r = await llamar(h, "jwt-super");
+    expect(r.status).toBe(200);
+    for (const valor of [...Object.values(SECRETOS), BASE_ENV.SUPABASE_SERVICE_ROLE_KEY]) {
+      expect(r.texto).not.toContain(valor);
+      expect(JSON.stringify(estado.insertadas)).not.toContain(valor);
+    }
+    // Cada API con su propia clave.
+    expect(llamadas.find((l) => l.url.host === "api.vercel.com")?.auth).toBe(`Bearer ${SECRETOS.SERVICIOS_VERCEL_TOKEN}`);
+    expect(llamadas.find((l) => l.url.host === "api.stripe.com")?.auth).toBe(`Bearer ${SECRETOS.STRIPE_SECRET_KEY}`);
+    expect(llamadas.find((l) => l.url.pathname.includes("/deployments"))?.url.searchParams.get("teamId")).toBe(EQUIPO_VERCEL);
+
+    const v = lectura(r.cuerpo, "vercel");
+    expect(v.error).toBeNull();
+    expect(v.metricas.peticiones_cdn).toMatchObject({ valor: 3600, limite: 1000000 });
+    expect(v.metricas.transferencia_rapida).toMatchObject({ valor: 3 * 1024 ** 3, unidad: "bytes", limite: 100, unidad_limite: "GB" });
+    expect(v.metricas.invocaciones_funciones).toMatchObject({ valor: 402 });
+    expect(v.metricas.despliegues_24h).toMatchObject({ valor: 12, limite: 100 });
+
+    const s = lectura(r.cuerpo, "supabase");
+    expect(s.metricas.peticiones_api_7d).toMatchObject({ valor: 1000, periodo: "últimos 7 días" });
+    expect(s.metricas.invocaciones_funciones_24h).toMatchObject({ valor: 1959 });
+    expect(s.detalles.secreto_opcional).toBeUndefined();
+    const logs = llamadas.find((l) => l.url.pathname.endsWith("/logs"))!;
+    expect(logs.url.searchParams.get("sql")).toContain("function_edge_logs");
+    expect(Date.parse(logs.url.searchParams.get("iso_timestamp_end")!) - Date.parse(logs.url.searchParams.get("iso_timestamp_start")!)).toBeLessThanOrEqual(86_400_000);
+
+    const g = lectura(r.cuerpo, "github");
+    expect(g.metricas.actions_computo).toMatchObject({ valor: 7, unidad: "USD", limite: 12 });
+    expect(g.metricas.actions_minutos).toMatchObject({ valor: 1100 });
+    // 3,6 GB·h repartidos en las 60 h que lleva el mes (1 nov 00:00 → 3 nov 12:00).
+    expect(g.metricas.almacenamiento_artefactos.valor).toBe(Math.round((3.6 / 60) * 1024 ** 3));
+    expect(g.detalles.plan_detectado).toBe("free");
+
+    const re = lectura(r.cuerpo, "resend");
+    expect(re.error).toBeNull();
+    expect(re.metricas.correos_mes).toMatchObject({ valor: 321, limite: 3000, nota: expect.stringContaining("Dato de Resend") });
+    expect(re.metricas.correos_hoy).toMatchObject({ valor: 17, limite: 100 });
+    expect(re.metricas.dominios).toMatchObject({ valor: 1, limite: 3 });
+    expect(re.detalles.plan_detectado).toBe("Free");
+
+    const st = lectura(r.cuerpo, "stripe");
+    expect(st.detalles).toMatchObject({ modo: "prueba", moneda: "EUR" });
+    expect(st.metricas.cobros_mes.valor).toBe(2);
+    expect(st.metricas.importe_cobrado_mes).toMatchObject({ valor: 75, unidad: "EUR" });
+    expect(st.metricas.comisiones_mes.valor).toBeCloseTo(1.63);
+    expect(st.metricas.saldo_disponible.valor).toBeCloseTo(123.45);
+    expect(st.metricas.saldo_pendiente.valor).toBe(5);
+    expect(st.metricas.importe_cobrado_mes.nota).toContain("10,00");
+    // Modo prueba: las comisiones no son dinero real.
+    expect(st.coste_variable).toMatchObject({ importe: 0, moneda: "EUR", origen: "api" });
+    // Solo las cifras de su API.
+    expect(Object.keys(st.metricas).sort()).toEqual(["cobros_mes", "comisiones_mes", "importe_cobrado_mes", "saldo_disponible", "saldo_pendiente"]);
+
+    // GitHub: lo que factura de verdad (netAmount) es el coste variable.
+    expect(g.coste_variable).toMatchObject({ importe: 1, moneda: "USD", origen: "api" });
+
+    // Hostinger: suscripciones activas, dominios con su caducidad y coste al mes de lo que se renueva.
+    const ho = lectura(r.cuerpo, "hostinger");
+    expect(ho.error).toBeNull();
+    expect(ho.metricas.suscripciones_activas.valor).toBe(2);
+    expect(ho.metricas.dominios).toMatchObject({ valor: 2, nota: expect.stringContaining("cristaleriabv.es, el 15/01/2027") });
+    expect(ho.detalles.plan_detectado).toBe("Premium Web Hosting, .es Domain");
+    expect(ho.detalles.coste_mensual_detectado).toEqual({ importe: 8.99, moneda: "EUR" });
+    expect((ho.detalles.dominios as unknown[]).length).toBe(2);
+    expect(llamadas.find((l) => l.url.host === "developers.hostinger.com")?.auth).toBe(`Bearer ${SECRETOS.SERVICIOS_HOSTINGER_TOKEN}`);
+  });
+
+  it("un secreto que la API devuelve en su mensaje de error no llega al navegador", async () => {
+    const eco = () => resp({ error: { message: `Invalid API Key provided: ${SECRETOS.STRIPE_SECRET_KEY}` } }, 401);
+    const { h } = manejador({ env: SECRETOS, rutas: rutasCompletas({ "api.stripe.com/v1/balance": eco }) });
+    const r = await llamar(h, "jwt-super");
+    expect(r.texto).not.toContain(SECRETOS.STRIPE_SECRET_KEY);
+    expect(lectura(r.cuerpo, "stripe")).toMatchObject({ error: "credencial_rechazada", detalles: { http: 401, modo: "prueba" } });
+  });
+
+  it("si una API falla, el resto sigue", async () => {
+    const { h } = manejador({
+      env: SECRETOS,
+      rutas: rutasCompletas({
+        "api.vercel.com/v6/deployments": () => resp({ error: { code: "forbidden" } }, 403),
+        "api.github.com/users/oficiososia/settings/billing/usage/summary": () => { throw new TypeError("network"); },
+        "developers.hostinger.com/api/billing/v1/subscriptions": () => resp({ message: "Unauthenticated." }, 401),
+      }),
+    });
+    const r = await llamar(h, "jwt-super");
+    expect(r.status).toBe(200);
+    expect(lectura(r.cuerpo, "vercel")).toMatchObject({ error: "credencial_rechazada", detalles: { http: 403 } });
+    expect(lectura(r.cuerpo, "github").error).toBe("error_interno");
+    expect(lectura(r.cuerpo, "stripe").error).toBeNull();
+    expect(lectura(r.cuerpo, "supabase").error).toBeNull();
+    expect(lectura(r.cuerpo, "hostinger")).toMatchObject({ error: "credencial_rechazada", detalles: { http: 401 } });
+  });
+});
+
+describe("lectores", () => {
+  const ctx = (env: Record<string, string>, rutas: Record<string, Ruta>) => ({
+    env: (n: string) => ({ ...BASE_ENV, ...env })[n], fetch: fetchSimulado(rutas).fn, ahora: AHORA,
+    admin: crearCliente("", "") as never, refProyecto: "sfonaclosuafvlhutkon",
+  });
+
+  it("Google Drive: espacio de la cuenta de Google del panel (secretos de Control Excel); sin ellos, qué falta; token rechazado", async () => {
+    olvidarTokenDrive();
+    const GOOGLE = { GOOGLE_CLIENT_ID: "cliente.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "secreto-google-444", GOOGLE_REFRESH_TOKEN: "1//refresco-555" };
+    const rutas = {
+      "oauth2.googleapis.com/token": () => resp({ access_token: "ya29.token-666", expires_in: 3600, scope: "https://www.googleapis.com/auth/drive.file" }),
+      "www.googleapis.com/drive/v3/about": (url: URL) => {
+        expect(url.searchParams.get("fields")).toBe("storageQuota");
+        return resp({ storageQuota: { limit: String(15 * 1024 ** 3), usage: String(3 * 1024 ** 3), usageInDrive: String(1024 ** 3), usageInDriveTrash: "1024" } });
+      },
+    };
+    const r = await LECTORES.google_drive(ctx(GOOGLE, rutas));
+    expect(r.error).toBeUndefined();
+    expect(r.metricas.almacenamiento).toMatchObject({ valor: 3 * 1024 ** 3, unidad: "bytes", limite: 15, unidad_limite: "GB" });
+    expect(r.metricas.en_drive).toMatchObject({ valor: 1024 ** 3 });
+    expect(r.metricas.papelera).toMatchObject({ valor: 1024 });
+    expect(r.detalles?.plan_detectado).toBe("15 GB de espacio");
+    expect(JSON.stringify(r)).not.toContain("ya29");
+
+    expect(await LECTORES.google_drive(ctx({}, {}))).toMatchObject({ error: "falta_secreto", detalles: { secreto: "GOOGLE_REFRESH_TOKEN" } });
+    expect(await LECTORES.google_drive(ctx({ ...GOOGLE, GOOGLE_CLIENT_SECRET: "  " }, {}))).toMatchObject({ error: "falta_secreto", detalles: { secreto: "GOOGLE_CLIENT_SECRET" } });
+
+    olvidarTokenDrive();
+    const rechazo = await LECTORES.google_drive(ctx(GOOGLE, { "oauth2.googleapis.com/token": () => resp({ error: "invalid_grant" }, 400) }));
+    expect(rechazo).toMatchObject({ error: "credencial_rechazada", metricas: {} });
+    olvidarTokenDrive();
+    const sinLimite = await LECTORES.google_drive(ctx(GOOGLE, { ...rutas, "www.googleapis.com/drive/v3/about": () => resp({ storageQuota: { usage: "10" } }) }));
+    expect(sinLimite.metricas.almacenamiento.limite).toBeUndefined();
+    expect(sinLimite.detalles?.avisos).toEqual([expect.stringMatching(/no tiene límite/)]);
+  });
+
+  it("Vercel: si la API da el almacenamiento de despliegues y funciones, salen como métricas (Hobby hoy no lo da)", async () => {
+    const conAlmacen = { data: USO_VERCEL.data.map((d, i) => ({ ...d, deployment_storage_bytes: 1000 + i, function_storage_bytes: 50 + i })) };
+    const r = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ "api.vercel.com/v2/usage": () => resp(conAlmacen) })));
+    expect(r.metricas.almacenamiento_despliegues).toMatchObject({ valor: 1001, unidad: "bytes", periodo: "ahora" });
+    expect(r.metricas.almacenamiento_funciones).toMatchObject({ valor: 51, unidad: "bytes" });
+    const sin = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas()));
+    expect(sin.metricas.almacenamiento_despliegues).toBeUndefined();
+  });
+
+  it("Vercel: formato de uso desconocido → aviso con las claves vistas, sin inventar cifras", async () => {
+    const r = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ "api.vercel.com/v2/usage": () => resp({ data: [{ cosa_rara: 5 }] }) })));
+    expect(r.error).toBeFalsy();
+    expect(r.metricas.peticiones_cdn).toBeUndefined();
+    expect(r.metricas.despliegues_24h.valor).toBe(12);
+    expect(r.detalles?.claves_uso).toEqual(["cosa_rara"]);
+    expect(String(r.detalles?.avisos)).toContain("formato");
+  });
+
+  it("Vercel: sin token pide SERVICIOS_VERCEL_TOKEN; con token y sin equipo, SERVICIOS_VERCEL_TEAM_ID (no hay equipo por defecto)", async () => {
+    expect(VERCEL_TEAM_POR_DEFECTO).toBe("");
+    const f = fetchSimulado(rutasCompletas());
+    const sinToken = await LECTORES.vercel({ ...ctx({}, {}), fetch: f.fn });
+    expect(sinToken).toMatchObject({ error: "falta_secreto", metricas: {}, detalles: { secreto: "SERVICIOS_VERCEL_TOKEN" } });
+    const sinEquipo = await LECTORES.vercel({ ...ctx({ ...SECRETOS, SERVICIOS_VERCEL_TEAM_ID: "  " }, {}), fetch: f.fn });
+    expect(sinEquipo).toMatchObject({ error: "falta_secreto", metricas: {}, detalles: { secreto: "SERVICIOS_VERCEL_TEAM_ID" } });
+    // Sin las dos cosas no se llama a Vercel.
+    expect(f.llamadas).toEqual([]);
+  });
+
+  it("Vercel: sin equipo, la petición entera también lo dice (y no llama a Vercel)", async () => {
+    const { h, llamadas } = manejador({ env: { ...SECRETOS, SERVICIOS_VERCEL_TEAM_ID: "" } });
+    const r = await llamar(h, "jwt-super");
+    expect(lectura(r.cuerpo, "vercel")).toMatchObject({ error: "falta_secreto", secreto: "SERVICIOS_VERCEL_TEAM_ID" });
+    expect(llamadas.some((l) => l.url.host === "api.vercel.com")).toBe(false);
+  });
+
+  it("Vercel: memoria de las funciones, reparto por proyecto, caché y compilaciones", async () => {
+    const dia = (fecha: string, hit: number, miss: number, reparto: Array<[string, number]>) => ({
+      date: fecha, request_hit_count: hit, request_miss_count: miss, bandwidth_outgoing_bytes: 1000,
+      function_invocation_successful_count: 5, function_execution_successful_gb_hours: 0.05, function_execution_error_gb_hours: 0.01,
+      breakdown: { requests: reparto.map(([name, percent]) => ({ name, percent, id: `prj_${name}` })) },
+    });
+    const rutas = rutasCompletas({
+      "api.vercel.com/v2/usage": (url) => url.searchParams.get("type") === "builds"
+        ? resp({ data: [{ date: "2026-11-01", build_completed_count: 40, build_failed_count: 2, build_build_seconds: 9000 }, { date: "2026-11-02", build_completed_count: 10, build_build_seconds: 1800 }] })
+        : resp({ data: [dia("2026-11-01", 800, 200, [["admin-cristaleriabv", 80], ["cristaleriabv", 20]]), dia("2026-11-02", 900, 100, [["cristaleriabv", 60], ["admin-cristaleriabv", 40]])] }),
+    });
+    const r = await LECTORES.vercel(ctx(SECRETOS, rutas));
+    expect(r.metricas.peticiones_cdn).toMatchObject({ valor: 2000, nota: "Por proyecto: admin 60 % · web 40 %. 85 % servidas desde la caché del CDN." });
+    expect(r.detalles).toMatchObject({ peticiones_por_proyecto: [{ proyecto: "admin-cristaleriabv", peticiones: 1200 }, { proyecto: "cristaleriabv", peticiones: 800 }], aciertos_cache: 85 });
+    expect(r.metricas.memoria_funciones).toMatchObject({ valor: 0.12, unidad: "GB-hora" });
+    expect(r.metricas.memoria_funciones.limite).toBeUndefined(); // en Pro no hay cupo: se paga por uso
+    expect(r.metricas.compilaciones_30d).toMatchObject({ valor: 52, nota: expect.stringMatching(/^2 fallidas · 3,0 h compilando/) });
+    // Si servicios_contratados tiene un límite, se aplica.
+    expect(aplicarLimites(r.metricas, { memoria_funciones: { limite: 1000, unidad: "GB-hora" } }).memoria_funciones.limite).toBe(1000);
+  });
+
+  it("Vercel Pro: uso del periodo de facturación frente a los 20 US$ incluidos, en qué se va y lo que se cobraría aparte", async () => {
+    const cargo = (servicio: string, usd: number, proyecto?: string, categoria = "Usage") =>
+      JSON.stringify({ BilledCost: 0, EffectiveCost: usd, ChargeCategory: categoria, ServiceName: servicio, Tags: proyecto ? { ProjectName: proyecto } : {} });
+    const jsonl = (lineas: string[]) => new Response(lineas.join("\n") + "\n", { status: 200, headers: { "Content-Type": "application/jsonl" } });
+    const inicio = Date.parse("2026-10-27T12:00:00Z"); // 7 días antes de AHORA; el periodo dura 28
+    const equipo = (plan: string) => () => resp({ id: "team_x", billing: { plan, period: { start: inicio, end: inicio + 28 * 86_400_000 } } });
+    const ruta = `api.vercel.com/v2/teams/${EQUIPO_VERCEL}`;
+    const rutas = (lineas: string[], plan = "pro") => rutasCompletas({
+      [ruta]: equipo(plan),
+      "api.vercel.com/v1/billing/charges": (url) => {
+        expect(url.searchParams.get("from")).toBe("2026-10-27T12:00:00.000Z");
+        // Un día más que «ahora»: Vercel solo da los días (08:00–08:00 UTC) que acaban antes de `to`.
+        expect(url.searchParams.get("to")).toBe(new Date(AHORA.getTime() + 86_400_000).toISOString());
+        return jsonl(lineas);
+      },
+    });
+
+    // 9 US$ en 7 días de 28: dentro de lo incluido, pero a este ritmo serán 36.
+    const r = await LECTORES.vercel(ctx(SECRETOS, rutas([
+      cargo("Pro", 4.67, undefined, "Purchase"), // la cuota no es uso
+      cargo("Build CPU Minutes", 5, "admin-cristaleriabv"), cargo("Build CPU Minutes", 2.5, "cristaleriabv"),
+      cargo("Function Storage", 1.5), cargo("CDN Requests", 0.001, "cristaleriabv"), cargo("Blob", 0), "línea rota {",
+    ])));
+    expect(r.error).toBeFalsy();
+    expect(r.metricas.uso_periodo).toMatchObject({ valor: 9, unidad: "USD", limite: 20, periodo: "periodo de facturación (del 27/10/2026 al 24/11/2026)" });
+    expect(r.metricas.uso_periodo.nota).toContain("En qué se va: compilaciones 7,50 US$ · almacenamiento de funciones 1,50 US$.");
+    expect(r.metricas.uso_periodo.nota).toContain("Por proyecto: admin 5,00 US$ · web 2,50 US$.");
+    expect(r.metricas.uso_periodo.nota).toContain("A este ritmo, 36,00 US$ al acabar el periodo.");
+    expect(r.coste_variable).toMatchObject({ importe: 0, moneda: "USD", origen: "api" });
+    expect(r.detalles).toMatchObject({ plan_detectado: "Pro", facturacion: { uso_usd: 9.001, previsto_usd: 36 } });
+    expect(String(r.detalles?.avisos)).toMatch(/36,00 US\$ en el periodo: unos 16,00 US\$ más/);
+
+    // Ya por encima: lo que pasa de 20 es el gasto variable del mes.
+    const pasado = await LECTORES.vercel(ctx(SECRETOS, rutas([cargo("Build CPU Minutes", 27.5)])));
+    expect(pasado.coste_variable?.importe).toBe(7.5);
+    expect(pasado.detalles?.avisos).toBeUndefined();
+
+    // A menos de un día del final del periodo, `to` no pasa del final.
+    const finCerca = AHORA.getTime() + 3_600_000;
+    let pedidoHasta = "";
+    await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({
+      [ruta]: () => resp({ billing: { plan: "pro", period: { start: inicio, end: finCerca } } }),
+      "api.vercel.com/v1/billing/charges": (url) => { pedidoHasta = url.searchParams.get("to") ?? ""; return jsonl([cargo("Build CPU Minutes", 1)]); },
+    })));
+    expect(pedidoHasta).toBe(new Date(finCerca).toISOString());
+
+    // Hobby: no se pide la facturación. Token sin permiso o formato nuevo: aviso, y el resto sigue.
+    const hobby = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ [ruta]: equipo("hobby") })));
+    expect(hobby.metricas.uso_periodo).toBeUndefined();
+    expect(hobby.coste_variable).toBeUndefined();
+    const sinPermiso = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ [ruta]: equipo("pro"), "api.vercel.com/v1/billing/charges": () => resp({ error: {} }, 403) })));
+    expect(sinPermiso.metricas.uso_periodo).toBeUndefined();
+    expect(sinPermiso.metricas.peticiones_cdn.valor).toBe(3600);
+    expect(String(sinPermiso.detalles?.avisos)).toMatch(/no tiene permiso para leer la facturación/);
+    const raro = await LECTORES.vercel(ctx(SECRETOS, rutas(["nada"])));
+    expect(String(raro.detalles?.avisos)).toMatch(/formato de su facturación/);
+  });
+
+  it("resumirFacturacionVercel: líneas JSON o { data: [...] }; solo el uso con coste", () => {
+    expect(resumirFacturacionVercel("")).toBeNull();
+    const r = resumirFacturacionVercel(JSON.stringify({ data: [
+      { ChargeCategory: "Usage", EffectiveCost: 1.25, BilledCost: 0.5, ServiceName: "A" },
+      { ChargeCategory: "Usage", EffectiveCost: 0.75, ServiceName: "B", Tags: { ProjectName: "cristaleriabv" } },
+      { ChargeCategory: "Purchase", EffectiveCost: 20, ServiceName: "Pro" },
+    ] }));
+    expect(r).toMatchObject({ usoUsd: 2, facturadoUsd: 0.5, filas: 3, porServicio: [{ servicio: "A", usd: 1.25 }, { servicio: "B", usd: 0.75 }], porProyecto: [{ proyecto: "cristaleriabv", usd: 0.75 }] });
+  });
+
+  it("Vercel: equipo configurable", async () => {
+    const rutas = rutasCompletas();
+    const f = fetchSimulado(rutas);
+    await LECTORES.vercel({ ...ctx({ ...SECRETOS, SERVICIOS_VERCEL_TEAM_ID: "team_otro" }, rutas), fetch: f.fn });
+    expect(f.llamadas.every((l) => l.url.searchParams.get("teamId") === "team_otro")).toBe(true);
+  });
+
+  it("GitHub: sin el resumen (404) usa el informe detallado; sin permiso → credencial_rechazada", async () => {
+    const r = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
+      "api.github.com/users/oficiososia/settings/billing/usage/summary": () => resp({ message: "Not Found" }, 404),
+      "api.github.com/users/oficiososia/settings/billing/usage": () => resp({ usageItems: [{ product: "actions", unitType: "Minutes", quantity: 50, pricePerUnit: 0.006 }] }),
+    })));
+    expect(r.metricas.actions_computo.valor).toBe(0.3);
+    const sinPermiso = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
+      "api.github.com/users/oficiososia/settings/billing/usage/summary": () => resp({ message: "Resource not accessible" }, 403),
+    })));
+    expect(sinPermiso).toMatchObject({ error: "credencial_rechazada", detalles: { permiso_necesario: "Plan (lectura)" } });
+  });
+
+  // 06/11/2026: minutos, ejecuciones y bloqueo de GitHub Actions (el caso real de noviembre: todo
+  // terminaba en 2–4 s sin arrancar, también la copia de seguridad).
+  const ejecucion = (creada: string, segundos: number, conclusion: string | null = "success", status = "completed") => {
+    const inicio = new Date(creada).getTime();
+    return { created_at: creada, run_started_at: creada, updated_at: new Date(inicio + segundos * 1000).toISOString(), status, conclusion };
+  };
+  const rutasEjecuciones = (porRepo: Record<string, unknown[]>) => Object.fromEntries(Object.entries(porRepo).map(([repo, runs]) => [
+    `api.github.com/repos/oficiososia/${repo}/actions/runs`,
+    () => resp({ total_count: runs.length, workflow_runs: runs }),
+  ]));
+
+  it("GitHub: por defecto, la cuenta oficiososia y sus dos repos; se puede cambiar con SERVICIOS_GITHUB_OWNER y SERVICIOS_GITHUB_REPOS", async () => {
+    expect(GITHUB_OWNER_POR_DEFECTO).toBe("oficiososia");
+    expect(GITHUB_REPOS_POR_DEFECTO).toEqual(["cristaleriabv", "admin-cristaleriabv"]);
+    const f = fetchSimulado(rutasCompletas());
+    await LECTORES.github({ ...ctx(SECRETOS, {}), fetch: f.fn });
+    const runs = (ll: typeof f.llamadas) => ll.filter((l) => l.url.pathname.endsWith("/actions/runs")).map((l) => l.url.pathname);
+    expect(runs(f.llamadas)).toEqual(["/repos/oficiososia/cristaleriabv/actions/runs", "/repos/oficiososia/admin-cristaleriabv/actions/runs"]);
+    const otro = fetchSimulado({ "api.github.com/users/otra-org/settings/billing/usage/summary": () => resp({ message: "Not Found" }, 404) });
+    await LECTORES.github({ ...ctx({ ...SECRETOS, SERVICIOS_GITHUB_OWNER: "otra-org", SERVICIOS_GITHUB_REPOS: " uno , dos " }, {}), fetch: otro.fn });
+    expect(runs(otro.llamadas)).toEqual(["/repos/otra-org/uno/actions/runs", "/repos/otra-org/dos/actions/runs"]);
+    expect(otro.llamadas.some((l) => l.url.pathname === "/users/otra-org/settings/billing/usage/summary")).toBe(true);
+  });
+
+  it("GitHub: avisa cuando las ejecuciones no arrancan y cuenta las del mes por repositorio", async () => {
+    const f = fetchSimulado(rutasCompletas(rutasEjecuciones({
+      "cristaleriabv": [ejecucion("2026-11-03T10:00:00Z", 3, "failure"), ejecucion("2026-11-02T19:52:00Z", 1300, "failure"), ejecucion("2026-11-02T10:00:00Z", 600)],
+      "admin-cristaleriabv": [ejecucion("2026-11-03T11:00:00Z", 2, "failure"), ejecucion("2026-11-03T09:00:00Z", 4, "failure"), ejecucion("2026-11-03T11:30:00Z", 0, null, "in_progress")],
+    })));
+    const r = await LECTORES.github({ ...ctx(SECRETOS, {}), fetch: f.fn });
+    expect(r.error).toBeFalsy();
+    // El repo de la web se llama «cristaleriabv»: sin el sufijo queda vacío y sale como «web».
+    expect(r.metricas.actions_ejecuciones).toMatchObject({ valor: 6, nota: "web 3 · admin 3" });
+    expect(r.metricas.actions_sin_arrancar).toMatchObject({ valor: 3 });
+    // Con el informe de facturación, los minutos son los de GitHub (1100), no la estimación.
+    expect(r.metricas.actions_minutos).toMatchObject({ valor: 1100, nota: "Dato de GitHub." });
+    expect(r.detalles).toMatchObject({
+      bloqueado_desde: "2026-11-03T09:00:00Z",
+      ultima_ejecucion_que_arranco: "2026-11-02T19:52:00Z",
+      repos: ["cristaleriabv", "admin-cristaleriabv"],
+    });
+    expect((r.detalles!.avisos as string[])[0]).toMatch(/GitHub no arranca las pruebas automáticas desde el 0?3\/11,? 10:00: las últimas 3 ejecuciones/);
+    const runs = f.llamadas.find((l) => l.url.pathname.endsWith("/oficiososia/cristaleriabv/actions/runs"))!;
+    expect(runs.url.searchParams.get("created")).toBe(">=2026-11-01");
+  });
+
+  it("GitHub: sin permiso «Plan» estima los minutos con las ejecuciones; sin nada → credencial_rechazada", async () => {
+    const r = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
+      "api.github.com/users/oficiososia/settings/billing/usage/summary": () => resp({ message: "Resource not accessible" }, 403),
+      ...rutasEjecuciones({
+        "cristaleriabv": [ejecucion("2026-11-02T10:00:00Z", 601), ejecucion("2026-11-02T09:00:00Z", 59, "failure")],
+        "admin-cristaleriabv": [ejecucion("2026-11-02T08:00:00Z", 120)],
+      }),
+    })));
+    expect(r.error).toBeFalsy();
+    // 601 s → 11 min, 59 s → 1 min, 120 s → 2 min (minutos empezados, como factura GitHub).
+    expect(r.metricas.actions_minutos).toMatchObject({ valor: 14, nota: expect.stringContaining("Estimación") });
+    expect(r.metricas.actions_computo).toBeUndefined();
+    expect(r.detalles!.permiso_faltante).toMatch(/Plan/);
+    expect(r.detalles!.avisos).toBeUndefined();
+  });
+
+  // 09/11/2026: la web y el admin son públicos. GitHub no cobra sus minutos ni los cuenta en los
+  // 2.000 incluidos, pero el informe los suma: la tarjeta marcaba un «157 %» rojo que no lo era.
+  const reposPublicos = (visibles: Record<string, boolean>) => Object.fromEntries(Object.entries(visibles).map(([repo, publico]) => [
+    `api.github.com/repos/oficiososia/${repo}`,
+    () => resp({ name: repo, private: !publico, visibility: publico ? "public" : "private" }),
+  ]));
+
+  it("GitHub: los minutos de repositorios públicos no cuentan para el límite (informe detallado)", async () => {
+    const f = fetchSimulado(rutasCompletas({
+      ...reposPublicos({ "cristaleriabv": true, "admin-cristaleriabv": true }),
+      "api.github.com/users/oficiososia/settings/billing/usage": () => resp({ usageItems: [
+        { date: "2026-11-02", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 2000, pricePerUnit: 0.006, grossAmount: 12, discountAmount: 12, netAmount: 0, repositoryName: "oficiososia/admin-cristaleriabv" },
+        { date: "2026-11-03", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 1148, pricePerUnit: 0.006, grossAmount: 6.888, discountAmount: 6.888, netAmount: 0, repositoryName: "oficiososia/cristaleriabv" },
+        { date: "2026-11-03", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 30, pricePerUnit: 0.006, grossAmount: 0.18, discountAmount: 0.18, netAmount: 0, repositoryName: "oficiososia/becarios" },
+      ] }),
+    }));
+    const r = await LECTORES.github({ ...ctx(SECRETOS, {}), fetch: f.fn });
+    expect(r.error).toBeFalsy();
+    expect(r.metricas.actions_minutos).toMatchObject({ valor: 30, etiqueta: "Minutos de Actions en repositorios privados", nota: expect.stringContaining("Los repositorios públicos (web, admin) no cuentan") });
+    expect(r.metricas.actions_minutos_publicos).toMatchObject({ valor: 3148, unidad: "minutos" });
+    expect(r.metricas.actions_computo).toMatchObject({ valor: 0.18, unidad: "USD", nota: expect.stringContaining("3178 minutos este mes (19,07 US$") });
+    expect(r.detalles!.repos_publicos).toEqual(["cristaleriabv", "admin-cristaleriabv"]);
+    expect(r.coste_variable).toMatchObject({ importe: 0 });
+    // Con el informe detallado no hace falta el resumen.
+    expect(f.llamadas.some((l) => l.url.pathname.endsWith("/usage/summary"))).toBe(false);
+    // Frente a los 2.000 minutos del plan: 30 (1,5 %), no 3.178 (159 %).
+    const conLimite = aplicarLimites(r.metricas, { actions_minutos: { limite: 2000, unidad: "minutos" } });
+    expect(conLimite.actions_minutos).toMatchObject({ valor: 30, limite: 2000 });
+  });
+
+  it("GitHub: solo con el resumen y repositorios públicos, los privados se estiman con sus ejecuciones", async () => {
+    const r = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
+      ...reposPublicos({ "cristaleriabv": true, "admin-cristaleriabv": false }),
+      ...rutasEjecuciones({
+        "cristaleriabv": [ejecucion("2026-11-02T10:00:00Z", 6000)],
+        "admin-cristaleriabv": [ejecucion("2026-11-02T09:00:00Z", 120)],
+      }),
+    })));
+    expect(r.metricas.actions_minutos).toMatchObject({ valor: 2, nota: expect.stringContaining("Estimación") });
+    expect(r.metricas.actions_minutos_publicos).toMatchObject({ valor: 1098 });
+    expect(r.metricas.actions_computo.valor).toBeCloseTo((7 / 1100) * 2, 2);
+  });
+
+  it("GitHub: sin acceso a un repositorio lo dice", async () => {
+    const r = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
+      ...rutasEjecuciones({ "cristaleriabv": [ejecucion("2026-11-02T10:00:00Z", 60)] }),
+      "api.github.com/repos/oficiososia/admin-cristaleriabv/actions/runs": () => resp({ message: "Not Found" }, 404),
+    })));
+    expect(r.detalles!.repos).toEqual(["cristaleriabv"]);
+    expect((r.detalles!.avisos as string[]).join(" ")).toMatch(/admin-cristaleriabv.*«Actions» \(lectura\)/);
+  });
+
+  it("Resend: clave solo de envío (401 restricted_api_key) aprovecha las cabeceras de cuota", async () => {
+    const r = await LECTORES.resend(ctx(SECRETOS, rutasCompletas({
+      "api.resend.com/domains": () => resp({ name: "restricted_api_key", message: "This API key is restricted" }, 401, { "x-resend-monthly-quota": "40" }),
+    })));
+    expect(r.error).toBeFalsy();
+    expect(r.metricas.correos_mes.valor).toBe(40);
+    expect(r.metricas.correos_hoy).toBeUndefined(); // sin tope diario = plan de pago
+    expect(String(r.detalles?.avisos)).toContain("solo permite enviar");
+  });
+
+  it("Resend: sin cabeceras de cuota, los dominios y un aviso para mirarlo en su panel (nada estimado con nuestras tablas)", async () => {
+    const r = await LECTORES.resend(ctx(SECRETOS, rutasCompletas({ "api.resend.com/domains": () => resp({ data: [] }) })));
+    expect(r.error).toBeFalsy();
+    expect(r.metricas.correos_mes).toBeUndefined();
+    expect(r.metricas.correos_hoy).toBeUndefined();
+    expect(r.metricas.dominios.valor).toBe(0);
+    expect(String(r.detalles?.avisos)).toContain("míralo en su panel");
+    expect(estado.rpcs).not.toContain("servicios_metricas_supabase");
+  });
+
+  it("Resend: clave inválida → credencial_rechazada, sin cifras", async () => {
+    const r = await LECTORES.resend(ctx(SECRETOS, rutasCompletas({ "api.resend.com/domains": () => resp({ name: "validation_error" }, 401) })));
+    expect(r).toMatchObject({ error: "credencial_rechazada", metricas: {}, detalles: { http: 401 } });
+  });
+
+  it("Resend: sin contadores ni dominios (clave solo de envío sin cuota, o error de Resend) → error_api con el motivo", async () => {
+    const restringida = await LECTORES.resend(ctx(SECRETOS, rutasCompletas({
+      "api.resend.com/domains": () => resp({ name: "restricted_api_key", message: "This API key is restricted" }, 401),
+    })));
+    expect(restringida).toMatchObject({ error: "error_api", metricas: {} });
+    expect(String(restringida.detalles?.avisos)).toContain("solo permite enviar");
+    const caida = await LECTORES.resend(ctx(SECRETOS, rutasCompletas({ "api.resend.com/domains": () => resp({}, 500) })));
+    expect(caida).toMatchObject({ error: "error_api", metricas: {} });
+    expect(String(caida.detalles?.avisos)).toContain("Resend respondió 500");
+  });
+
+  it("Supabase: token sin permiso → aviso, pero las métricas de la BD siguen", async () => {
+    const r = await LECTORES.supabase(ctx(SECRETOS, rutasCompletas({
+      "api.supabase.com/v1/projects/sfonaclosuafvlhutkon/analytics/endpoints/usage.api-counts": () => resp({ message: "Forbidden" }, 403),
+      "api.supabase.com/v1/projects/sfonaclosuafvlhutkon/analytics/endpoints/logs": () => resp({ message: "Forbidden" }, 403),
+    })));
+    expect(r.error).toBeFalsy();
+    expect(r.metricas.bd_tamano.valor).toBe(50_632_371);
+    expect(r.detalles?.token_rechazado).toBe(true);
+  });
+
+  it("Supabase: sin la migración y sin token → error_api", async () => {
+    estado.errorMetricas = true;
+    const r = await LECTORES.supabase(ctx({}, {}));
+    expect(r.error).toBe("error_api");
+  });
+
+  it("OpenAI: sin coste real reciente avisa; sin ningún real, todo es estimado; sin tablas → error_api", async () => {
+    estado.metricasExtra = { openai_ultimo_dia_real: "2026-10-22" };
+    const r = await LECTORES.openai(ctx({}, {}));
+    expect(String(r.detalles?.avisos)).toContain("desde el 22/10/2026");
+    estado.metricasExtra = { openai_usd_mes_real: null, openai_ultimo_dia_real: null, ia_usd_mes_estimado: 0.5 };
+    const sinReal = await LECTORES.openai(ctx({}, {}));
+    expect(sinReal.metricas.gasto_estimado_usd.valor).toBe(0.5);
+    expect(sinReal.coste_variable).toMatchObject({ importe: 0.5, origen: "estimado" });
+    expect(String(sinReal.detalles?.avisos)).toContain("ningún coste real");
+    estado.metricasExtra = { openai_usd_mes_real: undefined, ia_usd_mes_estimado: undefined };
+    expect((await LECTORES.openai(ctx({}, {}))).error).toBe("error_api");
+  });
+
+  it("Hostinger: sin el portfolio de dominios sigue con las suscripciones", async () => {
+    const r = await LECTORES.hostinger(ctx(SECRETOS, rutasCompletas({ "developers.hostinger.com/api/domains/v1/portfolio": () => resp({}, 500) })));
+    expect(r.error).toBeFalsy();
+    expect(r.metricas.suscripciones_activas.valor).toBe(2);
+    expect(r.metricas.dominios).toBeUndefined();
+    expect(String(r.detalles?.avisos)).toContain("500");
+  });
+
+  it("Supabase: conexiones y tablas que más ocupan (RPC nueva), crecimiento de la BD y peticiones por tipo", async () => {
+    const c = ctx(SECRETOS, rutasCompletas());
+    const rpcBase = c.admin.rpc;
+    // Lecturas guardadas de Supabase (servicios_uso), de la más reciente a la más antigua.
+    const guardadas = [
+      { tomado_en: "2026-10-30T12:00:00Z", metricas: { bd_tamano: { valor: 40_000_000 } } },
+      { tomado_en: "2026-10-27T12:00:00Z", metricas: { bd_tamano: { valor: 30_000_000 } } },
+    ];
+    const consultas: Array<Record<string, unknown>> = [];
+    const r = await LECTORES.supabase({
+      ...c,
+      admin: {
+        rpc: (fn: string, args?: Record<string, unknown>) => fn === "servicios_metricas_bd_extra"
+          ? Promise.resolve({ data: { conexiones: 22, conexiones_max: 60, tablas_mayores: [{ tabla: "peticiones", bytes: 167_772_160 }, { tabla: "audit_log", bytes: 74_448_896 }, { tabla: "servicios_uso", bytes: 34_603_008 }, { tabla: "x", bytes: 1 }] }, error: null })
+          : rpcBase(fn, args),
+        from: () => {
+          const q: Record<string, unknown> = {};
+          const cadena = {
+            select: () => cadena,
+            eq: (k: string, v: unknown) => { q[k] = v; return cadena; },
+            lte: (_k: string, v: string) => { q.hasta = v; return cadena; },
+            order: (_k: string, o: { ascending: boolean }) => { q.asc = o.ascending; return cadena; },
+            limit: async () => {
+              consultas.push({ ...q });
+              const filas = guardadas.filter((g) => g.tomado_en <= String(q.hasta));
+              return { data: q.asc ? [...filas].reverse() : filas, error: null };
+            },
+          };
+          return cadena;
+        },
+      },
+    });
+    expect(r.metricas.conexiones).toMatchObject({ valor: 22, limite: 60, unidad: "conexiones" });
+    expect(r.metricas.bd_tamano.nota).toBe("Lo que más ocupa: peticiones 160 MB · audit_log 71 MB · servicios_uso 33 MB.");
+    expect(r.detalles!.tablas_mayores).toHaveLength(4);
+    // Hace 7 días (27/10 12:00) había 30 MB; ahora 50,6 MB.
+    expect(r.metricas.bd_crecimiento).toMatchObject({ valor: 50_632_371 - 30_000_000, unidad: "bytes", periodo: "últimos 7 días", nota: "+20 MB en 7 días." });
+    expect(consultas[0]).toMatchObject({ proveedor: "supabase", hasta: "2026-10-27T12:00:00.000Z", asc: false });
+    expect(r.metricas.peticiones_api_7d.nota).toMatch(/^base de datos 900 · archivos 85 · inicio de sesión 10 · tiempo real 5\./);
+    expect(r.detalles!.peticiones_por_tipo).toEqual({ "base de datos": 900, archivos: 85, "inicio de sesión": 10, "tiempo real": 5 });
+
+    // Sin lecturas de hace 7 días: la más antigua de hace al menos un día.
+    guardadas.splice(1, 1);
+    guardadas[0].tomado_en = "2026-11-01T12:00:00Z";
+    const r2 = await LECTORES.supabase({ ...c, admin: { rpc: rpcBase, from: () => ({
+      select: () => ({ eq: () => ({ lte: (_k: string, hasta: string) => ({ order: () => ({ limit: async () => ({ data: guardadas.filter((g) => g.tomado_en <= hasta), error: null }) }) }) }) }),
+    }) } });
+    expect(r2.metricas.bd_crecimiento).toMatchObject({ periodo: "desde el 01/11/2026", nota: "+10 MB en 2 días." });
+    // Sin la RPC nueva (base sin 20261120100000): ni conexiones ni tablas, lo demás igual.
+    expect(r2.metricas.conexiones).toBeUndefined();
+    expect(r2.metricas.bd_tamano).toBeDefined();
+  });
+
+  it("metricasBd: una sola llamada a la RPC por contexto", async () => {
+    const c = ctx({}, {});
+    await Promise.all([metricasBd(c), metricasBd(c), LECTORES.openai(c), LECTORES.supabase(c)]);
+    expect(estado.rpcs.filter((f) => f === "servicios_metricas_supabase")).toHaveLength(1);
+  });
+
+  it("Stripe: más de 5 páginas → cifras parciales con aviso", async () => {
+    let n = 0;
+    const r = await LECTORES.stripe(ctx(SECRETOS, rutasCompletas({
+      "api.stripe.com/v1/balance_transactions": () => resp({ data: [{ id: `txn_${++n}`, type: "charge", amount: 100, fee: 1, currency: "eur" }], has_more: true }),
+    })));
+    expect(r.metricas.cobros_mes.valor).toBe(5);
+    expect(String(r.detalles?.avisos)).toContain("parciales");
+  });
+
+  it("Stripe: si falla la lista de movimientos → error con el modo, sin cifras ni coste", async () => {
+    const r = await LECTORES.stripe(ctx(SECRETOS, rutasCompletas({ "api.stripe.com/v1/balance_transactions": () => resp({ error: {} }, 500) })));
+    expect(r).toMatchObject({ error: "error_api", metricas: {}, detalles: { http: 500, modo: "prueba" } });
+    expect(r.coste_variable).toBeUndefined();
+    expect(estado.rpcs).not.toContain("servicios_metricas_supabase");
+  });
+});
+
+describe("manejo de la base de datos", () => {
+  it("base sin 20261103160000 (sin coste_variable): se guarda la lectura sin esa columna", async () => {
+    estado.errorInsertColumna = true;
+    const r = await llamar(manejador().h, "jwt-super");
+    expect(r.status).toBe(200);
+    expect(lectura(r.cuerpo, "openai").guardada).toBe(true);
+    expect(estado.insertadas.every((f) => !("coste_variable" in f))).toBe(true);
+  });
+  it("sin la migración → 503 sin_migracion", async () => {
+    estado.errorServicios = { message: 'relation "public.servicios_contratados" does not exist', code: "42P01" };
+    const r = await llamar(manejador().h, "jwt-super");
+    expect(r).toMatchObject({ status: 503, cuerpo: { error: "sin_migracion" } });
+  });
+  it("si no se puede guardar la lectura, se devuelve igual (guardada: false)", async () => {
+    estado.errorInsert = { message: "disk full" };
+    const r = await llamar(manejador().h, "jwt-super");
+    expect(r.status).toBe(200);
+    expect(lectura(r.cuerpo, "supabase")).toMatchObject({ guardada: false, desde_cache: false });
+  });
+});
+
+describe("utilidades", () => {
+  it("resumirUsoVercel reconoce nombres alternativos", () => {
+    expect(resumirUsoVercel([{ requests: 7, fast_data_transfer_bytes: 10, fast_origin_transfer_bytes: 3, invocations: 2, active_cpu_ms: 7_200_000 }]))
+      .toMatchObject({ peticiones: 7, bytesServidos: 10, bytesOrigen: 3, invocaciones: 2, cpuHoras: 2 });
+    expect(resumirUsoVercel({ data: { proyectos: [{ request_hit_count: 1 }, { request_hit_count: 2 }] } }).peticiones).toBe(3);
+    expect(resumirUsoVercel(null).claves).toEqual([]);
+  });
+  it("resumirUsoVercel: almacenamiento de despliegues y funciones, el último día (no se suma); sin él, nada", () => {
+    const r = resumirUsoVercel({ data: [
+      { timestamp: "2026-11-01", deployment_storage_bytes: 100, function_storage_bytes: 10, request_hit_count: 1 },
+      { timestamp: "2026-11-02", deployment_storage_bytes: 120, function_storage_bytes: 12, request_hit_count: 1 },
+    ] });
+    expect(r).toMatchObject({ bytesDespliegues: 120, bytesFunciones: 12 });
+    expect(resumirUsoVercel(USO_VERCEL)).toMatchObject({ bytesDespliegues: undefined, bytesFunciones: undefined });
+  });
+  it("resumirUsoGithub ignora lo que no es Actions (salvo en lo facturado)", () => {
+    expect(resumirUsoGithub(GITHUB_RESUMEN)).toEqual({ computoUsd: 7, minutos: 1100, almacenamientoGbHoras: 3.6, netoUsd: 1, minutosPublicos: 0, computoPublicoUsd: 0, conRepositorio: false });
+    expect(resumirUsoGithub({})).toEqual({ computoUsd: 0, minutos: 0, almacenamientoGbHoras: 0, netoUsd: null, minutosPublicos: 0, computoPublicoUsd: 0, conRepositorio: false });
+    // Con el repositorio de cada línea: los públicos aparte («dueño/repo» o solo el nombre).
+    const detalle = { usageItems: [
+      { product: "Actions", unitType: "Minutes", quantity: 3000, grossAmount: 18, netAmount: 0, repositoryName: "oficiososia/cristaleriabv" },
+      { product: "Actions", unitType: "Minutes", quantity: 100, grossAmount: 0.6, netAmount: 0, repositoryName: "becarios" },
+    ] };
+    expect(resumirUsoGithub(detalle, new Set(["cristaleriabv"]))).toMatchObject({ minutos: 3100, minutosPublicos: 3000, computoPublicoUsd: 18, conRepositorio: true });
+  });
+  it("resumirSuscripcionesHostinger", () => {
+    const [hosting] = resumirSuscripcionesHostinger(SUSCRIPCIONES_HOSTINGER);
+    expect(hosting).toMatchObject({ nombre: "Premium Web Hosting", precio_renovacion: 95.88, moneda: "EUR", meses: 12, renovacion_automatica: true, caduca: "2026-11-20T10:00:00Z" });
+    expect(resumirSuscripcionesHostinger({ data: [{ name: "X", billing_period: 30, billing_period_unit: "day", renewal_price: 300 }] })[0]).toMatchObject({ meses: 1, precio_renovacion: 3 });
+  });
+  it("aplicarLimites usa el límite y la unidad de servicios_contratados", () => {
+    expect(aplicarLimites({ a: { etiqueta: "A", valor: 1, unidad: "bytes" }, b: { etiqueta: "B", valor: 2, unidad: "u" } }, { a: { limite: 5, unidad: "GB" }, b: { limite: null } }))
+      .toEqual({ a: { etiqueta: "A", valor: 1, unidad: "bytes", limite: 5, unidad_limite: "GB" }, b: { etiqueta: "B", valor: 2, unidad: "u" } });
+  });
+  it("modoStripe por el prefijo", () => {
+    expect(modoStripe("sk_live_x")).toBe("real");
+    expect(modoStripe("rk_test_x")).toBe("prueba");
+    expect(modoStripe("otra")).toBe("desconocido");
+  });
+  it("refDeUrl y ocultarSecretos", () => {
+    expect(refDeUrl("https://sfonaclosuafvlhutkon.supabase.co")).toBe("sfonaclosuafvlhutkon");
+    expect(refDeUrl("http://127.0.0.1:54321")).toBeNull();
+    expect(ocultarSecretos({ a: [`x ${SECRETOS.RESEND_API_KEY} y`] }, (n) => (SECRETOS as Record<string, string>)[n])).toEqual({ a: ["x [oculto] y"] });
+  });
+});

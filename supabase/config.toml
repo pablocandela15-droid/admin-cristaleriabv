@@ -1,0 +1,120 @@
+# Demo (se enlaza primero, ver docs/PROCESO-DE-CAMBIOS.md). El despliegue siempre usa
+# --project-ref explicito; este valor solo nombra el stack local.
+project_id = "admin-cristaleriabv"
+
+# ============================================================================
+# verify_jwt — criterio de este proyecto
+# ----------------------------------------------------------------------------
+# LEER ANTES DE TOCAR NADA: `verify_jwt = true` NO ES AUTENTICACIÓN.
+# La anon/publishable key es un JWT válido y viaja en el bundle público de las
+# webs y del panel, así que cualquiera puede copiarla y pasar el filtro. Lo
+# único que hace `true` es descartar en la pasarela las peticiones que no traen
+# NINGUNA cabecera (bots, curl a pelo, escáneres). Es un filtro barato, no una
+# barrera. La autorización de verdad la tiene que hacer cada función.
+#
+# Regla aplicada aquí:
+#   · false  SOLO si la función necesita ser alcanzable SIN cabeceras
+#            (enlaces GET dentro de un correo, webhooks de terceros) Y lleva su
+#            propia autenticación real (HMAC, firma svix).  -> 3 funciones.
+#   · true   en todo lo demás. Todos sus llamadores usan
+#            `supabase.functions.invoke()` con sesión iniciada, o `fetch` con
+#            `apikey` + `Authorization`, así que el filtro no les afecta.
+#
+# TODA función desplegable tiene entrada explícita abajo. Si falta una, la CLI
+# asume `verify_jwt = true` al desplegarla y puede romperla en silencio.
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# verify_jwt = false — las funciones que TIENEN que responder sin cabeceras
+# ----------------------------------------------------------------------------
+
+# Centro de modelos de IA (20261107500000): la llama pg_cron a diario (pg_net,
+# sin JWT, con x-ocr-secret) o un SUPER ADMIN con su JWT (lo comprueba ella con
+# exigirSuperAdmin). Ver supabase/functions/ia-modelos-openai/index.ts.
+[functions.ia-modelos-openai]
+verify_jwt = false
+
+
+# ----------------------------------------------------------------------------
+# verify_jwt = true — autenticación propia REAL + filtro barato encima
+# ----------------------------------------------------------------------------
+# Estas validan un usuario real (`auth.getUser()`) y, casi todas, el permiso
+# concreto. `true` es solo el prefiltro del gateway.
+
+# JWT de usuario + `is_admin()` + allowlist SUPER_ADMIN_EMAILS.
+[functions.admin-create-user]
+verify_jwt = true
+
+[functions.admin-delete-user]
+verify_jwt = true
+
+[functions.admin-update-user-password]
+verify_jwt = true
+
+[functions.list-users]
+verify_jwt = true
+
+[functions.admin-set-super-admin]
+verify_jwt = true
+
+[functions.registrar-metrica]
+verify_jwt = true
+
+[functions.leer-metricas]
+verify_jwt = true
+
+# Super Admin › Servicios: JWT de usuario + is_super_admin (exigirSuperAdmin).
+# Lee el consumo de Vercel, Supabase, GitHub, Resend y Stripe con sus secretos
+# (SERVICIOS_*_TOKEN, RESEND_API_KEY, STRIPE_SECRET_KEY) y nunca los devuelve.
+# Ver supabase/functions/servicios-uso/servicios.ts y la migración
+# 20261103120000_servicios_contratados.sql.
+[functions.servicios-uso]
+verify_jwt = true
+
+# Login público: comprueba las credenciales en Auth, registra antes/después
+# desde service_role y limita intentos en SQL. Nunca confía en actor del body.
+[functions.panel-auth]
+verify_jwt = false
+
+# sincronizar-costes-openai: la llama SOLO el cron «sincronizar-costes-openai»
+# por pg_net (sin JWT) con la cabecera x-ocr-secret == OCR_TRABAJOS_SECRET (mismo
+# secreto y mismo valor de Vault que ia-modelos-openai). No acepta datos del cuerpo:
+# con OPENAI_ADMIN_KEY trae de OpenAI el gasto real (GET /v1/organization/costs)
+# y el tipo de cambio del BCE. Ver supabase/functions/sincronizar-costes-openai/
+# y la migración 20261008150000_openai_costes_reales.sql.
+[functions.sincronizar-costes-openai]
+verify_jwt = false
+
+[functions.auditoria-revertir]
+verify_jwt = true
+
+# «Mi cuenta» › Cambiar contraseña: JWT de usuario (solo su propia cuenta).
+# Comprueba la contraseña actual en Auth con un cliente aislado (esa sesión se
+# revoca), con el límite de intentos SQL compartido con el login de la cuenta
+# (20261103170000_cambio_contrasena_propia.sql), y la cambia con el JWT del
+# propio usuario: conserva su sesión y cierra las de sus otros dispositivos.
+[functions.cambiar-mi-contrasena]
+verify_jwt = true
+
+[functions.admin-set-user-access]
+verify_jwt = true
+
+# Avisos por Telegram (20261126001000): la llaman pg_cron con x-ocr-secret y el super admin
+# con su JWT (exigirSuperAdmin). Ver supabase/functions/avisos-telegram/index.ts.
+[functions.avisos-telegram]
+verify_jwt = false
+
+# Peticiones del panel → Tickets del Super Admin (20261129100000_peticiones.sql): la llama el panel con el
+# JWT del usuario justo después de guardar, y el super admin con «Volver a analizar» (exigirUsuario + la
+# petición es suya o es super admin; forzar solo super admin).
+[functions.analizar-peticion]
+verify_jwt = true
+
+# Super Admin › Gestor Gasto › «Control (Excel)»: JWT de usuario + is_super_admin
+# (exigirSuperAdmin). Lee y edita en el Excel de control de OficiosOsIA (Google
+# Drive, secretos GOOGLE_* de las facturas) SOLO las filas del cliente de este
+# panel (CONTROL_EXCEL_CLIENTE, por defecto «Cristalería Baix Vinalopó»). Nunca devuelve tokens.
+# Ver supabase/functions/control-excel/control.ts y docs/CONTROL-EXCEL.md.
+[functions.control-excel]
+verify_jwt = true

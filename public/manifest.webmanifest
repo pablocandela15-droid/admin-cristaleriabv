@@ -1,0 +1,53 @@
+{
+  "id": "/",
+  "name": "Cristalería Baix Vinalopó · Panel de gestión",
+  "short_name": "Cristalería BV",
+  "description": "Panel de gestión interno de Cristalería Baix Vinalopó.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FBF8EF",
+  "theme_color": "#062C4C",
+  "lang": "es",
+  "dir": "ltr",
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nueva petición",
+      "short_name": "Petición",
+      "description": "Reportar un error o pedir una mejora",
+      "url": "/peticiones",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "type": "image/png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

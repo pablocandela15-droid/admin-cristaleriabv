@@ -1,0 +1,158 @@
+# Comprobaciones automáticas del panel (propuesta de la auditoría de regresión
+# del 18/10/2026). Ningún paso necesita secretos ni habla con Supabase: los
+# tests usan un host local inalcanzable (vitest.config.ts) y las pruebas SQL
+# corren en Postgres en memoria (PGlite).
+#
+# BLOQUEAN: instalación reproducible, tests unitarios, pruebas SQL, build y el
+# TOPE DE DEUDA de calidad: typecheck con 20 errores y ESLint con 479 errores
+# (cifras del 30/10/2026, CT-REM-OPS-09). Es un "trinquete": el job falla si el
+# recuento SUBE; si baja, hay que bajar también el tope en este fichero (los dos
+# valores TOPE_* de abajo). Cuando lleguen a cero, sustituir por el check normal.
+#
+# DOS MODOS (pedido del dueño 10/11/2026: menos tests, que solo se revise lo que se modifica,
+# para no agotar los minutos de GitHub Actions):
+#   - LIGERO (push a staging y PR a staging o a ramas de trabajo): typecheck, ESLint de lo
+#     cambiado (scripts/lint-cambios.mjs) y `npm run test:cambios` (solo los tests afectados y las pruebas PGlite si cambian migraciones).
+#   - COMPLETO (PR o push hacia main, ramas release/*, y el lanzamiento a mano de «Release ·
+#     preparar»): todo lo de siempre, suite completa, todas las PGlite y build.
+# Los jobs que protegen producción (tests-y-build, calidad-tope-deuda, control-release) siguen existiendo con el
+# mismo nombre; en modo ligero el job de calidad se salta (un check saltado cuenta como superado).
+# Un push que solo toca docs/Markdown no lanza CI (paths-ignore); los PR siempre lo lanzan.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [staging, main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  # Lo lanza «Release · preparar» sobre la rama release/X.Y.Z: los PR que abre Actions con su
+  # token no disparan otros workflows (docs/PROCESO-DE-CAMBIOS.md).
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # "true" → modo COMPLETO (camino a producción). "false" → modo LIGERO (staging y ramas de trabajo).
+  COMPLETA: ${{ github.base_ref == 'main' || github.ref_name == 'main' || startsWith(github.ref_name, 'release/') || startsWith(github.head_ref, 'release/') }}
+  # Base contra la que se mira «lo cambiado» en modo ligero: la rama destino del PR o el commit
+  # anterior del push (si es rama nueva, los scripts usan origin/staging).
+  BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before || 'origin/staging' }}
+
+jobs:
+  tests-y-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          # Modo ligero: historia completa para comparar con la base. Modo completo: basta 1.
+          fetch-depth: ${{ env.COMPLETA == 'true' && 1 || 0 }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # ---- Modo LIGERO (staging y ramas de trabajo) ----
+      - name: Typecheck (no puede superar el tope)
+        if: env.COMPLETA != 'true'
+        env:
+          TOPE_TSC: "20"
+        run: |
+          npx tsc --noEmit -p tsconfig.app.json > tsc.log || true
+          n=$(grep -c "error TS" tsc.log || true)
+          echo "Errores de tipos: $n (tope $TOPE_TSC)"
+          if [ "$n" -gt "$TOPE_TSC" ]; then
+            grep "error TS" tsc.log | head -50
+            echo "::error::Typecheck: $n errores, el tope es $TOPE_TSC. No se puede aumentar la deuda."
+            exit 1
+          fi
+      - name: ESLint de lo cambiado (ningún fichero puede empeorar)
+        if: env.COMPLETA != 'true'
+        run: npm run lint:cambios
+      - name: Tests afectados por lo cambiado (y PGlite si cambian migraciones)
+        if: env.COMPLETA != 'true'
+        run: npm run test:cambios
+      # ---- Modo COMPLETO (camino a producción) ----
+      - name: Tests unitarios y de componentes
+        if: env.COMPLETA == 'true'
+        run: npm test
+      - name: Esquema del núcleo, RLS y vuelta atrás (PGlite)
+        if: env.COMPLETA == 'true'
+        run: npm run test:nucleo:db
+      - name: Versiones de migración sin repetir (salvo las históricas)
+        if: env.COMPLETA == 'true'
+        run: npm run test:migraciones
+      - name: Build de producción
+        if: env.COMPLETA == 'true'
+        run: npm run build
+
+  calidad-tope-deuda:
+    # Solo en modo completo; en modo ligero el typecheck y el ESLint de lo cambiado van en tests-y-build.
+    if: ${{ github.base_ref == 'main' || github.ref_name == 'main' || startsWith(github.ref_name, 'release/') || startsWith(github.head_ref, 'release/') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TOPE_TSC: "20"
+      TOPE_ESLINT: "479"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck (no puede superar el tope)
+        run: |
+          npx tsc --noEmit -p tsconfig.app.json > tsc.log || true
+          n=$(grep -c "error TS" tsc.log || true)
+          echo "Errores de tipos: $n (tope $TOPE_TSC)"
+          if [ "$n" -gt "$TOPE_TSC" ]; then
+            grep "error TS" tsc.log | head -50
+            echo "::error::Typecheck: $n errores, el tope es $TOPE_TSC. No se puede aumentar la deuda."
+            exit 1
+          fi
+          if [ "$n" -lt "$TOPE_TSC" ]; then
+            echo "::warning::Bajaste a $n errores de tipos: baja TOPE_TSC a $n en .github/workflows/ci.yml."
+          fi
+      - name: ESLint (no puede superar el tope)
+        run: |
+          npx eslint . -f json -o eslint.json || true
+          n=$(node -e "const r=require('./eslint.json');console.log(r.reduce((a,f)=>a+f.errorCount,0))")
+          echo "Errores de ESLint: $n (tope $TOPE_ESLINT)"
+          if [ "$n" -gt "$TOPE_ESLINT" ]; then
+            echo "::error::ESLint: $n errores, el tope es $TOPE_ESLINT. No se puede aumentar la deuda."
+            exit 1
+          fi
+          if [ "$n" -lt "$TOPE_ESLINT" ]; then
+            echo "::warning::Bajaste a $n errores de ESLint: baja TOPE_ESLINT a $n en .github/workflows/ci.yml."
+          fi
+
+  control-release:
+    name: Validar release a producción
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Producción solo acepta PR desde release/X.Y.Z (scripts/release.mjs comprobar): nada de
+    # staging entero, versión y CHANGELOG coherentes y basada en el último main.
+    if: >-
+      (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+      (github.event_name == 'workflow_dispatch' && startsWith(github.ref_name, 'release/'))
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Rama, versión, CHANGELOG y base de la release
+        env:
+          RAMA: ${{ github.head_ref || github.ref_name }}
+        run: node scripts/release.mjs comprobar --base origin/main --head HEAD --rama "$RAMA"

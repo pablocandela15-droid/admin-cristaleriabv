@@ -1,0 +1,287 @@
+// @vitest-environment node
+/**
+ * Cliente de Google Drive de las Edge Functions (_shared/google-drive.ts) con
+ * fetch falso: token con secretos limpios (trim) y en memoria, alcance,
+ * carpetas que se crean solo si faltan, listado, subida multipart, descarga,
+ * miniaturas solo de googleusercontent.com y medidas de un JPEG. Sin red
+ * (el Drive simulado va en este mismo fichero).
+ */
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  ALCANCE_DRIVE_FILE,
+  ClienteDrive,
+  ErrorDrive,
+  esIdDrive,
+  limpiarConfigGoogle,
+  medidasJpeg,
+  olvidarTokenDrive,
+  urlMiniatura,
+} from "../google-drive.ts";
+
+// ── Google Drive en memoria ──────────────────────────────────────────────────
+// (Antes venía de la simulación de Instagram, que ya no existe: aquí solo lo que usan estas pruebas.)
+
+type Llamada = { url: string; metodo: string; cabeceras: Record<string, string>; cuerpo: string | null; bruto?: unknown };
+
+const RAIZ_DRIVE = "1RaizDelPanel000000000000001";
+const TOKEN_GOOGLE = "ya29.tokenDeAccesoDeGoogleSecreto123";
+const REFRESH_GOOGLE = "1//refreshTokenDeGoogleSuperSecreto";
+const SECRETO_GOOGLE = "GOCSPX-secretoDelClienteGoogle";
+const CARPETA = "application/vnd.google-apps.folder";
+
+/** JPEG mínimo con cabecera SOF0 (lo justo para medidasJpeg). */
+function jpegDe(ancho: number, alto: number): Uint8Array {
+  return new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, alto >> 8, alto & 255, ancho >> 8, ancho & 255, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xd9]);
+}
+
+const resp = (estado: number, cuerpo: unknown) => new Response(JSON.stringify(cuerpo), { status: estado, headers: { "Content-Type": "application/json" } });
+
+interface FicheroFalso {
+  id: string;
+  name: string;
+  mimeType: string;
+  parents?: string[];
+  size?: string;
+  trashed?: boolean;
+  createdTime?: string;
+  bytes?: Uint8Array;
+}
+
+/**
+ * Drive en memoria: token (con el alcance pedido), búsqueda y creación de
+ * carpetas, listados, metadatos, descarga, subida multipart y mover.
+ */
+function driveFalso(o: { alcance?: string; tokenFalla?: boolean } = {}) {
+  const ficheros = new Map<string, FicheroFalso>([[RAIZ_DRIVE, { id: RAIZ_DRIVE, name: "panel", mimeType: CARPETA }]]);
+  let n = 0;
+  const nuevoId = () => `1Drive${String(++n).padStart(22, "0")}`;
+  const peticionesToken: Llamada[] = [];
+  const subidas: Array<{ meta: { name: string; parents: string[]; description?: string }; bytes: number }> = [];
+
+  const m = (l: Llamada): Response | undefined => {
+    if (l.url === "https://oauth2.googleapis.com/token") {
+      peticionesToken.push(l);
+      if (o.tokenFalla) return resp(400, { error: "invalid_client", error_description: "Unauthorized" });
+      return resp(200, { access_token: TOKEN_GOOGLE, expires_in: 3599, scope: o.alcance ?? "https://www.googleapis.com/auth/drive", token_type: "Bearer" });
+    }
+    if (l.cabeceras.authorization !== `Bearer ${TOKEN_GOOGLE}`) return resp(401, { error: { message: "Invalid Credentials" } });
+    const u = new URL(l.url);
+    if (u.pathname === "/upload/drive/v3/files" && l.metodo === "POST") {
+      const texto = new TextDecoder("utf-8").decode(l.bruto as Uint8Array);
+      const meta = JSON.parse(texto.split("\r\n\r\n")[1].split("\r\n--")[0]) as { name: string; parents: string[] };
+      const id = nuevoId();
+      subidas.push({ meta, bytes: (l.bruto as Uint8Array).length });
+      ficheros.set(id, { id, name: meta.name, mimeType: "image/jpeg", parents: meta.parents, size: "100", createdTime: "2026-11-05T10:00:00Z" });
+      return resp(200, { id, name: meta.name, mimeType: "image/jpeg", parents: meta.parents });
+    }
+    if (u.pathname === "/drive/v3/files" && l.metodo === "GET") {
+      const q = u.searchParams.get("q") ?? "";
+      // Uno o varios padres («'a' in parents or 'b' in parents»).
+      const padres = [...q.matchAll(/'([^']+)' in parents/g)].map((x) => x[1]);
+      const nombre = /name='((?:[^'\\]|\\.)*)'/.exec(q)?.[1];
+      const lista = [...ficheros.values()].filter((f) => f.parents?.some((p) => padres.includes(p)) && !f.trashed);
+      // Sin `name='…'` (listarHijos) salen todas las subcarpetas; con él, solo la de ese nombre.
+      if (q.includes(`mimeType='${CARPETA}'`)) return resp(200, { files: lista.filter((f) => f.mimeType === CARPETA && (nombre === undefined || f.name === nombre)) });
+      return resp(200, { files: lista.filter((f) => f.mimeType.startsWith("image/")).map(({ bytes: _b, ...f }) => f) });
+    }
+    if (u.pathname === "/drive/v3/files" && l.metodo === "POST") {
+      const meta = JSON.parse(l.cuerpo!) as { name: string; parents: string[]; mimeType: string };
+      if (!ficheros.has(meta.parents[0])) return resp(404, { error: { message: "File not found" } });
+      const id = nuevoId();
+      ficheros.set(id, { id, name: meta.name, mimeType: meta.mimeType, parents: meta.parents });
+      return resp(200, { id });
+    }
+    const ruta = /^\/drive\/v3\/files\/([A-Za-z0-9_-]+)$/.exec(u.pathname);
+    // Mover (addParents / removeParents).
+    if (ruta && l.metodo === "PATCH" && u.searchParams.has("addParents")) {
+      const f = ficheros.get(ruta[1]);
+      if (!f) return resp(404, { error: { message: "File not found" } });
+      const quitar = (u.searchParams.get("removeParents") ?? "").split(",").filter(Boolean);
+      f.parents = [...(f.parents ?? []).filter((p) => !quitar.includes(p)), u.searchParams.get("addParents")!];
+      return resp(200, { id: f.id });
+    }
+    if (ruta && l.metodo === "GET") {
+      const f = ficheros.get(ruta[1]);
+      if (!f) return resp(404, { error: { message: `File not found: ${ruta[1]}.` } });
+      if (u.searchParams.get("alt") === "media") return new Response(f.bytes ?? jpegDe(1080, 1350), { status: 200, headers: { "Content-Type": f.mimeType } });
+      const { bytes: _b, ...meta } = f;
+      return resp(200, meta);
+    }
+    return undefined;
+  };
+
+  /** Crea (si falta) la carpeta `nombre` dentro de la raíz y mete ahí una imagen. Devuelve el id de la carpeta. */
+  const ponerImagen = (nombre: string, f: Partial<FicheroFalso> & { id: string }) => {
+    let carpeta = [...ficheros.values()].find((x) => x.name === nombre && x.parents?.includes(RAIZ_DRIVE))?.id;
+    if (!carpeta) {
+      carpeta = nuevoId();
+      ficheros.set(carpeta, { id: carpeta, name: nombre, mimeType: CARPETA, parents: [RAIZ_DRIVE] });
+    }
+    ficheros.set(f.id, { name: `${f.id}.jpg`, mimeType: "image/jpeg", size: "200000", createdTime: "2026-11-01T10:00:00Z", parents: [carpeta], ...f });
+    return carpeta;
+  };
+
+  return { m, ficheros, subidas, peticionesToken, ponerImagen };
+}
+
+const CONFIG = { clientId: " 123-abc.apps.googleusercontent.com\n", clientSecret: `${SECRETO_GOOGLE}\n`, refreshToken: ` ${REFRESH_GOOGLE}` };
+
+/** fetch que solo sabe hablar con el Drive simulado. */
+function conDrive(d = driveFalso()) {
+  const llamadas: Llamada[] = [];
+  const f = (async (entrada: string | URL | Request, init: RequestInit = {}) => {
+    const l: Llamada = {
+      url: String(entrada),
+      metodo: (init.method ?? "GET").toUpperCase(),
+      cabeceras: Object.fromEntries(new Headers(init.headers as HeadersInit).entries()),
+      cuerpo: typeof init.body === "string" ? init.body : null,
+      bruto: init.body,
+    };
+    llamadas.push(l);
+    const r = await d.m(l);
+    if (!r) throw new Error(`URL inesperada: ${l.metodo} ${l.url}`);
+    return r;
+  }) as typeof fetch;
+  return { d, f, llamadas };
+}
+
+beforeEach(() => olvidarTokenDrive());
+
+describe("token", () => {
+  it("limpia los secretos (salto de línea de fb30bd56), da el alcance y reutiliza el token hasta que caduca", async () => {
+    const { d, f } = conDrive(driveFalso({ alcance: ALCANCE_DRIVE_FILE }));
+    let t = 1_000_000;
+    const c = new ClienteDrive({ config: CONFIG, fetch: f, ahora: () => t });
+    expect(await c.token()).toEqual({ token: TOKEN_GOOGLE, alcances: [ALCANCE_DRIVE_FILE] });
+    const cuerpo = new URLSearchParams(String(d.peticionesToken[0].bruto));
+    expect(cuerpo.get("client_id")).toBe("123-abc.apps.googleusercontent.com");
+    expect(cuerpo.get("client_secret")).toBe(SECRETO_GOOGLE);
+    expect(cuerpo.get("refresh_token")).toBe(REFRESH_GOOGLE);
+    expect(cuerpo.get("grant_type")).toBe("refresh_token");
+    await c.token();
+    expect(d.peticionesToken).toHaveLength(1);
+    t += 3600 * 1000;
+    await c.token();
+    expect(d.peticionesToken).toHaveLength(2);
+  });
+
+  it("sin secretos: ErrorDrive «sin_config» sin llamar a Google; token rechazado: «token» sin el secreto en el mensaje", async () => {
+    const { f, llamadas } = conDrive(driveFalso({ tokenFalla: true }));
+    await expect(new ClienteDrive({ config: { clientId: "x" }, fetch: f }).token()).rejects.toMatchObject({ motivo: "sin_config" });
+    expect(llamadas).toHaveLength(0);
+    const e = (await new ClienteDrive({ config: CONFIG, fetch: f }).token().catch((x) => x)) as ErrorDrive;
+    expect(e).toBeInstanceOf(ErrorDrive);
+    expect(e.motivo).toBe("token");
+    expect(e.message).toMatch(/invalid_client/);
+    expect(e.message).not.toContain(SECRETO_GOOGLE);
+    expect(e.message).not.toContain(REFRESH_GOOGLE);
+  });
+
+  it("registra los secretos y el token para taparlos", async () => {
+    const vistos: string[] = [];
+    const { f } = conDrive();
+    await new ClienteDrive({ config: CONFIG, fetch: f, registrarSecreto: (v) => vistos.push(v) }).token();
+    expect(vistos).toEqual(expect.arrayContaining([SECRETO_GOOGLE, REFRESH_GOOGLE, TOKEN_GOOGLE]));
+  });
+});
+
+describe("carpetas, ficheros y miniaturas", () => {
+  it("asegurarRuta crea solo lo que falta y reutiliza lo que hay", async () => {
+    const { d, f, llamadas } = conDrive();
+    const c = new ClienteDrive({ config: CONFIG, fetch: f });
+    const id = await c.asegurarRuta(RAIZ_DRIVE, ["control-excel", "2026", "noviembre"]);
+    const creadas = llamadas.filter((l) => l.metodo === "POST" && l.url.startsWith("https://www.googleapis.com/drive/v3/files"));
+    expect(creadas.map((l) => JSON.parse(l.cuerpo!).name)).toEqual(["control-excel", "2026", "noviembre"]);
+    expect(d.ficheros.get(id)?.name).toBe("noviembre");
+    llamadas.length = 0;
+    expect(await c.asegurarRuta(RAIZ_DRIVE, ["control-excel", "2026", "noviembre"])).toBe(id);
+    expect(llamadas.some((l) => l.metodo === "POST")).toBe(false);
+    // Cada búsqueda lleva el token de Google, no otro.
+    expect(llamadas.every((l) => l.cabeceras.authorization === `Bearer ${TOKEN_GOOGLE}`)).toBe(true);
+  });
+
+  it("buscarCarpeta escapa las comillas del nombre y rechaza ids de carpeta raros", async () => {
+    const { f, llamadas } = conDrive();
+    const c = new ClienteDrive({ config: CONFIG, fetch: f });
+    await c.buscarCarpeta("L'Arxiu", RAIZ_DRIVE);
+    expect(new URL(llamadas.at(-1)!.url).searchParams.get("q")).toContain("name='L\\'Arxiu'");
+    await expect(c.buscarCarpeta("x", "abc' or '1'='1")).rejects.toBeInstanceOf(ErrorDrive);
+  });
+
+  it("listarHijos: subcarpetas o imágenes de varias carpetas en una consulta (de 25 en 25) y mover cambia de padre sin cambiar el id", async () => {
+    const { d, f, llamadas } = conDrive();
+    const c = new ClienteDrive({ config: CONFIG, fetch: f });
+    const A = await c.crearCarpeta("A", RAIZ_DRIVE);
+    const B = await c.crearCarpeta("B", RAIZ_DRIVE);
+    const A1 = await c.crearCarpeta("A1", A);
+    d.ficheros.set("1FotoEnB000000000000001", { id: "1FotoEnB000000000000001", name: "b.jpg", mimeType: "image/jpeg", parents: [B] });
+    expect((await c.listarCarpetas(A)).map((x) => x.id)).toEqual([A1]);
+    expect((await c.listarHijos([A, B], "carpetas")).map((x) => x.name).sort()).toEqual(["A1"]);
+    expect((await c.listarHijos([A, B], "imagenes")).map((x) => x.id)).toEqual(["1FotoEnB000000000000001"]);
+    const q = new URL(llamadas.at(-1)!.url).searchParams.get("q")!;
+    expect(q).toContain(`'${A}' in parents or '${B}' in parents`);
+    await expect(c.listarHijos(["abc' or '1'='1"], "carpetas")).rejects.toBeInstanceOf(ErrorDrive);
+    // 30 carpetas = 2 consultas.
+    const muchas = Array.from({ length: 30 }, (_, i) => `1Carpeta${String(i).padStart(12, "0")}`);
+    llamadas.length = 0;
+    await c.listarHijos(muchas, "imagenes");
+    expect(llamadas.filter((l) => new URL(l.url).pathname === "/drive/v3/files")).toHaveLength(2);
+    await c.mover("1FotoEnB000000000000001", A, [B]);
+    expect(d.ficheros.get("1FotoEnB000000000000001")?.parents).toEqual([A]);
+  });
+
+  it("sube en multipart (metadatos + bytes) y la descarga devuelve los bytes", async () => {
+    const { d, f, llamadas } = conDrive();
+    const c = new ClienteDrive({ config: CONFIG, fetch: f });
+    const bytes = jpegDe(1080, 1350);
+    const subido = await c.subir(RAIZ_DRIVE, "foto.jpg", "image/jpeg", bytes, "Descripción");
+    const l = llamadas.find((x) => x.url.startsWith("https://www.googleapis.com/upload/"))!;
+    expect(l.cabeceras["content-type"]).toMatch(/^multipart\/related; boundary=/);
+    expect(d.subidas[0].meta).toMatchObject({ name: "foto.jpg", parents: [RAIZ_DRIVE], description: "Descripción" });
+    d.ficheros.get(subido.id)!.bytes = bytes;
+    expect((await c.descargar(subido.id)).bytes).toEqual(bytes);
+  });
+
+  it("metadatos: null si no existe (404) o si el id no es válido", async () => {
+    const { f } = conDrive();
+    const c = new ClienteDrive({ config: CONFIG, fetch: f });
+    expect(await c.metadatos("1NoExiste000000000000000")).toBeNull();
+    expect(await c.metadatos("../../etc")).toBeNull();
+    expect((await c.metadatos(RAIZ_DRIVE))?.name).toBe("panel");
+  });
+
+  it("listarImagenes pide solo imágenes de la carpeta, sin papelera", async () => {
+    const d = driveFalso();
+    const carpeta = d.ponerImagen("capturas", { id: "1FotoA0000000000000000001" });
+    d.ponerImagen("capturas", { id: "1FotoB0000000000000000002", trashed: true });
+    const { f, llamadas } = conDrive(d);
+    const c = new ClienteDrive({ config: CONFIG, fetch: f });
+    expect((await c.listarImagenes(carpeta)).map((x) => x.id)).toEqual(["1FotoA0000000000000000001"]);
+    const q = new URL(llamadas.at(-1)!.url).searchParams.get("q");
+    expect(q).toBe(`'${carpeta}' in parents and trashed=false and mimeType contains 'image/'`);
+  });
+
+  it("urlMiniatura: solo https de *.googleusercontent.com, con el tamaño pedido", () => {
+    expect(urlMiniatura("https://lh3.googleusercontent.com/drive-storage/abc=s220", 400)).toBe("https://lh3.googleusercontent.com/drive-storage/abc=s400");
+    expect(urlMiniatura("https://evil.example.com/abc=s220")).toBeNull();
+    expect(urlMiniatura("https://googleusercontent.com.evil.com/x")).toBeNull();
+    expect(urlMiniatura("http://lh3.googleusercontent.com/x")).toBeNull();
+    expect(urlMiniatura("https://user:pw@lh3.googleusercontent.com/x")).toBeNull();
+    expect(urlMiniatura(undefined)).toBeNull();
+  });
+});
+
+describe("utilidades", () => {
+  it("medidasJpeg lee el SOF; null si no es JPEG", () => {
+    expect(medidasJpeg(jpegDe(1708, 2560))).toEqual({ ancho: 1708, alto: 2560 });
+    expect(medidasJpeg(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).toBeNull();
+    expect(medidasJpeg(new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0, 2]))).toBeNull();
+  });
+
+  it("esIdDrive y limpiarConfigGoogle", () => {
+    expect(esIdDrive("1AbC_d-EfGhIjKlMn")).toBe(true);
+    expect(esIdDrive("abc' or 1=1")).toBe(false);
+    expect(esIdDrive("corto")).toBe(false);
+    expect(limpiarConfigGoogle({ clientId: " a\n", clientSecret: "b\r\n" })).toEqual({ clientId: "a", clientSecret: "b", refreshToken: "" });
+  });
+});

@@ -1,0 +1,20 @@
+# Changelog
+
+Publicaciones en producción de admin-cristaleriabv. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración empieza en 1.0.0.
+
+## [1.0.0] - 2026-11-18
+
+Objetivo: Primera versión del panel de administración de Cristalería Baix Vinalopó
+
+### Añadido
+- Panel de administración y Super Admin heredados del núcleo de admin-casatomas (el panel de referencia de OficiosOsIA), sin nada de restaurante
+- Login, usuarios y permisos por sección, con roles preconfigurados, contraseñas y bloqueo de accesos
+- Peticiones y tickets del equipo, con análisis por IA y envío a Linear
+- Avisos en la campana y por Telegram
+- Ayuda con guías paso a paso y recorridos guiados
+- Auditoría de todo lo que se hace en el panel, con vuelta atrás de cambios
+- Informes mensuales de costes y de auditoría (PDF y CSV)
+- Servicios y costes: servicios contratados, su consumo, el gasto de IA y los modelos de IA
+- Control del Panel: encender y apagar módulos para el equipo
+- Base de datos consolidada en una sola migración (`20261118120000_nucleo_panel.sql`, con su vuelta atrás)
+- Marca de Cristalería Baix Vinalopó: logotipo, colores y tipografías Lexend e Inter

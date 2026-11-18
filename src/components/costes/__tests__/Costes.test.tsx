@@ -1,0 +1,376 @@
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
+import type { ReactNode } from "react";
+import { AuthProvider } from "@/hooks/useAuth";
+
+// ─── Mocks ───────────────────────────────────────────────────────────────────
+const rpcData: Record<string, unknown> = {};
+/** Ventanas de gasto_ia_real_resumen, por p_dias. */
+const ventanasReal: Record<number, unknown[]> = {};
+const tablaData: Record<string, unknown[]> = {};
+const llamadas: Array<{ fn: string; args?: Record<string, unknown> }> = [];
+
+vi.mock("@/integrations/supabase/client", () => {
+  const chain = (tabla: string) => {
+    const resultado = () => Promise.resolve({ data: tablaData[tabla] ?? [], error: null });
+    const q: Record<string, unknown> = {};
+    q.select = () => q;
+    q.order = () => q;
+    q.eq = () => q;
+    q.limit = () => q;
+    q.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) => resultado().then(ok, ko);
+    return q;
+  };
+  return {
+    supabase: {
+      rpc: vi.fn((nombre: string, args?: Record<string, unknown>) => {
+        llamadas.push({ fn: nombre, args });
+        if (nombre === "gasto_ia_real_resumen") {
+          const v = ventanasReal[Number(args?.p_dias)];
+          return Promise.resolve(v ? { data: v, error: null } : { data: [], error: null });
+        }
+        return Promise.resolve({ data: rpcData[nombre] ?? [], error: null });
+      }),
+      from: vi.fn((tabla: string) => chain(tabla)),
+      // `SuperAdminLayout` comprueba la sesión al montarse: sin `auth` el
+      // render revienta antes de pintar nada.
+      auth: {
+        getSession: vi.fn(() => Promise.resolve({ data: { session: null }, error: null })),
+        getUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: null })),
+        onAuthStateChange: vi.fn(() => ({
+          data: { subscription: { unsubscribe: vi.fn() } },
+        })),
+      },
+    },
+  };
+});
+
+// Lo que se factura al mes (Facturación): null = sin borrador guardado.
+const facturado = vi.hoisted(() => ({ eur: null as number | null }));
+vi.mock("@/hooks/useFacturacionOficiososia", () => ({ useMensualFacturado: () => facturado.eur }));
+
+vi.mock("@/components/DashboardLayout", () => ({
+  DashboardLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: () => ({ canAccess: true, loading: false }),
+}));
+
+import { CostesIa } from "@/components/costes/CostesIa";
+
+// Servicios › Costes › Inteligencia artificial (lo que era la pantalla «Costes»;
+// desde el 04/11/2026, las cuotas de cada servicio están en el desglose por
+// proveedor de la misma pestaña, ver SuperAdminServicios.test.tsx).
+const renderPagina = (previsionTotalEur?: number | null) => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <AuthProvider>
+          <CostesIa previsionTotalEur={previsionTotalEur} />
+        </AuthProvider>
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+};
+
+const fijo = (id: string, concepto: string, eur: number | null, proveedor = "Proveedor") => ({
+  id,
+  concepto,
+  proveedor,
+  categoria: "infraestructura",
+  naturaleza: "fijo",
+  activo: true,
+  eur_mes: eur,
+  orden: 1,
+  verificado_en: "2026-10-01",
+  notas: null,
+});
+
+const fila = (proceso: string, real: number, hoy = 0, corte = "2026-10-08") => ({
+  proceso,
+  usd_real: real,
+  ultimo_dia_real: corte,
+  usd_estimado_hoy: hoy,
+  reparto: "clave_tarifa",
+});
+
+/** Hoy = 9 oct 2026, último día cerrado = 8 oct (8 días de mes, 38 desde el 1 de septiembre). Cambio 0,5 EUR/USD. */
+function datosConReal() {
+  tablaData.costes_fijos = [
+    fijo("f1", "Supabase", 25, "Supabase"),
+    fijo("f2", "Vercel", 20, "Vercel"),
+    fijo("f3", "Dominio", 1.5, "Registrador"),
+    fijo("f4", "Resend", null, "Resend"),
+  ];
+  const hoyOcr = 0.2;
+  ventanasReal[1] = [fila("ocr", 0.1, hoyOcr), fila("chat", 0.1), fila("otros", 0.1)];
+  ventanasReal[8] = [
+    fila("ocr", 2, hoyOcr),
+    fila("chat", 1),
+    fila("chatweb", 0.5),
+    fila("vinos", 0),
+    fila("otros", 0.5),
+  ];
+  ventanasReal[38] = [fila("ocr", 5), fila("chat", 2), fila("chatweb", 1), fila("vinos", 0), fila("otros", 1)];
+  rpcData.tipo_cambio_usd_eur_actual = [{ eur_por_usd: 0.5, fecha: "2026-10-08", fuente: "bce" }];
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 9, 9, 12, 0, 0));
+  for (const k of Object.keys(rpcData)) delete rpcData[k];
+  for (const k of Object.keys(ventanasReal)) delete ventanasReal[Number(k)];
+  for (const k of Object.keys(tablaData)) delete tablaData[k];
+  llamadas.length = 0;
+  facturado.eur = null;
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("Costes · la IA del mes", () => {
+  it("dos cifras: IA este mes contra el tope y la previsión de IA a fin de mes", async () => {
+    datosConReal();
+    renderPagina();
+
+    const ia = await screen.findByTestId("kpi-ia-mes");
+    // IA real (2,2+1+0,5+0,5)*0,5 = 2,10
+    expect(ia).toHaveTextContent("2,10 €");
+    expect(ia).toHaveTextContent("42 % del tope de 5,00 €");
+    expect(within(ia).getByRole("progressbar")).toHaveAttribute("data-nivel", "ok");
+
+    // IA al ritmo del mes: real cerrado 2,00 € / 8 días * 31 + hoy 0,10 = 7,85
+    expect(screen.getByTestId("kpi-prevision-ia")).toHaveTextContent("≈ 7,85 €");
+    // Sin las cifras de «Este mes» con los fijos de antes: el total del mes está en el Resumen de Servicios.
+    expect(screen.queryByTestId("kpi-este-mes")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Inteligencia artificial (OpenAI)" })).toBeInTheDocument();
+  });
+
+  it("una tabla de la IA por proceso, ordenada por gasto y con el mes anterior; sin los fijos declarados a mano", async () => {
+    datosConReal();
+    renderPagina();
+    const tabla = await screen.findByTestId("tabla-partidas");
+
+    const claves = within(tabla)
+      .getAllByTestId(/^partida-/)
+      .map((f) => f.getAttribute("data-testid"));
+    expect(claves).toEqual([
+      "partida-ia:ocr", // Lectura de documentos 1,10 €
+      "partida-ia:chat", // Chatbot 0,50 €
+      "partida-ia:chatweb", // Chat de la web 0,25 €
+      "partida-ia:otros", // IA del panel 0,25 €
+    ]);
+    expect(within(tabla).getByRole("columnheader", { name: "Proceso" })).toBeInTheDocument();
+
+    const ocr = within(tabla).getByTestId("partida-ia:ocr");
+    expect(ocr).toHaveTextContent("Lectura de documentos");
+    expect(ocr).toHaveTextContent("1,10 €"); // este mes: (2 + 0,2) * 0,5
+    expect(ocr).toHaveTextContent("≈ 1,50 €"); // mes anterior: (5 - 2) * 0,5, aproximado
+    // Todas son IA: sin la etiqueta «IA»/«fijo» en cada fila.
+    expect(within(ocr).queryByText("IA")).not.toBeInTheDocument();
+    // Los costes fijos (costes_fijos) ya no salen: las cuotas están en el desglose por proveedor.
+    expect(within(tabla).queryByText("Supabase")).not.toBeInTheDocument();
+    expect(within(tabla).queryByTestId("partida-fijo:f1")).not.toBeInTheDocument();
+    // «Fotos con IA» sin gasto: no ocupa fila.
+    expect(within(tabla).queryByText("Fotos con IA")).not.toBeInTheDocument();
+    expect(within(tabla).getByTestId("partida-ia:otros")).toHaveTextContent("IA del panel (tickets, modelos…)");
+  });
+
+  it("en este panel casi todo va a «otros»: sin gasto en los demás procesos, una sola fila", async () => {
+    tablaData.costes_fijos = [fijo("f1", "Supabase", 25, "Supabase")];
+    ventanasReal[1] = [fila("otros", 0.1, 0.2), fila("ocr", 0), fila("chat", 0)];
+    ventanasReal[8] = [fila("otros", 1, 0.2), fila("ocr", 0), fila("chat", 0), fila("chatweb", 0), fila("vinos", 0)];
+    ventanasReal[38] = [fila("otros", 3), fila("ocr", 0)];
+    rpcData.tipo_cambio_usd_eur_actual = [{ eur_por_usd: 0.5, fecha: "2026-10-08", fuente: "bce" }];
+    renderPagina();
+    const tabla = await screen.findByTestId("tabla-partidas");
+    const claves = within(tabla)
+      .getAllByTestId(/^partida-/)
+      .map((f) => f.getAttribute("data-testid"));
+    expect(claves).toEqual(["partida-ia:otros"]);
+    // (1 + 0,2) * 0,5 = 0,60 este mes; (3 - 1) * 0,5 ≈ 1,00 el anterior.
+    const otros = within(tabla).getByTestId("partida-ia:otros");
+    expect(otros).toHaveTextContent("IA del panel (tickets, modelos…)");
+    expect(otros).toHaveTextContent("0,60 €");
+    expect(otros).toHaveTextContent("≈ 1,00 €");
+    for (const t of ["Lectura de documentos", "Chatbot", "Chat de la web", "Fotos con IA"]) expect(within(tabla).queryByText(t)).not.toBeInTheDocument();
+  });
+
+  it("la barra del tope pasa a ámbar al 80 % y a rojo al superarlo", async () => {
+    datosConReal();
+    tablaData.servicios_config = [{ tope_ia_mes_eur: 2.5 }]; // 2,10 / 2,5 = 84 %
+    renderPagina();
+    const ia = await screen.findByTestId("kpi-ia-mes");
+    await waitFor(() => expect(ia).toHaveTextContent("84 % del tope de 2,50 €"));
+    expect(within(ia).getByRole("progressbar")).toHaveAttribute("data-nivel", "aviso");
+    expect(ia).toHaveTextContent("cerca del tope");
+  });
+
+  it("con tope superado, rojo", async () => {
+    datosConReal();
+    tablaData.servicios_config = [{ tope_ia_mes_eur: 2 }];
+    renderPagina();
+    const ia = await screen.findByTestId("kpi-ia-mes");
+    await waitFor(() => expect(within(ia).getByRole("progressbar")).toHaveAttribute("data-nivel", "superado"));
+    expect(ia).toHaveTextContent("superado");
+  });
+
+  it("sin gasto real de OpenAI: la IA es la estimada (ia_uso), una sola fila marcada como estimada", async () => {
+    tablaData.costes_fijos = [fijo("f1", "Supabase", 25)];
+    rpcData.ia_coste_mes = [
+      {
+        mes: "2026-10-01",
+        coste_acumulado_usd: 2,
+        peticiones: 10,
+        dias_con_dato: 8,
+        dias_mes: 31,
+        dias_restantes: 22,
+        usd_medio_dia: 0.25,
+        proy_lineal_usd: 7.75,
+        proy_media7_usd: 8,
+        fijos_eur_mes: 25,
+        fijos_sin_verificar: 0,
+        estimado_ia_usd_mes: 9,
+      },
+    ];
+    renderPagina();
+    const ia = await screen.findByTestId("kpi-ia-mes");
+    // 2 USD * 0,92 = 1,84
+    await waitFor(() => expect(ia).toHaveTextContent("1,84 €"));
+    expect(ia).toHaveTextContent("(estimada)");
+    expect(screen.getByTestId("partida-ia:estimado")).toHaveTextContent("IA (OpenAI), estimada");
+    expect(screen.queryByTestId("partida-ia:ocr")).not.toBeInTheDocument();
+  });
+
+  it("sin nada de nada no finge un coste de 0: «sin datos»", async () => {
+    renderPagina();
+    const ia = await screen.findByTestId("kpi-ia-mes");
+    expect(ia).toHaveTextContent("sin datos");
+    expect(screen.getByTestId("kpi-prevision-ia")).toHaveTextContent("sin datos");
+    expect(await screen.findByText(/Un coste vacío no significa que no se esté gastando/)).toBeInTheDocument();
+  });
+});
+
+describe("Costes · Detalles", () => {
+  it("agrupa real/estimado, tipo de cambio y los avisos en un desplegable", async () => {
+    datosConReal();
+    rpcData.ia_funciones_sin_registro = [
+      { funcion: "analizar-peticion", descripcion: "Análisis de tickets", instrumentada: false, ultima_fila: null, dias_sin_registro: null },
+    ];
+    rpcData.ia_coste_por_modelo = [{ modelo: "gpt-nuevo", tarifado: false, coste_usd: null }];
+    renderPagina();
+    await screen.findByTestId("tabla-partidas");
+    // Los avisos ya no son tarjetas sueltas…
+    expect(screen.queryByText("Hay funciones de IA que todavía no registran su consumo")).not.toBeInTheDocument();
+    // …están en «Detalles», que lleva un punto de aviso.
+    await waitFor(() => expect(screen.getByTestId("detalles-aviso")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("boton-detalles"));
+
+    expect(await screen.findByText("Hay funciones de IA que todavía no registran su consumo")).toBeInTheDocument();
+    expect(screen.getByText("analizar-peticion")).toBeInTheDocument();
+    expect(screen.getByText(/Modelos usados sin tarifa/)).toBeInTheDocument();
+    expect(screen.getByText(/1 USD = 0,500 EUR, BCE 8 oct/)).toBeInTheDocument();
+    expect(screen.getByText(/Real \(OpenAI\) hasta el 8 oct/)).toBeInTheDocument();
+  });
+
+  it("compara la lectura de facturas: estimado (ia_uso) frente a real (OpenAI) en la misma ventana", async () => {
+    datosConReal();
+    // Real del mes hasta el 8 oct = 2 USD (ventana de 8 días). Estimado de ia_uso: 1,2 + 0,5 + 0,1 = 1,8 USD (-10 %).
+    rpcData.ia_coste_por_funcion = [
+      { funcion: "procesar-factura", coste_usd: 1.2 },
+      { funcion: "ocr-trabajo", coste_usd: 0.5 },
+      { funcion: "clasificar-productos", coste_usd: 0.1 },
+      { funcion: "chat-facturas", coste_usd: 9 }, // otro proceso: no cuenta
+    ];
+    renderPagina();
+    await screen.findByTestId("tabla-partidas");
+    fireEvent.click(screen.getByTestId("boton-detalles"));
+    const linea = await screen.findByTestId("contraste-lectura");
+    expect(linea).toHaveTextContent(/Lectura de facturas: estimado \(ia_uso\) 1,80 \$ vs real \(OpenAI\) 2,00 \$ \([-−]10 %\) hasta el 8 oct/);
+    // La ventana pedida es del 1 de octubre al último día cerrado.
+    const pedida = llamadas.find((l) => l.fn === "ia_coste_por_funcion");
+    expect(pedida?.args).toEqual({ p_desde: "2026-10-01", p_hasta: "2026-10-08" });
+  });
+
+  it("si ia_uso no tiene tarifa para la lectura, el estimado sale «sin datos» (no 0)", async () => {
+    datosConReal();
+    rpcData.ia_coste_por_funcion = [{ funcion: "procesar-factura", coste_usd: null }];
+    renderPagina();
+    await screen.findByTestId("tabla-partidas");
+    fireEvent.click(screen.getByTestId("boton-detalles"));
+    expect(await screen.findByTestId("contraste-lectura")).toHaveTextContent("estimado (ia_uso) sin datos vs real (OpenAI) 2,00 $");
+  });
+
+  it("sin gasto real no hay contraste que hacer", async () => {
+    tablaData.costes_fijos = [fijo("f1", "Supabase", 25)];
+    renderPagina();
+    // Sin IA no hay filas: la tabla deja paso al «sin datos».
+    await screen.findByText(/Todavía no hay consumo de IA registrado este mes/);
+    fireEvent.click(screen.getByTestId("boton-detalles"));
+    await screen.findByText(/Todavía no hay gasto real/);
+    expect(screen.queryByTestId("contraste-lectura")).not.toBeInTheDocument();
+  });
+
+  it("el margen frente a lo facturado usa la previsión de todos los servicios (no los fijos de antes)", async () => {
+    datosConReal();
+    facturado.eur = 100;
+    renderPagina(40);
+    await screen.findByTestId("tabla-partidas");
+    fireEvent.click(screen.getByTestId("boton-detalles"));
+    const margen = await screen.findByText(/Se factura 100,00 €\/mes/);
+    expect(margen).toHaveTextContent("Con la previsión de coste de 40,00 €, el margen es de 60,00 €");
+    expect(screen.queryByText(/los fijos del mes anterior/)).not.toBeInTheDocument();
+  });
+
+  it("sin avisos no hay punto", async () => {
+    datosConReal();
+    tablaData.costes_fijos = [fijo("f1", "Supabase", 25)]; // verificado y reciente
+    renderPagina();
+    await screen.findByTestId("tabla-partidas");
+    expect(screen.queryByTestId("detalles-aviso")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("boton-detalles"));
+    expect(await screen.findByText(/Sin avisos/)).toBeInTheDocument();
+  });
+});
+
+describe("Costes · acciones", () => {
+  it("«Sincronizar ahora» llama a la RPC y se apaga un minuto", async () => {
+    datosConReal();
+    rpcData.openai_sincronizar_ahora = 1;
+    renderPagina();
+    const boton = await screen.findByTestId("boton-sincronizar");
+    expect(boton).toHaveTextContent("Sincronizar ahora");
+    fireEvent.click(boton);
+    await waitFor(() => expect(llamadas.some((l) => l.fn === "openai_sincronizar_ahora")).toBe(true));
+    await waitFor(() => expect(screen.getByTestId("boton-sincronizar")).toBeDisabled());
+    expect(screen.getByTestId("boton-sincronizar")).toHaveTextContent(/Sincronizar \(\d+ s\)/);
+  });
+
+  it("el tope se cambia con la RPC fijar_tope_ia_mes", async () => {
+    datosConReal();
+    rpcData.fijar_tope_ia_mes = 8;
+    renderPagina();
+    fireEvent.click(await screen.findByTestId("editar-tope-ia"));
+    const campo = await screen.findByLabelText("Tope mensual de IA (€)");
+    fireEvent.change(campo, { target: { value: "8" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar tope" }));
+    await waitFor(() =>
+      expect(llamadas.find((l) => l.fn === "fijar_tope_ia_mes")?.args).toEqual({ p_eur: 8 }),
+    );
+    await waitFor(() => expect(screen.getByTestId("kpi-ia-mes")).toHaveTextContent("de 8,00 €"));
+  });
+
+  it("un tope fuera de rango no se puede guardar", async () => {
+    datosConReal();
+    renderPagina();
+    fireEvent.click(await screen.findByTestId("editar-tope-ia"));
+    const campo = await screen.findByLabelText("Tope mensual de IA (€)");
+    fireEvent.change(campo, { target: { value: "0" } });
+    expect(screen.getByRole("button", { name: "Guardar tope" })).toBeDisabled();
+  });
+});
