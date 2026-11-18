@@ -3,11 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useMensualFacturado } from "@/hooks/useFacturacionOficiososia";
 import type { CosteFijo, FilaCosteMes, FilaCostePorModelo, FilaFuncionSinRegistro } from "@/hooks/useCostes";
-import type { ContrasteLectura } from "./calculos";
 import { fmtEurIa, fmtFechaCorta, textoTipoCambioReal } from "@/lib/gastoIa";
 import { AvisosCostes } from "./AvisosCostes";
 
-const fmtPct1 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
 import { calcularAvisosCostes, iaUsdMes, TEXTO_ORIGEN } from "./calculos";
 import { esNulo, fmtEur, fmtUsd, TEXTO_TIPO_CAMBIO } from "./formato";
 import type { ResumenCostesMes } from "./resumenMes";
@@ -18,8 +16,6 @@ interface DetallesCostesProps {
   sinRegistro: FilaFuncionSinRegistro[] | undefined;
   modelos: FilaCostePorModelo[] | undefined;
   fijos: CosteFijo[] | undefined;
-  /** Lectura de facturas: estimado (ia_uso) frente a real (OpenAI), misma ventana. null = no se puede comparar. */
-  contrasteLectura?: ContrasteLectura | null;
   /** Coste previsto del mes con el que se calcula el margen frente a lo facturado (por defecto, el del resumen). */
   previsionTotalEur?: number | null;
 }
@@ -49,7 +45,7 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
  * instrumentar, modelos sin tarifa, fijos sin verificar). Antes eran tarjetas
  * sueltas que se comían la pantalla.
  */
-export function DetallesCostes({ resumen, mes, sinRegistro, modelos, fijos, contrasteLectura, previsionTotalEur }: DetallesCostesProps) {
+export function DetallesCostes({ resumen, mes, sinRegistro, modelos, fijos, previsionTotalEur }: DetallesCostesProps) {
   const facturado = useMensualFacturado();
   const prevision = previsionTotalEur === undefined ? resumen.previsionEur : previsionTotalEur;
   const aviso = hayAvisosCostes({ sinRegistro, modelos, fijos });
@@ -88,15 +84,6 @@ export function DetallesCostes({ resumen, mes, sinRegistro, modelos, fijos, cont
                 {real.repartoTexto}. {textoTipoCambioReal(real.tipo)}. El real manda; el estimado de abajo solo sirve
                 para contrastar.
               </p>
-              {contrasteLectura && (
-                <p className="text-xs text-muted-foreground tabular-nums" data-testid="contraste-lectura">
-                  Lectura de facturas: estimado (ia_uso) {fmtUsd(contrasteLectura.estimadoUsd)} vs real (OpenAI){" "}
-                  {fmtUsd(contrasteLectura.realUsd)}
-                  {contrasteLectura.difPct !== null && ` (${contrasteLectura.difPct > 0 ? "+" : ""}${fmtPct1.format(contrasteLectura.difPct)} %)`}
-                  {" "}
-                  hasta el {fmtFechaCorta(resumen.ultimoDiaReal)}.
-                </p>
-              )}
               {resumen.subOtros.length > 0 && (
                 <ul className="space-y-0.5 border-l pl-3 text-xs text-muted-foreground" aria-label="Detalle de otros">
                   {resumen.subOtros.map((s) => (

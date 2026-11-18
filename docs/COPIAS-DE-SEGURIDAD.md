@@ -8,25 +8,25 @@ Por eso el workflow **«Copia de seguridad de la base de datos»** (`.github/wor
 
 | Sí | No |
 |---|---|
-| Todas las tablas y sus datos: usuarios del panel y permisos, auditoría, avisos, peticiones, servicios y costes, recibos del Gestor Gasto… | Los **ficheros** de Storage: fotos de la carta, fotos de novedades y PDF originales de facturas. Solo se guardan sus datos (nombre, ruta, tamaño). |
+| Todas las tablas y sus datos: usuarios del panel y permisos, auditoría, avisos, peticiones, servicios y costes, recibos del Gestor Gasto… | Los **ficheros** de Storage (capturas de los tickets y demás adjuntos). Solo se guardan sus datos (nombre, ruta, tamaño). |
 | Estructura: tablas, funciones, políticas de seguridad (RLS), triggers. | `vault.secrets`: está cifrado con la clave del proyecto y no sirve en otro. |
 | Roles y el historial de migraciones. | Las colas internas de cron y de pg_net, que se regeneran solas. |
 
 ## Puesta en marcha (una vez, la hace el dueño)
 
-1. En GitHub, en el repo **admin-casatomas**, entra en **Settings → Secrets and variables → Actions**.
+1. En GitHub, en el repo **admin-cristaleriabv**, entra en **Settings → Secrets and variables → Actions**.
 2. Comprueba que existe **`SUPABASE_ACCESS_TOKEN`**. Es el token personal de la cuenta de Supabase del proyecto que ya usa la migración. Si caducó, crea uno nuevo en https://supabase.com/dashboard/account/tokens y sustitúyelo.
 3. Pulsa **New repository secret** y crea **`COPIA_SEGURIDAD_CLAVE`**: una frase larga, de 20 caracteres o más. **Guárdala también en tu gestor de contraseñas.** Sin ella las copias no se pueden abrir, ni siquiera por GitHub ni por Claude.
-4. Prueba la copia: **Actions → Copia de seguridad de la base de datos → Run workflow**. Tarda unos minutos. Si sale en verde, en esa ejecución aparece un artefacto `casatomas-prod-AAAAMMDD-HHMM`.
+4. Prueba la copia: **Actions → Copia de seguridad de la base de datos → Run workflow**. Tarda unos minutos. Si sale en verde, en esa ejecución aparece un artefacto `cristaleriabv-prod-AAAAMMDD-HHMM`.
 
 A partir de ahí se ejecuta sola cada noche. Si falla, GitHub te avisa por correo.
 
 ## Cómo restaurar una copia
 
-1. Descarga el artefacto desde la ejecución de Actions que quieras. Es un `.zip` que contiene `casatomas-prod-….tar.gz.gpg`.
+1. Descarga el artefacto desde la ejecución de Actions que quieras. Es un `.zip` que contiene `cristaleriabv-prod-….tar.gz.gpg`.
 2. Descífralo y descomprímelo:
    ```bash
-   gpg --decrypt casatomas-prod-AAAAMMDD-HHMM.tar.gz.gpg > copia.tar.gz
+   gpg --decrypt cristaleriabv-prod-AAAAMMDD-HHMM.tar.gz.gpg > copia.tar.gz
    ```
    ```bash
    mkdir copia && tar -xzf copia.tar.gz -C copia

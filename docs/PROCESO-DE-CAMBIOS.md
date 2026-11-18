@@ -1,6 +1,6 @@
 # Proceso de cambios: del desarrollo a producción
 
-Vale para los dos repos, `restcasatomascrevillent/web-casatomas` (web) y `restcasatomascrevillent/admin-casatomas` (panel). Este documento es el mismo en ambos.
+Vale para los dos repos, `oficiososia/cristaleriabv` (web) y `oficiososia/admin-cristaleriabv` (panel).
 
 ```
  feature/x ──PR──┐
@@ -29,10 +29,9 @@ Con un único PR `staging → main` que se actualizara solo, aceptarlo publicar�
 | `release/X.Y.Z` | Una publicación: `main` + la selección | **Preview de la candidata**, en cada subida | demo |
 | `feature/*`, `fix/*` | Un cambio cada una | No (el CI corre en su PR) | — |
 
-- Demo web: https://web-casatomas-git-staging-casa-tomas.vercel.app · panel: https://admin-casatomas-git-staging-casa-tomas.vercel.app
-- Producción web: https://web-casatomas.vercel.app · panel: https://admin-casatomas.vercel.app
+- Demo del panel: la URL de la rama `staging` en Vercel (proyecto `admin-cristaleriabv`, *Domains* de la rama).
+- Producción del panel: https://admin-cristaleriabv.vercel.app (o el dominio propio que se le asigne en Vercel).
 - La demo y las previews usan una **copia de los datos reales**, sin Stripe ni Resend: no cobran ni mandan correos. Desde el 04/11/2026 se abren sin la cuenta de Vercel (se quitó *Vercel Authentication*; para volver a cerrarlas: Vercel → proyecto → *Settings → Deployment Protection*). El panel sigue pidiendo usuario y contraseña.
-- El proyecto viejo (`jeamoczmbfsnwkfjxcyo`, repos de `oficiososia`) no se toca.
 
 ## Guía práctica
 
@@ -40,7 +39,7 @@ Con un único PR `staging → main` que se actualizara solo, aceptarlo publicar�
 
 1. Rama desde `staging`: `feature/<tema>` para algo nuevo, `fix/<tema>` para un arreglo. **Un cambio por rama**: es la unidad que luego se puede publicar o dejar fuera.
 2. Commits con tipo: `feat(usuarios): …`, `fix(avisos): …`, `refactor`, `perf`, `docs`, `test`, `chore`. Si cambia un comportamiento, añade en el cuerpo dos líneas `Antes: …` y `Ahora: …`: salen tal cual en el informe del PR de la release.
-3. **Antes de subir a staging:** `npm run test:cambios` + typecheck (`npx tsc --noEmit -p tsconfig.app.json`). `test:cambios` pasa solo los tests afectados por lo cambiado respecto a `origin/staging` (o a la base que le pases: `npm run test:cambios -- origin/main`) y la suite completa si cambia algo global (package.json, lockfile, config de vite/vitest, tsconfig, setup de tests, tipos de Supabase). En el panel, si cambian `supabase/migrations`, lanza también todas las pruebas PGlite. `npm run lint:cambios` revisa con ESLint solo los ficheros cambiados. En la web, `npm run test:e2e` solo si tocas reservas, carta, cheques o maquetación. **La suite completa** (`npm test`, en el panel `npm run test:cheques:db` y demás PGlite, `npm run build`) **solo al preparar una release** (sobre la rama `release/X.Y.Z`).
+3. **Antes de subir a staging:** `npm run test:cambios` + typecheck (`npx tsc --noEmit -p tsconfig.app.json`). `test:cambios` pasa solo los tests afectados por lo cambiado respecto a `origin/staging` (o a la base que le pases: `npm run test:cambios -- origin/main`) y la suite completa si cambia algo global (package.json, lockfile, config de vite/vitest, tsconfig, setup de tests, tipos de Supabase). En el panel, si cambian `supabase/migrations`, lanza también todas las pruebas PGlite. `npm run lint:cambios` revisa con ESLint solo los ficheros cambiados. **La suite completa** (`npm test`, `npm run test:nucleo:db`, `npm run build`) **solo al preparar una release** (sobre la rama `release/X.Y.Z`).
 4. PR de la rama a `staging` y fusión con **Create a merge commit** (o *Squash*). Así el cambio se puede elegir luego por su número (`#12`). Si se integra en local, el mensaje debe llevar el número: `Merge branch 'fix/x' into staging (#12)`.
 5. Vercel publica la demo en 1–3 minutos. Se prueba ahí.
 
@@ -91,7 +90,7 @@ En el PR de la release corren solos:
 | **Validar release a producción** | La rama es `release/X.Y.Z`, `versionado.json` y el CHANGELOG dicen esa versión, parte del último `main` y la etiqueta no existe |
 | **Release · candidata** | Vercel despliega la rama; su `/version.json` lleva la versión y el commit exactos; en la web, la prueba rápida (humo) contra esa preview; capturas antes/después si hay cambios visuales. Actualiza el informe del PR con los resultados |
 
-La preview de la candidata está en el PR (check de Vercel y apartado *Validación*). Pruébala ahí: es exactamente lo que se publicará. Su URL es la de la rama, sin los puntos de la versión: `release/1.4.0` → `https://web-casatomas-git-release-140-casa-tomas.vercel.app` (en el panel, `admin-casatomas-git-release-140-…`).
+La preview de la candidata está en el PR (check de Vercel y apartado *Validación*). Pruébala ahí: es exactamente lo que se publicará. Su URL es la de la rama, sin los puntos de la versión: `release/1.4.0` → `https://admin-cristaleriabv-git-release-140-<equipo>.vercel.app`.
 
 - **Si hay que corregir algo:** mejor arreglarlo en staging (PR a staging) y volver a preparar la release (`git push origin --delete release/1.4.0`, cerrar el PR y repetir el paso 3). Un commit directo en la rama de la release también vale; el informe lo marca como «hecho en la release» y al publicar vuelve a staging solo.
 - **Si `main` cambia** mientras la release está abierta, «Validar release a producción» falla: hay que prepararla otra vez.
@@ -104,7 +103,7 @@ Antes de aceptar: que los checks estén en verde, haber mirado la preview y leer
 
 ### 6. Publicar
 
-1. En GitHub, **con la cuenta `restcasatomascrevillent`**, abre el PR *Release vX.Y.Z* y pulsa **Merge pull request** con **Create a merge commit**. No uses otra cuenta (el plan Hobby de Vercel bloquea sus despliegues) ni *Squash* o *Rebase* (Vercel no publica).
+1. En GitHub, **con la cuenta dueña del proyecto de Vercel**, abre el PR *Release vX.Y.Z* y pulsa **Merge pull request** con **Create a merge commit**. No uses otra cuenta (el plan Hobby de Vercel bloquea sus despliegues) ni *Squash* o *Rebase* (Vercel no publica).
 2. Después, sin hacer nada más:
    - **Vercel** publica producción en 1–3 minutos.
    - **Release · publicar** crea la etiqueta `vX.Y.Z` y la **GitHub Release** con la entrada del CHANGELOG, integra `main` en `staging` (si choca, abre un PR `main → staging`) y, cuando Vercel termina, comprueba que producción sirve `vX.Y.Z` con ese commit y lo anota en la Release.

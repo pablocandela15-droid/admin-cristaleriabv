@@ -95,9 +95,9 @@ a releer los permisos y, si procede, el nuevo rol antes de cerrar el diálogo.
 
 La migración `20261007220000_audit_log_panel_completo.sql` sustituye la lista de
 13 tablas por la instalación sobre las tablas de negocio de `public`, además
-de `auth.users` y `storage.objects`. Incluye reservas, espacios y asignaciones,
-carta, menús, novedades, reseñas, facturas, productos, proveedores, cheques,
-ecommerce, stock, newsletter, plantillas, configuración y sus documentos.
+de `auth.users` y `storage.objects`. Incluye usuarios, roles y permisos,
+módulos del panel, peticiones, servicios y costes, recibos y tarifas del
+Gestor Gasto, configuración y sus documentos.
 Un event trigger instala la auditoría en las nuevas tablas de negocio de
 `public`; las particiones heredan el trigger de su tabla principal.
 
@@ -111,7 +111,7 @@ Los triggers son transaccionales: si un cambio requiere un evento y no se
 puede identificar su autor, también se rechaza el cambio. Cada evento conserva
 el identificador del registro (incluidas claves compuestas), origen, operación
 SQL y estados anterior/posterior. Un guardado idéntico o solo de marcas de
-tiempo no crea eventos. Una asignación/retirada de rol, acceso o mesa es un
+tiempo no crea eventos. Una asignación/retirada de rol o de acceso es un
 cambio; la creación real del usuario o documento es una creación.
 
 Las funciones del servidor utilizan `_shared/audit-client.ts`. El UUID se
@@ -123,8 +123,6 @@ servicio ajenas al repositorio también deben aportar `x-audit-source` y, si
 actúan en nombre de un usuario, un `x-audit-actor-id` verificado por ellas.
 Si no se puede verificar un token de usuario, se detiene la petición antes
 de ejecutar el handler; nunca se sustituye ese usuario por un proceso.
-La delegación de avisos de reservas conserva el JWT del iniciador, de modo
-que los registros de envío y las acciones de correo mantienen su identidad.
 
 Además de las mutaciones, las acciones externas iniciadas por un usuario
 (correos, sincronización, traducción, publicación, consultas del asistente...)
@@ -140,57 +138,14 @@ su hash. Otros secretos, tokens, claves y binarios base64 se ocultan también
 en objetos anidados. Login/logout esperan a registrar el acceso mientras el
 token sigue disponible; un fallo se comunica, sin descartarlo en segundo plano.
 
-### Activación de cobertura y accesos por dispositivo (8 de octubre)
+### Activación
 
-**Publicar `main` no aplica estas migraciones ni despliega las funciones.**
-La pantalla avisa mientras el registro completo no esté activo. El login
-mantiene el comportamiento anterior hasta que `version_auditoria_panel()`
-responda 2; en esa fase todavía no se recogen intentos fallidos ni sesiones
-restauradas. No se anuncia una cobertura que el servidor no tenga.
-
-Actualizar ambos repositorios a `main` y enlazarlos al proyecto existente
-`jeamoczmbfsnwkfjxcyo`. No ejecutar de nuevo la migración de limpieza de las
-20:00 ni aplicar indiscriminadamente todo el historial de migraciones.
-
-1. Como `postgres`, ejecutar
-   `supabase/migrations/20261007213000_audit_preparar_servidor.sql`.
-   Prepara las columnas y RPC sin ampliar todavía los triggers.
-   Presupone las migraciones de identidad, limpieza y permisos ya aplicadas.
-2. Desde **adminpanelct** ejecutar `npx supabase functions deploy`, incluido
-   el nuevo gateway `panel-auth` que aún no usa el frontend. Desde
-   **casa-tomas-story**, desplegar las tres funciones compartidas de cheques:
-
-   ```sh
-   npx supabase functions deploy cheques-regalo-admin
-   npx supabase functions deploy cheques-regalo-web
-   npx supabase functions deploy stripe-webhook-cheques-regalo --no-verify-jwt
-   ```
-
-3. Ejecutar `supabase/migrations/20261007220000_audit_log_panel_completo.sql`.
-4. Ejecutar `supabase/migrations/20261008080000_audit_accesos_dispositivos.sql`.
-   Este último paso activa los accesos del nuevo frontend. Recargar el panel
-   en las pestañas abiertas. Estas migraciones no eliminan registros.
-
-Los handlers se actualizan antes de ampliar la cobertura para que ninguna
-función siga escribiendo sin origen durante la transición. Integraciones
-externas al código, como n8n, también deben enviar un `x-audit-source` concreto
-y el iniciador verificado si actúan por un usuario. No se inventa ese iniciador.
-
-Comprobaciones después de desplegar:
-
-```sql
-select public.version_auditoria_panel(); -- 2
-select count(*) as sin_identidad from public.audit_log
-where actor_label is null or btrim(actor_label)=''; -- 0
-select accion, actor_origin, count(*) from public.audit_log
-where tabla='accesos_panel' group by accion,actor_origin;
-```
-
-Desde dos navegadores/dispositivos: iniciar sesión con dos cuentas distintas,
-fallar una contraseña, intentar un email inexistente y reabrir una sesión ya
-iniciada. El super admin debe ver todos los casos, sus dispositivos y la hora.
-Después crear, editar y eliminar una entidad, cambiar permisos y subir/borrar
-un archivo. Un usuario normal no debe poder consultar `audit_log`.
+En este proyecto la auditoría completa (cobertura de todas las tablas, accesos
+por dispositivo y `version_auditoria_panel()` = 2) va dentro de la migración
+única `20261118120000_nucleo_panel.sql`, y las funciones se despliegan con el
+resto (ver docs/DESPLIEGUE.md). Mientras el servidor no responda 2, la pantalla
+avisa de que el registro completo no está activo y el login mantiene el
+comportamiento anterior: no se anuncia una cobertura que el servidor no tenga.
 
 ### Qué identifica cada acceso
 
@@ -223,29 +178,10 @@ un archivo. Un usuario normal no debe poder consultar `audit_log`.
 ### Verificación
 
 ```sh
-npm run test:auditoria:db
+npm run test:nucleo:db
 npm test -- src/hooks/__tests__/audit-client.test.ts src/hooks/__tests__/audit-auth.test.ts src/hooks/__tests__/useAuth.auditoria.test.tsx src/hooks/__tests__/useAuditLog.test.ts src/hooks/__tests__/panel-auth.test.ts src/pages/__tests__/SuperAdminAuditoria.test.tsx
 ```
 
-El banco de PostgreSQL usa PGlite en memoria: aplica las migraciones y comprueba
-identidad, rechazo con rollback, clasificación, claves compuestas, archivos,
-cascadas, secretos, acciones externas y tablas nuevas, sin conectar a producción.
-
-
-## Activación verificada (8 de octubre de 2026)
-
-Las funciones en producción incluyen el contexto de auditoría y las migraciones
-`audit_log_panel_completo`, `audit_accesos_dispositivos` y
-`audit_version_search_path` están aplicadas. La RPC de disponibilidad devuelve 2.
-La cobertura pasó de 13 a 102 tablas, incluidos `auth.users` y `storage.objects`.
-Los tres registros previos se conservaron y no hay registros sin identidad.
-
-Se verificaron en producción, dentro de transacciones revertidas, los intentos
-fallidos, accesos correctos, sesiones restauradas, dispositivos distintos y
-protección frente a duplicados y accesos fabricados. Con el rol real
-`authenticated`, un usuario normal no puede leer la auditoría; el superadmin
-consulta todos los registros. No quedaron entradas de prueba. El gateway
-responde y la publicación del frontend en Vercel finalizó correctamente.
-
-Recargar las pestañas abiertas para utilizar el frontend actualizado. Los
-intentos anteriores que nunca se registraron no se reconstruyen ni se inventan.
+El banco de PostgreSQL usa PGlite en memoria (`scripts/test-nucleo.mjs`): aplica
+la migración y comprueba permisos, RLS, auditoría y la vuelta atrás, sin
+conectar a producción.

@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { Bloque } from "@/components/servicios/Bloque";
-import { useCosteMes, useCostePorFuncion, useCostePorModelo, useFuncionesSinRegistro } from "@/hooks/useCostes";
+import { useCosteMes, useCostePorModelo, useFuncionesSinRegistro } from "@/hooks/useCostes";
 import { useGastoIaRealMes, useSincronizarCostes, useTopeIaMes } from "@/hooks/useGastoIa";
-import { primerDiaMesIso, TOPE_IA_POR_DEFECTO, ultimoDiaDe } from "@/lib/gastoIa";
+import { TOPE_IA_POR_DEFECTO } from "@/lib/gastoIa";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
-import { contrasteLectura as calcularContrasteLectura, DIAS_SIN_REGISTRO } from "./calculos";
+import { DIAS_SIN_REGISTRO } from "./calculos";
 import { construirResumenMes } from "./resumenMes";
 import { ResumenIaFila } from "./ResumenCostesMes";
 import { TablaPartidas } from "./TablaPartidas";
@@ -98,23 +98,6 @@ export function CostesIa({ previsionTotalEur }: { previsionTotalEur?: number | n
 
   const resumen = useMemo(() => construirResumenMes({ fijos: [], real: realQ.data, mes: mesQ.data }), [realQ.data, mesQ.data]);
 
-  // Lectura de facturas: lo estimado por la app (ia_uso) frente a lo que ha facturado OpenAI, en la MISMA
-  // ventana (1 del mes → último día cerrado con datos reales). Si cuadra, la contabilidad es fiable.
-  const ultimoDiaReal = realQ.data ? ultimoDiaDe(realQ.data.actual) : null;
-  const primeroMes = primerDiaMesIso(new Date());
-  const hayVentanaLectura = !!ultimoDiaReal && ultimoDiaReal >= primeroMes;
-  const porFuncionQ = useCostePorFuncion(primeroMes, ultimoDiaReal ?? primeroMes, hayVentanaLectura);
-  const contrasteLectura = useMemo(
-    () =>
-      hayVentanaLectura
-        ? calcularContrasteLectura({
-            porFuncion: porFuncionQ.data,
-            realOcrEur: resumen.real?.lineas.find((l) => l.clave === "ocr")?.realEur,
-            eurPorUsd: resumen.real?.tipo.eurPorUsd ?? 0,
-          })
-        : null,
-    [hayVentanaLectura, porFuncionQ.data, resumen.real],
-  );
   const topeEur = topeQ.data ?? TOPE_IA_POR_DEFECTO;
   const cargando = realQ.isLoading || mesQ.isLoading;
 
@@ -133,7 +116,6 @@ export function CostesIa({ previsionTotalEur }: { previsionTotalEur?: number | n
             sinRegistro={sinRegistroQ.data}
             modelos={porModeloQ.data}
             fijos={[]}
-            contrasteLectura={contrasteLectura}
             previsionTotalEur={previsionTotalEur}
           />
         </>
