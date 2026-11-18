@@ -61,7 +61,7 @@ jobs:
       - name: Typecheck (no puede superar el tope)
         if: env.COMPLETA != 'true'
         env:
-          TOPE_TSC: "20"
+          TOPE_TSC: "17"
         run: |
           npx tsc --noEmit -p tsconfig.app.json > tsc.log || true
           n=$(grep -c "error TS" tsc.log || true)
@@ -97,8 +97,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      TOPE_TSC: "20"
-      TOPE_ESLINT: "479"
+      TOPE_TSC: "17"
+      TOPE_ESLINT: "13"
     steps:
       - uses: actions/checkout@v4
         with:
