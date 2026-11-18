@@ -747,26 +747,25 @@ describe("Super Admin › Servicios › Costes · precio de todo (13/11/2026)", 
       if (fn !== "ia_coste_por_uso") return { data: [], error: null };
       if (args?.p_desde !== `${mesDe(new Date()).slice(0, 7)}-01`) return { data: [], error: null };
       return { data: [
-        { funcion: "ocr-trabajo", que_hace: "Lee las facturas", accion: "Leer una factura", unidad: "documento", orden: 25, llamadas: 586, usos: 316, usos_con_coste: 316,
+        { funcion: "analizar-peticion", que_hace: "Analiza los tickets", accion: "Analizar un ticket", unidad: "ticket", orden: 25, llamadas: 586, usos: 316, usos_con_coste: 316,
           coste_usd: "1.4360", filas_sin_tarifa: 0, modelos_sin_tarifa: [], mediana_usd: "0.0062", media_usd: "0.0045", servidor_propio: false },
-        { funcion: "chat-facturas", que_hace: "Contesta en el chat de Facturas", accion: "Contestar una pregunta en el chat de Facturas", unidad: "pregunta", orden: 30, llamadas: 144,
+        { funcion: "resumir-informe", que_hace: "Resume un informe", accion: "Resumir un informe", unidad: "informe", orden: 30, llamadas: 144,
           usos: 60, usos_con_coste: 36, coste_usd: "0.1038", filas_sin_tarifa: 24, modelos_sin_tarifa: ["gpt-6.1-terra"], mediana_usd: "0.002", media_usd: "0.0029", servidor_propio: false },
-        { funcion: "recortar-foto", que_hace: "Quita el fondo de las fotos", accion: "Recortar una foto", unidad: "foto", orden: 90, llamadas: 2, usos: 2, usos_con_coste: 2,
+        { funcion: "comprimir-foto", que_hace: "Reduce las fotos en el servidor", accion: "Comprimir una foto", unidad: "foto", orden: 90, llamadas: 2, usos: 2, usos_con_coste: 2,
           coste_usd: 0, filas_sin_tarifa: 0, modelos_sin_tarifa: [], mediana_usd: 0, media_usd: 0, servidor_propio: true },
       ], error: null };
     });
     pintar("/super-admin/servicios?tab=costes");
     const cosas = await screen.findByTestId("coste-cada-cosa");
     const linea = (f: string) => cosas.querySelector(`[data-accion='${f}']`) as HTMLElement;
-    await waitFor(() => expect(t(linea("ocr-trabajo").textContent)).toMatch(/Leer una factura≈ 0,6 céntimosmediana de 316 documentos/));
-    expect(t(linea("extraer-vino-foto").textContent)).toContain("Leer la etiqueta de un vinosin usos todavía");
-    expect(t(linea("traducir-contenido").textContent)).toContain("Traducir un platosin usos todavía");
-    expect(t(linea("recortar-foto").textContent)).toContain("Recortar una fotogratis (en nuestro servidor)");
-    expect(t(linea("chat-facturas").textContent)).toContain("≈ 0,2 céntimos");
+    await waitFor(() => expect(t(linea("analizar-peticion").textContent)).toMatch(/Analizar un ticket≈ 0,6 céntimosmediana de 316 tickets/));
+    expect(t(linea("ia-modelos-openai").textContent)).toContain("Probar un modelosin usos todavía");
+    expect(t(linea("comprimir-foto").textContent)).toContain("Comprimir una fotogratis (en nuestro servidor)");
+    expect(t(linea("resumir-informe").textContent)).toContain("≈ 0,2 céntimos");
     const ia = screen.getByRole("region", { name: "Gasto de IA por acción" });
     expect(within(ia).getByRole("alert")).toHaveTextContent("24 llamadas de gpt-6.1-terra sin tarifa: su coste no está sumado.");
     const filaIa = (f: string) => within(ia).getByRole("table").querySelector(`[data-ia-funcion='${f}']`) as HTMLElement;
-    expect(t(filaIa("ocr-trabajo").textContent)).toMatch(/Leer una factura.*Lee las facturas.*316 documentos.*586 llamadas.*1,29 €.*93 %.*0,6 céntimos por documento/);
+    expect(t(filaIa("analizar-peticion").textContent)).toMatch(/Analizar un ticket.*Analiza los tickets.*316 tickets.*586 llamadas.*1,29 €.*93 %.*0,6 céntimos por ticket/);
     expect(t(within(ia).getByTestId("ia-total").textContent)).toBe("1,39 €");
   });
 

@@ -64,6 +64,7 @@ const ENV: Record<string, string> = {
   SUPABASE_URL: "https://ejemplo.supabase.co",
   SUPABASE_ANON_KEY: "anon-jwt-publico",
   SUPABASE_SERVICE_ROLE_KEY: "service-role-secreta",
+  METRICS_SUPABASE_URL: "https://metricas.example.supabase.co",
   METRICS_SUPABASE_SERVICE_ROLE_KEY: "metricas",
 };
 

@@ -13,7 +13,7 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("pedirControlExcel", () => {
   it("devuelve el estado (o el «no disponible») que da la función", async () => {
-    h.invoke.mockResolvedValueOnce({ data: { ok: true, disponible: false, motivo: "sin_config", mensaje: "x", cliente: "Casa Tomás" }, error: null });
+    h.invoke.mockResolvedValueOnce({ data: { ok: true, disponible: false, motivo: "sin_config", mensaje: "x", cliente: "Cristalería BV" }, error: null });
     await expect(pedirControlExcel({ accion: "leer" })).resolves.toMatchObject({ disponible: false, motivo: "sin_config" });
     expect(h.invoke).toHaveBeenCalledWith("control-excel", { body: { accion: "leer" } });
   });

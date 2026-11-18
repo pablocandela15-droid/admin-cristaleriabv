@@ -26,7 +26,7 @@ vi.mock("@/hooks/useAuditLog", async (original) => ({
       entradas: state.entradas,
       total: state.total || state.entradas.length,
       pageSize: 25,
-      tablas: ["Platos", "Bebidas", "novedades"],
+      tablas: ["peticiones", "user_permissions", "admin_feature_toggles"],
       loading: false,
       error: null,
     };
@@ -61,17 +61,17 @@ it("recoger filtros mantiene la lectura de detalles y la paginación sin aplicar
   fireEvent.click(screen.getByText("María"));
   expect(screen.getByText("Usuario: maria-id")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
-  fireEvent.change(screen.getByLabelText("Buscar en auditoría"), { target: { value: "paella" } });
+  fireEvent.change(screen.getByLabelText("Buscar en auditoría"), { target: { value: "mampara" } });
   fireEvent.click(screen.getByRole("button", { name: "Recoger filtros" }));
   expect(screen.getByText("Usuario: maria-id")).toBeInTheDocument();
   expect(state.filtros.at(-1)).toEqual({ origen: "sin_servidor" });
   fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
   expect(state.paginas.at(-1)).toBe(1);
   fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
-  expect(screen.getByLabelText("Buscar en auditoría")).toHaveValue("paella");
+  expect(screen.getByLabelText("Buscar en auditoría")).toHaveValue("mampara");
   fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
   expect(state.paginas.at(-1)).toBe(0);
-  expect(state.filtros.at(-1)).toMatchObject({ texto: "paella", origen: "sin_servidor" });
+  expect(state.filtros.at(-1)).toMatchObject({ texto: "mampara", origen: "sin_servidor" });
 });
 
 describe("tabla de auditoría", () => {
@@ -140,10 +140,10 @@ it("muestra el dispositivo, la IP y la identidad no verificada de los intentos f
 it("los filtros rápidos conservan la exclusión de los procesos del servidor", () => {
   render(<SuperAdminAuditoria />);
   expect(state.filtros.at(-1)).toEqual({ origen: "sin_servidor" });
-  fireEvent.click(screen.getByRole("button", { name: "IA facturas" }));
+  fireEvent.click(screen.getByRole("button", { name: "Usuarios y permisos" }));
   expect(state.filtros.at(-1)).toEqual({
     origen: "sin_servidor",
-    accion: "grupo_ia",
+    accion: "grupo_usuarios",
   });
   fireEvent.click(screen.getByRole("button", { name: "Cambios" }));
   expect(state.filtros.at(-1)).toEqual({
@@ -159,29 +159,25 @@ it("cambia de sección sin arrastrar filtros y separa los procesos de las person
   render(<SuperAdminAuditoria />);
   const elegir = (name: string) =>
     fireEvent.click(screen.getByRole("button", { name, exact: true }));
-  elegir("Platos");
+  elegir("Tickets");
   expect(state.filtros.at(-1)).toMatchObject({
     origen: "sin_servidor",
-    accion: "actualizar",
-    tabla: "Platos",
+    accion: "grupo_cambios",
+    tabla: "peticiones",
   });
   expect(
-    screen.getByRole("button", { name: "Platos", exact: true }),
+    screen.getByRole("button", { name: "Tickets", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  elegir("Bebidas");
-  expect(state.filtros.at(-1)).toMatchObject({
-    accion: "actualizar",
-    tabla: "Bebidas",
-  });
-  elegir("Novedades");
-  expect(state.filtros.at(-1)).toMatchObject({
-    accion: "grupo_cambios",
-    tabla: "novedades",
-  });
-  elegir("IA facturas");
+  elegir("Usuarios y permisos");
   expect(state.filtros.at(-1)).toMatchObject({
     origen: "sin_servidor",
-    accion: "grupo_ia",
+    accion: "grupo_usuarios",
+  });
+  expect(state.filtros.at(-1)?.tabla).toBeUndefined();
+  elegir("Reversiones");
+  expect(state.filtros.at(-1)).toMatchObject({
+    origen: "sin_servidor",
+    accion: "reversion",
   });
   expect(state.filtros.at(-1)?.tabla).toBeUndefined();
   elegir("Procesos");
@@ -194,7 +190,7 @@ it("cambia de sección sin arrastrar filtros y separa los procesos de las person
     screen.getByRole("button", { name: "Procesos", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   expect(
-    screen.getByRole("button", { name: "IA facturas", exact: true }),
+    screen.getByRole("button", { name: "Reversiones", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
   elegir("Inicios de sesión");
   expect(state.filtros.at(-1)).toEqual({
@@ -218,22 +214,22 @@ it("conserva búsqueda y fechas al elegir una categoría rápida", () => {
   render(<SuperAdminAuditoria />);
   fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
   fireEvent.change(screen.getByLabelText("Buscar en auditoría"), {
-    target: { value: "paella" },
+    target: { value: "mampara" },
   });
   fireEvent.click(screen.getByRole("button", { name: /Persona, fechas/ }));
   fireEvent.change(screen.getByLabelText("Desde"), {
     target: { value: "2026-10-01" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
-  fireEvent.click(screen.getByRole("button", { name: "Platos", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Tickets", exact: true }));
   expect(state.filtros.at(-1)).toMatchObject({
     origen: "sin_servidor",
-    accion: "actualizar",
-    tabla: "Platos",
-    texto: "paella",
+    accion: "grupo_cambios",
+    tabla: "peticiones",
+    texto: "mampara",
     desde: "2026-10-01",
   });
-  expect(screen.getByText("Sección: Platos")).toBeInTheDocument();
+  expect(screen.getByText("Sección: Tickets")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
-  expect(screen.getByLabelText("Sección")).toHaveValue("Platos");
+  expect(screen.getByLabelText("Sección")).toHaveValue("peticiones");
 });

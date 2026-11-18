@@ -13,7 +13,7 @@ function Harness() {
     <FiltrosAuditoria
       pendientes={pendientes}
       activos={activos}
-      tablas={["Platos", "reservas"]}
+      tablas={["peticiones", "user_permissions"]}
       onChange={setPendientes}
       onAplicar={() => {
         aplicar(pendientes);
@@ -43,7 +43,7 @@ describe("filtros móviles de auditoría", () => {
       screen.getByRole("dialog", { name: "Filtrar auditoría" }),
     ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Tipo de acción"), {
-      target: { value: "consulta_ia" },
+      target: { value: "cambiar_permisos" },
     });
     fireEvent.change(screen.getByLabelText("Origen de la acción"), {
       target: { value: "usuario" },
@@ -51,12 +51,12 @@ describe("filtros móviles de auditoría", () => {
     expect(aplicar).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     expect(aplicar).toHaveBeenCalledWith({
-      accion: "consulta_ia",
+      accion: "cambiar_permisos",
       origen: "usuario",
     });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(
-      screen.getByText("Tipo: Pregunta a la IA de facturas"),
+      screen.getByText("Tipo: Cambiar permisos"),
     ).toBeInTheDocument();
   });
   it("conserva fechas y resultado al reabrir y permite limpiar todos los filtros", () => {
@@ -87,7 +87,7 @@ describe("filtros móviles de auditoría", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
     expect(screen.getByLabelText("Tipo de acción")).toBeInTheDocument();
     expect(
-      screen.getByRole("option", { name: "Cambiar precio" }),
+      screen.getByRole("option", { name: "Cambiar su propia contraseña" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("option", { name: "Procesos / servidor" }),
@@ -102,20 +102,20 @@ it("en escritorio recoge sin aplicar ni perder el borrador y mantiene un resumen
   const mostrar = screen.getByRole("button", { name: "Mostrar filtros" });
   expect(mostrar).toHaveAttribute("aria-expanded", "false");
   fireEvent.click(mostrar);
-  fireEvent.change(screen.getByLabelText("Tipo de acción"), { target: { value: "consulta_ia" } });
-  fireEvent.change(screen.getByLabelText("Buscar en auditoría"), { target: { value: "paella" } });
+  fireEvent.change(screen.getByLabelText("Tipo de acción"), { target: { value: "cambiar_permisos" } });
+  fireEvent.change(screen.getByLabelText("Buscar en auditoría"), { target: { value: "mampara" } });
   fireEvent.click(screen.getByRole("button", { name: "Recoger filtros" }));
   expect(aplicar).not.toHaveBeenCalled();
   expect(screen.queryByLabelText("Tipo de acción")).not.toBeInTheDocument();
   expect(screen.getByText("Cambios sin aplicar")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
-  expect(screen.getByLabelText("Buscar en auditoría")).toHaveValue("paella");
+  expect(screen.getByLabelText("Buscar en auditoría")).toHaveValue("mampara");
   fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
-  expect(aplicar).toHaveBeenCalledWith({ accion: "consulta_ia", texto: "paella" });
+  expect(aplicar).toHaveBeenCalledWith({ accion: "cambiar_permisos", texto: "mampara" });
   expect(screen.queryByLabelText("Tipo de acción")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Mostrar filtros" })).toHaveFocus();
-  expect(screen.getByText("Acción: Pregunta a la IA de facturas")).toBeInTheDocument();
-  expect(screen.getByText("Búsqueda: paella")).toBeInTheDocument();
+  expect(screen.getByText("Acción: Cambiar permisos")).toBeInTheDocument();
+  expect(screen.getByText("Búsqueda: mampara")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Limpiar filtros activos" }));
-  expect(screen.queryByText("Búsqueda: paella")).not.toBeInTheDocument();
+  expect(screen.queryByText("Búsqueda: mampara")).not.toBeInTheDocument();
 });

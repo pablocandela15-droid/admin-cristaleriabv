@@ -237,22 +237,27 @@ describe("IA función por función y lo que cuesta cada cosa (pasos 3 y 4)", () 
       .toEqual(["documentos", "peticiones", "resúmenes", "foto", "tandas", "incidencias"]);
   });
 
-  it("las cuatro cosas pedidas siempre (con el mes anterior si este no se usó) y después las demás con acción", () => {
+  it("las acciones del panel siempre (con el mes anterior si este no se usó) y después las demás con acción", () => {
     const actual = [
-      fila({ funcion: "ocr-trabajo", accion: "Leer una factura", unidad: "documento", usos: 316, usosConCoste: 316, medianaUsd: 0.0062 }),
-      fila({ funcion: "recortar-foto", accion: "Recortar una foto", unidad: "foto", usos: 2, usosConCoste: 2, medianaUsd: 0, servidorPropio: true }),
-      fila({ funcion: "chat-facturas", accion: "Contestar una pregunta en el chat de Facturas", unidad: "pregunta", orden: 30, usos: 3, usosConCoste: 1, medianaUsd: 0.002 }),
+      fila({ funcion: "analizar-peticion", accion: "Analizar un ticket", unidad: "ticket", usos: 316, usosConCoste: 316, medianaUsd: 0.0062 }),
+      fila({ funcion: "comprimir-foto", accion: "Comprimir una foto", unidad: "foto", usos: 2, usosConCoste: 2, medianaUsd: 0, servidorPropio: true }),
+      fila({ funcion: "resumir-informe", accion: "Resumir un informe", unidad: "informe", orden: 30, usos: 3, usosConCoste: 1, medianaUsd: 0.002 }),
       fila({ funcion: "sin-accion", accion: null }),
-      fila({ funcion: "clasificar-productos", accion: "Clasificar una tanda", unidad: "tanda", orden: 80, usosConCoste: 0, medianaUsd: null }),
+      fila({ funcion: "sin-usos", accion: "Algo que no se ha usado", unidad: "uso", orden: 80, usosConCoste: 0, medianaUsd: null }),
     ];
-    const anterior = [fila({ funcion: "extraer-vino-foto", accion: "Leer la etiqueta de un vino", unidad: "foto", usos: 7, usosConCoste: 7, medianaUsd: 0.03 })];
+    const anterior = [fila({ funcion: "ia-modelos-openai", accion: "Probar un modelo", unidad: "prueba", usos: 7, usosConCoste: 7, medianaUsd: 0.03 })];
     const r = costesPorAccion({ actual, anterior, eurPorUsd: 0.9, textoMes: "noviembre de 2026", textoMesAnterior: "octubre de 2026" });
     expect(r.map((a) => [a.funcion, a.accion, a.texto, a.detalle, a.delMesAnterior])).toEqual([
-      ["ocr-trabajo", "Leer una factura", "≈ 0,6 céntimos", "mediana de 316 documentos de noviembre de 2026", false],
-      ["extraer-vino-foto", "Leer la etiqueta de un vino", "≈ 2,7 céntimos", "mediana de 7 fotos de octubre de 2026", true],
-      ["traducir-contenido", "Traducir un plato", "sin usos todavía", null, false],
-      ["recortar-foto", "Recortar una foto", "gratis (en nuestro servidor)", "mediana de 2 fotos de noviembre de 2026", false],
-      ["chat-facturas", "Contestar una pregunta en el chat de Facturas", "≈ 0,2 céntimos", "1 pregunta de noviembre de 2026", false],
+      ["analizar-peticion", "Analizar un ticket", "≈ 0,6 céntimos", "mediana de 316 tickets de noviembre de 2026", false],
+      ["ia-modelos-openai", "Probar un modelo", "≈ 2,7 céntimos", "mediana de 7 pruebas de octubre de 2026", true],
+      ["resumir-informe", "Resumir un informe", "≈ 0,2 céntimos", "1 informe de noviembre de 2026", false],
+      ["comprimir-foto", "Comprimir una foto", "gratis (en nuestro servidor)", "mediana de 2 fotos de noviembre de 2026", false],
+    ]);
+    // Sin usos ni este mes ni el anterior, la acción del panel sale igual, «sin usos todavía».
+    const vacio = costesPorAccion({ actual: [], eurPorUsd: 0.9, textoMes: "noviembre de 2026", textoMesAnterior: "octubre de 2026" });
+    expect(vacio.map((a) => [a.funcion, a.texto])).toEqual([
+      ["analizar-peticion", "sin usos todavía"],
+      ["ia-modelos-openai", "sin usos todavía"],
     ]);
   });
 

@@ -31,23 +31,23 @@ import { AnalisisTicket } from "../AnalisisTicket";
 import { DetalleTicket } from "../DetalleTicket";
 
 const ANALISIS = {
-  resumen: "Que al guardar una reserva desde la tablet se guarde.",
+  resumen: "Que al cambiar los permisos de un usuario desde la tablet se guarden.",
   tipo: "error",
-  tarea_propuesta: "Revisar el botón Guardar del formulario de reservas.",
+  tarea_propuesta: "Revisar el botón Guardar del diálogo de permisos de Usuarios.",
   pasos: ["Reproducir en tablet", "Corregir el guardado"],
-  modulos_afectados: ["Reservas"],
+  modulos_afectados: ["Usuarios"],
   repo: "panel",
-  riesgo: { nivel: "alto", motivo: "Afecta a reservas de clientes." },
+  riesgo: { nivel: "alto", motivo: "Afecta a los permisos del equipo." },
   toca_bd: true,
-  criterios_aceptacion: ["La reserva aparece en la lista"],
-  preguntas: ["¿Pasa con todas las reservas?"],
-  prompt_ia: "## Contexto\nPanel de Casa Tomás.\n\n## Reglas del repositorio (obligatorias)\n- PR a staging",
+  criterios_aceptacion: ["El permiso nuevo aparece en la lista"],
+  preguntas: ["¿Pasa con todos los usuarios?"],
+  prompt_ia: "## Contexto\nPanel de Cristalería BV.\n\n## Reglas del repositorio (obligatorias)\n- PR a staging",
 };
 
 const TICKET: Peticion = {
   id: "t-1", creado_por: "u-1", creado_por_nombre: "Ana Sala", creado_por_email: "ana@t",
-  titulo: "No se guarda la reserva", prioridad: "alta", modulo: "reservas", descripcion: "Al pulsar Guardar no pasa nada.",
-  captura_path: null, ruta: "/reservas?tab=hoy&id=9", dispositivo: "Mozilla/5.0 (iPad)", estado: "en_analisis", motivo_descarte: null,
+  titulo: "No se guardan los permisos", prioridad: "alta", modulo: "usuarios", descripcion: "Al pulsar Guardar no pasa nada.",
+  captura_path: null, ruta: "/usuarios?usuario=9", dispositivo: "Mozilla/5.0 (iPad)", estado: "en_analisis", motivo_descarte: null,
   estado_cambiado_en: null, analisis: ANALISIS, analisis_estado: "hecho", analisis_error: null, analisis_modelo: "gpt-4.1-mini",
   analizado_en: "2026-11-13T10:01:00Z", linear_id: null, linear_url: null, created_at: "2026-11-13T10:00:00Z", updated_at: "2026-11-13T10:00:00Z",
 };
@@ -79,13 +79,13 @@ describe("AnalisisTicket", () => {
     expect(screen.getByRole("heading", { name: /Tarea propuesta \(cómo lo haría\)/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Prompt para la IA/ })).toBeInTheDocument();
     expect(screen.getByTestId("bloque-que-quieren")).toHaveTextContent(ANALISIS.resumen);
-    expect(screen.getByTestId("bloque-que-quieren")).toHaveTextContent("¿Pasa con todas las reservas?");
+    expect(screen.getByTestId("bloque-que-quieren")).toHaveTextContent("¿Pasa con todos los usuarios?");
     const tarea = screen.getByTestId("bloque-tarea");
     expect(tarea).toHaveTextContent("Reproducir en tablet");
-    expect(tarea).toHaveTextContent("Panel (admin-casatomas)");
-    expect(tarea).toHaveTextContent("Alto · Afecta a reservas de clientes.");
+    expect(tarea).toHaveTextContent("Panel (admin-cristaleriabv)");
+    expect(tarea).toHaveTextContent("Alto · Afecta a los permisos del equipo.");
     expect(tarea).toHaveTextContent("Sí, hay que tocarla");
-    expect(tarea).toHaveTextContent("La reserva aparece en la lista");
+    expect(tarea).toHaveTextContent("El permiso nuevo aparece en la lista");
     expect(screen.getByTestId("prompt-ia").textContent).toBe(ANALISIS.prompt_ia);
   });
 
@@ -118,10 +118,10 @@ describe("AnalisisTicket", () => {
 describe("DetalleTicket", () => {
   it("enseña lo que escribió, quién, desde dónde (sin parámetros) y el análisis", () => {
     pintarDetalle();
-    expect(screen.getByText("No se guarda la reserva")).toBeInTheDocument();
+    expect(screen.getByText("No se guardan los permisos")).toBeInTheDocument();
     expect(screen.getByText("Al pulsar Guardar no pasa nada.")).toBeInTheDocument();
     expect(screen.getByText(/Ana Sala · ana@t/)).toBeInTheDocument();
-    expect(screen.getByText("/reservas")).toBeInTheDocument();
+    expect(screen.getByText("/usuarios")).toBeInTheDocument();
     expect(screen.getByTitle("Mozilla/5.0 (iPad)")).toHaveTextContent("tablet");
     expect(screen.getByTestId("analisis-ticket")).toBeInTheDocument();
   });
