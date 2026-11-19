@@ -10,7 +10,8 @@ validaciones de lista, formato condicional y estilos), pero:
   (el real llega a la 506). No lleva `INICIO`, `GASTOS NEGOCIO`, `SOCIOS`,
   `MES A MES`, `AJUSTES` ni `GUIA`, ni sus textos ni sus gráficos.
 - De los otros clientes solo queda el nombre.
-- Los importes y las notas de Casa Tomás están cambiados por valores de prueba.
+- El cliente de este panel es «Cristalería BV»; los importes y las notas son valores de prueba.
+- Otro cliente se llama «Taller Ejemplo» (nombre ficticio).
 - Los valores guardados de algunas fórmulas están viejos **a propósito**
   (`COBROS!H7` = 999, `CLIENTES!K7` = 99,99): las pruebas comprueban que no nos
   fiamos de ellos.

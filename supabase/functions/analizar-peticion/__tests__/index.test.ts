@@ -134,7 +134,7 @@ describe("analizar-peticion", () => {
     const guardado = h.fila!.analisis as { resumen: string; prompt_ia: string };
     expect(guardado.resumen).toBe(ANALISIS.resumen);
     expect(guardado.prompt_ia).toMatch(/## Reglas del repositorio/);
-    expect(guardado.prompt_ia).toContain("oficiososia/admin-cristaleriabv");
+    expect(guardado.prompt_ia).toContain("pablocandela15-droid/admin-cristaleriabv");
     expect(h.registros).toEqual([expect.objectContaining({ disparador: `peticion:${ID}` })]);
   });
 

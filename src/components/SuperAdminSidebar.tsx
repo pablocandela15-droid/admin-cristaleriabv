@@ -4,7 +4,6 @@ import {
   Users,
   LogOut,
   ArrowLeft,
-  ShieldAlert,
   ScrollText,
   Server,
   FileBarChart2,
@@ -97,21 +96,15 @@ export function SuperAdminSidebar() {
           {/* Versión y entorno arriba, bien a la vista (2026-11-03); con el menú plegado, solo el número. */}
           {isCollapsed && <VersionPanel colapsado />}
           {!isCollapsed && (
-            <div className="flex min-w-0 flex-1 items-center gap-2.5">
-              <Logotipo variante="simbolo" decorativo className="h-8 shrink-0" />
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <Logotipo variante="simbolo" decorativo className="h-7 shrink-0" />
               <div className="min-w-0 flex-1">
                 {/* Versión a la derecha del título, en pequeño (dueño, 04/11/2026): solo el
                     número, en el color del entorno (ámbar demo, verde producción); el entorno va
-                    en el tooltip y para el lector de pantalla. El escudo, en rojo claro: sobre el
-                    marino del menú el rojo de `destructive` no se leía (2,8:1). */}
-                <div className="flex min-w-0 items-center gap-2">
-                  <h2 className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-sidebar-foreground">
-                    <ShieldAlert
-                      className="h-4 w-4 shrink-0 text-red-300"
-                      aria-hidden="true"
-                    />
-                    <span className="truncate">Super Admin</span>
-                  </h2>
+                    en el tooltip y para el lector de pantalla. Sin el escudo rojo de antes: sobre el
+                    marino del menú no se leía (2,8:1) y no cabía junto a la cúpula. */}
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <h2 className="min-w-0 truncate text-[15px] font-semibold tracking-tight text-sidebar-foreground">Super Admin</h2>
                   <VersionPanel colapsado className="font-medium" />
                 </div>
                 <p

@@ -24,7 +24,7 @@ const { ErrorControlExcel } = await import("@/hooks/useControlExcel");
 const ESTADO: EstadoControl = {
   ok: true,
   disponible: true,
-  cliente: "Casa Tomás",
+  cliente: "Cristalería BV",
   archivo: { id: "abc", nombre: "Control_OFICIOSOSIA.xlsm", modificado: "2026-11-17T06:55:38.957Z", url: "https://drive.google.com/file/d/abc/view" },
   revision: "rev-1",
   soloLectura: false,
@@ -78,7 +78,7 @@ describe("ControlExcel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(h.refetch).toHaveBeenCalledTimes(1);
 
-    conDatos({ ok: true, disponible: false, motivo: "sin_acceso", mensaje: "La cuenta de Google del panel (panel@oficiososia.test) no puede ver el Excel de control. Compártelo con esa cuenta como editor.", cliente: "Casa Tomás", cuentaGoogle: "panel@oficiososia.test" });
+    conDatos({ ok: true, disponible: false, motivo: "sin_acceso", mensaje: "La cuenta de Google del panel (panel@oficiososia.test) no puede ver el Excel de control. Compártelo con esa cuenta como editor.", cliente: "Cristalería BV", cuentaGoogle: "panel@oficiososia.test" });
     rerender(<ControlExcel />);
     const aviso = screen.getByRole("alert");
     expect(aviso).toHaveTextContent("El panel no puede abrir el Excel");
@@ -87,14 +87,14 @@ describe("ControlExcel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Volver a comprobar" }));
     expect(h.refetch).toHaveBeenCalledTimes(2);
 
-    conDatos({ ok: true, disponible: false, motivo: "sin_config", mensaje: "Este entorno no tiene configurada la cuenta de Google.", cliente: "Casa Tomás" });
+    conDatos({ ok: true, disponible: false, motivo: "sin_config", mensaje: "Este entorno no tiene configurada la cuenta de Google.", cliente: "Cristalería BV" });
     rerender(<ControlExcel />);
     expect(screen.getByRole("alert")).toHaveTextContent("En la demo es lo normal");
   });
 
   it("enseña el estado SOLO de este cliente: cabecera, tarjetas, ficha, cobros y gastos", () => {
     render(<ControlExcel />);
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Casa TomásActivo");
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Cristalería BVActivo");
     expect(screen.getByText(/Excel «Control_OFICIOSOSIA\.xlsm» · modificado el 17\/11\/2026/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Abrir en Drive/ })).toHaveAttribute("href", "https://drive.google.com/file/d/abc/view");
 
@@ -204,7 +204,7 @@ describe("ControlExcel", () => {
   it("editar la ficha manda lo pactado", async () => {
     render(<ControlExcel />);
     fireEvent.click(screen.getByRole("button", { name: /Editar ficha/ }));
-    const dialogo = await screen.findByRole("dialog", { name: "Ficha de Casa Tomás" });
+    const dialogo = await screen.findByRole("dialog", { name: "Ficha de Cristalería BV" });
     expect(screen.getByLabelText("Instalación pactada (€)")).toHaveValue("1500");
     escribir("Cuota pactada (€ al mes)", "650,5");
     escribir("Día de cobro (1–31)", "40");

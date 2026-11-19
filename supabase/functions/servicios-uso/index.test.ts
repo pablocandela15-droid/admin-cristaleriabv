@@ -165,8 +165,8 @@ function rutasCompletas(extra: Partial<Record<string, Ruta>> = {}): Record<strin
     "api.supabase.com/v1/projects/sfonaclosuafvlhutkon/analytics/endpoints/usage.api-counts": () =>
       resp({ result: [{ timestamp: "2026-11-02T00:00:00", total_auth_requests: 10, total_realtime_requests: 5, total_rest_requests: 100, total_storage_requests: 85 }, { total_rest_requests: 800 }] }),
     "api.supabase.com/v1/projects/sfonaclosuafvlhutkon/analytics/endpoints/logs": () => resp({ result: [{ invocaciones: 1959 }] }),
-    "api.github.com/users/oficiososia/settings/billing/usage/summary": () => resp(GITHUB_RESUMEN),
-    "api.github.com/user": () => resp({ login: "oficiososia", plan: { name: "free" } }),
+    "api.github.com/users/pablocandela15-droid/settings/billing/usage/summary": () => resp(GITHUB_RESUMEN),
+    "api.github.com/user": () => resp({ login: "pablocandela15-droid", plan: { name: "free" } }),
     "api.resend.com/domains": () => resp({ data: [{ id: "d1", name: "cristaleriabv.es", status: "verified" }] }, 200, { "x-resend-monthly-quota": "321", "x-resend-daily-quota": "17" }),
     "api.stripe.com/v1/balance": () => resp({ available: [{ amount: 12345, currency: "eur" }], pending: [{ amount: 500, currency: "eur" }, { amount: 99, currency: "usd" }] }),
     "api.stripe.com/v1/balance_transactions": (url) => url.searchParams.get("starting_after")
@@ -386,7 +386,7 @@ describe("con todos los secretos", () => {
       env: SECRETOS,
       rutas: rutasCompletas({
         "api.vercel.com/v6/deployments": () => resp({ error: { code: "forbidden" } }, 403),
-        "api.github.com/users/oficiososia/settings/billing/usage/summary": () => { throw new TypeError("network"); },
+        "api.github.com/users/pablocandela15-droid/settings/billing/usage/summary": () => { throw new TypeError("network"); },
         "developers.hostinger.com/api/billing/v1/subscriptions": () => resp({ message: "Unauthenticated." }, 401),
       }),
     });
@@ -570,12 +570,12 @@ describe("lectores", () => {
 
   it("GitHub: sin el resumen (404) usa el informe detallado; sin permiso → credencial_rechazada", async () => {
     const r = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
-      "api.github.com/users/oficiososia/settings/billing/usage/summary": () => resp({ message: "Not Found" }, 404),
-      "api.github.com/users/oficiososia/settings/billing/usage": () => resp({ usageItems: [{ product: "actions", unitType: "Minutes", quantity: 50, pricePerUnit: 0.006 }] }),
+      "api.github.com/users/pablocandela15-droid/settings/billing/usage/summary": () => resp({ message: "Not Found" }, 404),
+      "api.github.com/users/pablocandela15-droid/settings/billing/usage": () => resp({ usageItems: [{ product: "actions", unitType: "Minutes", quantity: 50, pricePerUnit: 0.006 }] }),
     })));
     expect(r.metricas.actions_computo.valor).toBe(0.3);
     const sinPermiso = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
-      "api.github.com/users/oficiososia/settings/billing/usage/summary": () => resp({ message: "Resource not accessible" }, 403),
+      "api.github.com/users/pablocandela15-droid/settings/billing/usage/summary": () => resp({ message: "Resource not accessible" }, 403),
     })));
     expect(sinPermiso).toMatchObject({ error: "credencial_rechazada", detalles: { permiso_necesario: "Plan (lectura)" } });
   });
@@ -587,17 +587,17 @@ describe("lectores", () => {
     return { created_at: creada, run_started_at: creada, updated_at: new Date(inicio + segundos * 1000).toISOString(), status, conclusion };
   };
   const rutasEjecuciones = (porRepo: Record<string, unknown[]>) => Object.fromEntries(Object.entries(porRepo).map(([repo, runs]) => [
-    `api.github.com/repos/oficiososia/${repo}/actions/runs`,
+    `api.github.com/repos/pablocandela15-droid/${repo}/actions/runs`,
     () => resp({ total_count: runs.length, workflow_runs: runs }),
   ]));
 
-  it("GitHub: por defecto, la cuenta oficiososia y sus dos repos; se puede cambiar con SERVICIOS_GITHUB_OWNER y SERVICIOS_GITHUB_REPOS", async () => {
-    expect(GITHUB_OWNER_POR_DEFECTO).toBe("oficiososia");
+  it("GitHub: por defecto, la cuenta pablocandela15-droid y sus dos repos; se puede cambiar con SERVICIOS_GITHUB_OWNER y SERVICIOS_GITHUB_REPOS", async () => {
+    expect(GITHUB_OWNER_POR_DEFECTO).toBe("pablocandela15-droid");
     expect(GITHUB_REPOS_POR_DEFECTO).toEqual(["cristaleriabv", "admin-cristaleriabv"]);
     const f = fetchSimulado(rutasCompletas());
     await LECTORES.github({ ...ctx(SECRETOS, {}), fetch: f.fn });
     const runs = (ll: typeof f.llamadas) => ll.filter((l) => l.url.pathname.endsWith("/actions/runs")).map((l) => l.url.pathname);
-    expect(runs(f.llamadas)).toEqual(["/repos/oficiososia/cristaleriabv/actions/runs", "/repos/oficiososia/admin-cristaleriabv/actions/runs"]);
+    expect(runs(f.llamadas)).toEqual(["/repos/pablocandela15-droid/cristaleriabv/actions/runs", "/repos/pablocandela15-droid/admin-cristaleriabv/actions/runs"]);
     const otro = fetchSimulado({ "api.github.com/users/otra-org/settings/billing/usage/summary": () => resp({ message: "Not Found" }, 404) });
     await LECTORES.github({ ...ctx({ ...SECRETOS, SERVICIOS_GITHUB_OWNER: "otra-org", SERVICIOS_GITHUB_REPOS: " uno , dos " }, {}), fetch: otro.fn });
     expect(runs(otro.llamadas)).toEqual(["/repos/otra-org/uno/actions/runs", "/repos/otra-org/dos/actions/runs"]);
@@ -622,13 +622,13 @@ describe("lectores", () => {
       repos: ["cristaleriabv", "admin-cristaleriabv"],
     });
     expect((r.detalles!.avisos as string[])[0]).toMatch(/GitHub no arranca las pruebas automáticas desde el 0?3\/11,? 10:00: las últimas 3 ejecuciones/);
-    const runs = f.llamadas.find((l) => l.url.pathname.endsWith("/oficiososia/cristaleriabv/actions/runs"))!;
+    const runs = f.llamadas.find((l) => l.url.pathname.endsWith("/pablocandela15-droid/cristaleriabv/actions/runs"))!;
     expect(runs.url.searchParams.get("created")).toBe(">=2026-11-01");
   });
 
   it("GitHub: sin permiso «Plan» estima los minutos con las ejecuciones; sin nada → credencial_rechazada", async () => {
     const r = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
-      "api.github.com/users/oficiososia/settings/billing/usage/summary": () => resp({ message: "Resource not accessible" }, 403),
+      "api.github.com/users/pablocandela15-droid/settings/billing/usage/summary": () => resp({ message: "Resource not accessible" }, 403),
       ...rutasEjecuciones({
         "cristaleriabv": [ejecucion("2026-11-02T10:00:00Z", 601), ejecucion("2026-11-02T09:00:00Z", 59, "failure")],
         "admin-cristaleriabv": [ejecucion("2026-11-02T08:00:00Z", 120)],
@@ -645,17 +645,17 @@ describe("lectores", () => {
   // 09/11/2026: la web y el admin son públicos. GitHub no cobra sus minutos ni los cuenta en los
   // 2.000 incluidos, pero el informe los suma: la tarjeta marcaba un «157 %» rojo que no lo era.
   const reposPublicos = (visibles: Record<string, boolean>) => Object.fromEntries(Object.entries(visibles).map(([repo, publico]) => [
-    `api.github.com/repos/oficiososia/${repo}`,
+    `api.github.com/repos/pablocandela15-droid/${repo}`,
     () => resp({ name: repo, private: !publico, visibility: publico ? "public" : "private" }),
   ]));
 
   it("GitHub: los minutos de repositorios públicos no cuentan para el límite (informe detallado)", async () => {
     const f = fetchSimulado(rutasCompletas({
       ...reposPublicos({ "cristaleriabv": true, "admin-cristaleriabv": true }),
-      "api.github.com/users/oficiososia/settings/billing/usage": () => resp({ usageItems: [
-        { date: "2026-11-02", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 2000, pricePerUnit: 0.006, grossAmount: 12, discountAmount: 12, netAmount: 0, repositoryName: "oficiososia/admin-cristaleriabv" },
-        { date: "2026-11-03", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 1148, pricePerUnit: 0.006, grossAmount: 6.888, discountAmount: 6.888, netAmount: 0, repositoryName: "oficiososia/cristaleriabv" },
-        { date: "2026-11-03", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 30, pricePerUnit: 0.006, grossAmount: 0.18, discountAmount: 0.18, netAmount: 0, repositoryName: "oficiososia/becarios" },
+      "api.github.com/users/pablocandela15-droid/settings/billing/usage": () => resp({ usageItems: [
+        { date: "2026-11-02", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 2000, pricePerUnit: 0.006, grossAmount: 12, discountAmount: 12, netAmount: 0, repositoryName: "pablocandela15-droid/admin-cristaleriabv" },
+        { date: "2026-11-03", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 1148, pricePerUnit: 0.006, grossAmount: 6.888, discountAmount: 6.888, netAmount: 0, repositoryName: "pablocandela15-droid/cristaleriabv" },
+        { date: "2026-11-03", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 30, pricePerUnit: 0.006, grossAmount: 0.18, discountAmount: 0.18, netAmount: 0, repositoryName: "pablocandela15-droid/becarios" },
       ] }),
     }));
     const r = await LECTORES.github({ ...ctx(SECRETOS, {}), fetch: f.fn });
@@ -688,7 +688,7 @@ describe("lectores", () => {
   it("GitHub: sin acceso a un repositorio lo dice", async () => {
     const r = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
       ...rutasEjecuciones({ "cristaleriabv": [ejecucion("2026-11-02T10:00:00Z", 60)] }),
-      "api.github.com/repos/oficiososia/admin-cristaleriabv/actions/runs": () => resp({ message: "Not Found" }, 404),
+      "api.github.com/repos/pablocandela15-droid/admin-cristaleriabv/actions/runs": () => resp({ message: "Not Found" }, 404),
     })));
     expect(r.detalles!.repos).toEqual(["cristaleriabv"]);
     expect((r.detalles!.avisos as string[]).join(" ")).toMatch(/admin-cristaleriabv.*«Actions» \(lectura\)/);
@@ -884,7 +884,7 @@ describe("utilidades", () => {
     expect(resumirUsoGithub({})).toEqual({ computoUsd: 0, minutos: 0, almacenamientoGbHoras: 0, netoUsd: null, minutosPublicos: 0, computoPublicoUsd: 0, conRepositorio: false });
     // Con el repositorio de cada línea: los públicos aparte («dueño/repo» o solo el nombre).
     const detalle = { usageItems: [
-      { product: "Actions", unitType: "Minutes", quantity: 3000, grossAmount: 18, netAmount: 0, repositoryName: "oficiososia/cristaleriabv" },
+      { product: "Actions", unitType: "Minutes", quantity: 3000, grossAmount: 18, netAmount: 0, repositoryName: "pablocandela15-droid/cristaleriabv" },
       { product: "Actions", unitType: "Minutes", quantity: 100, grossAmount: 0.6, netAmount: 0, repositoryName: "becarios" },
     ] };
     expect(resumirUsoGithub(detalle, new Set(["cristaleriabv"]))).toMatchObject({ minutos: 3100, minutosPublicos: 3000, computoPublicoUsd: 18, conRepositorio: true });

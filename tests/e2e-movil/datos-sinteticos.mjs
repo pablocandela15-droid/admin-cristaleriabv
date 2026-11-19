@@ -22,7 +22,7 @@ const ANALISIS = {
   toca_bd: false,
   criterios_aceptacion: ["Al escribir «montador» salen solo los usuarios con ese nombre", "En el móvil el buscador cabe sin desbordar"],
   preguntas: ["¿Hace falta buscar también por teléfono?"],
-  prompt_ia: "## Contexto\nPanel de Cristalería BV (oficiososia/admin-cristaleriabv).\n\n## Reglas del repositorio (obligatorias)\n- PR a staging",
+  prompt_ia: "## Contexto\nPanel de Cristalería BV (pablocandela15-droid/admin-cristaleriabv).\n\n## Reglas del repositorio (obligatorias)\n- PR a staging",
 };
 const peticion = (n, x) => ({
   id: uuid(800 + n), creado_por: USER_ID, creado_por_nombre: NOMBRES[n % NOMBRES.length], creado_por_email: EMAIL,

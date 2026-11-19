@@ -32,8 +32,8 @@ describe("mensajes para la IA", () => {
 
   it("el sistema conoce Cristalería BV, sus dos repos y trata el texto como datos", () => {
     expect(sistema.role).toBe("system");
-    expect(REPO_PANEL).toBe("oficiososia/admin-cristaleriabv");
-    expect(REPO_WEB).toBe("oficiososia/cristaleriabv");
+    expect(REPO_PANEL).toBe("pablocandela15-droid/admin-cristaleriabv");
+    expect(REPO_WEB).toBe("pablocandela15-droid/cristaleriabv");
     expect(PROMPT_SISTEMA).toMatch(/Cristalería BV/);
     expect(PROMPT_SISTEMA).toContain(`repo ${REPO_PANEL}`);
     expect(PROMPT_SISTEMA).toContain(`repo ${REPO_WEB}`);
@@ -87,7 +87,7 @@ describe("interpretarRespuesta", () => {
     expect(a.riesgo).toEqual({ nivel: "medio", motivo: "Afecta al acceso de los usuarios al panel." });
     expect(a.prompt_ia.startsWith("## Contexto")).toBe(true);
     expect(a.prompt_ia).toMatch(/## Reglas del repositorio \(obligatorias\)/);
-    expect(a.prompt_ia).toContain("`oficiososia/admin-cristaleriabv` (panel de gestión)");
+    expect(a.prompt_ia).toContain("`pablocandela15-droid/admin-cristaleriabv` (panel de gestión)");
     expect(a.prompt_ia).not.toContain(REPO_WEB + "`");
     expect(a.prompt_ia).toMatch(/desde `staging` y abre un PR a `staging`/);
     expect(a.prompt_ia).toMatch(/Nunca hagas push a `main`/);
@@ -101,7 +101,7 @@ describe("interpretarRespuesta", () => {
     expect(a.prompt_ia).toMatch(/supabase\/migrations\/.*supabase\/rollbacks\//);
     expect(a.prompt_ia).toMatch(/SOLO en la demo/);
     expect(a.prompt_ia).toMatch(/pruebas e2e/);
-    expect(a.prompt_ia).toContain("`oficiososia/cristaleriabv` (web pública)");
+    expect(a.prompt_ia).toContain("`pablocandela15-droid/cristaleriabv` (web pública)");
     expect(a.prompt_ia).toMatch(/un PR en cada uno/);
   });
 

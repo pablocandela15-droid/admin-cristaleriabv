@@ -36,7 +36,7 @@ const HOJA = `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://sch
   `<row r="4"><c r="B4" t="inlineStr"><is><t xml:space="preserve"> en línea &amp; tal </t></is></c><c r="E4" s="16" t="str"><f t="shared" si="0"/><v></v></c></row>` +
   `<row r="5" ht="12"/>` +
   `</sheetData><dataValidations count="2"><dataValidation type="list" allowBlank="1" sqref="B2:B4"><formula1>&quot;Uno,Dos y medio,Tres&quot;</formula1></dataValidation><dataValidation type="list" sqref="C2:C4 A9"><formula1>$Z$1:$Z$3</formula1></dataValidation></dataValidations></worksheet>`;
-const CADENAS = `<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>Fecha</t></si><si><t>Nombre</t></si><si><t>Importe</t></si><si><r><rPr><b/></rPr><t>Casa </t></r><r><t xml:space="preserve">Tomás &amp; Cía</t></r><rPh><t>fonética</t></rPh></si></sst>`;
+const CADENAS = `<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>Fecha</t></si><si><t>Nombre</t></si><si><t>Importe</t></si><si><r><rPr><b/></rPr><t>Cristalería </t></r><r><t xml:space="preserve">BV &amp; Cía</t></r><rPh><t>fonética</t></rPh></si></sst>`;
 const LIBRO = `<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="DATOS &amp; MÁS" sheetId="1" r:id="rId1"/><sheet name="Otra" sheetId="2" r:id="rId2"/></sheets><calcPr/></workbook>`;
 const RELS = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>`;
 const OTRA = `<worksheet><sheetData/></worksheet>`;
@@ -91,7 +91,7 @@ describe("utilidades", () => {
   });
 
   it("textos compartidos: sencillos, con formato y sin la guía fonética", () => {
-    expect(leerTextosCompartidos(CADENAS)).toEqual(["Fecha", "Nombre", "Importe", "Casa Tomás & Cía"]);
+    expect(leerTextosCompartidos(CADENAS)).toEqual(["Fecha", "Nombre", "Importe", "Cristalería BV & Cía"]);
     expect(leerTextosCompartidos("<sst><si><t/></si><si/><si><t>x</t></si></sst>")).toEqual(["", "", "x"]);
   });
 
@@ -144,7 +144,7 @@ describe("leer celdas", () => {
     expect(h.numerosDeFila()).toEqual([1, 2, 3, 4, 5]);
     expect(h.celda("A1")).toEqual({ ref: "A1", valor: "Fecha", formula: false, estilo: "4" });
     expect(h.celda("A2")).toMatchObject({ valor: 46339, estilo: "5" });
-    expect(h.celda("B2")?.valor).toBe("Casa Tomás & Cía");
+    expect(h.celda("B2")?.valor).toBe("Cristalería BV & Cía");
     expect(h.celda("C2")?.valor).toBe(1700.5);
     expect(h.celda("D2")).toMatchObject({ valor: 3401, formula: true });
     expect(h.celda("E2")).toMatchObject({ valor: "Sí", formula: true });
@@ -295,13 +295,13 @@ describe("guardar el libro", () => {
     expect(libro.nombresHojas()).toEqual(["CLIENTES", "COBROS", "GASTOS CLIENTES"]);
     const cobros = await libro.hoja("COBROS");
     expect(cobros.celda("C6")?.valor).toBe("Cliente");
-    expect(cobros.celda("C7")?.valor).toBe("Casa Tomás");
+    expect(cobros.celda("C7")?.valor).toBe("Cristalería BV");
     expect(serialAFecha(cobros.celda("A7")?.valor as number)).toBe("2026-11-13");
     expect(cobros.celda("F7")?.valor).toBe(1500);
     expect(cobros.celda("H7")).toMatchObject({ formula: true, valor: 999 });
     expect(cobros.celda("I8")).toMatchObject({ formula: true, valor: "Pendiente" });
     expect(cobros.listaDe("D7")).toEqual(["Instalación", "Mensualidad", "Reembolso gastos", "Otro"]);
-    expect(cobros.listaDe("C7")).toEqual(["Casa Tomás", "Nexo", "Energym", "Cristalería BV"]);
+    expect(cobros.listaDe("C7")).toEqual(["Cristalería BV", "Nexo", "Energym", "Taller Ejemplo"]);
     const estiloG = cobros.celda("G7")?.estilo;
     cobros.escribir([{ ref: "G7", valor: 1500 }, { ref: "B7", valor: { fecha: "2026-11-17" } }, { ref: "L7", valor: "Pagado en mano" }]);
     expect(() => cobros.escribir([{ ref: "H7", valor: 0 }])).toThrow(/fórmula/);

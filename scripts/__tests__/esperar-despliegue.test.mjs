@@ -41,7 +41,7 @@ describe("estado del despliegue de Vercel de un commit", () => {
 });
 
 describe("estado «Vercel» del commit (lo que hay cuando Vercel no crea deployments en GitHub)", () => {
-  const listo = { state: "success", context: "Vercel", description: "Deployment has completed", target_url: "https://vercel.com/oficiososia/cristaleriabv/AKKn" };
+  const listo = { state: "success", context: "Vercel", description: "Deployment has completed", target_url: "https://vercel.com/pablocandela15-droid/cristaleriabv/AKKn" };
   it("lee el estado del contexto «Vercel» y no hace caso de los demás", () => {
     expect(estadoVercel([listo], "cristaleriabv")).toEqual({ estado: "listo" });
     expect(estadoVercel([{ state: "pending", context: "Vercel" }], "cristaleriabv")).toEqual({ estado: "esperando" });
@@ -50,9 +50,9 @@ describe("estado «Vercel» del commit (lo que hay cuando Vercel no crea deploym
     expect(estadoVercel(undefined, "cristaleriabv")).toEqual({ estado: "esperando" });
   });
   it("si el build falla lo dice con el motivo y el enlace al despliegue en Vercel", () => {
-    expect(estadoVercel([{ state: "failure", context: "Vercel", description: "Deployment has failed", target_url: "https://vercel.com/oficiososia/cristaleriabv/XyZ" }], "cristaleriabv")).toEqual({
+    expect(estadoVercel([{ state: "failure", context: "Vercel", description: "Deployment has failed", target_url: "https://vercel.com/pablocandela15-droid/cristaleriabv/XyZ" }], "cristaleriabv")).toEqual({
       estado: "fallido",
-      detalle: "Vercel: failure: Deployment has failed (https://vercel.com/oficiososia/cristaleriabv/XyZ)",
+      detalle: "Vercel: failure: Deployment has failed (https://vercel.com/pablocandela15-droid/cristaleriabv/XyZ)",
     });
     expect(estadoVercel([{ state: "error", context: "Vercel" }], "cristaleriabv")).toEqual({ estado: "fallido", detalle: "Vercel: error" });
   });
@@ -65,7 +65,7 @@ describe("estado «Vercel» del commit (lo que hay cuando Vercel no crea deploym
 
 describe("juntar las señales de una vuelta", () => {
   const esperando = { estado: "esperando" };
-  const url = "https://cristaleriabv-git-release-1120-oficiososia.vercel.app";
+  const url = "https://cristaleriabv-git-release-1120-pablo1505.vercel.app";
   it("si la URL ya sirve el commit está listo, digan lo que digan las demás", () => {
     expect(resolverEspera({ sirve: true, url, github: esperando, vercel: esperando })).toEqual({ estado: "listo", url });
     expect(resolverEspera({ sirve: true, url, github: esperando, vercel: { estado: "fallido", detalle: "x" } })).toEqual({ estado: "listo", url });
@@ -84,8 +84,8 @@ describe("juntar las señales de una vuelta", () => {
 
 describe("esperar la preview de una release (peticiones simuladas)", () => {
   const SHA = "49e44170f80f0d7798978b4357b50b5f24f974cc";
-  const ALIAS = "https://cristaleriabv-git-release-1120-oficiososia.vercel.app";
-  const base = { repo: "oficiososia/cristaleriabv", sha: SHA, entorno: "Preview", rama: "release/1.12.0", pausaMs: 0, avisar: () => {} };
+  const ALIAS = "https://cristaleriabv-git-release-1120-pablo1505.vercel.app";
+  const base = { repo: "pablocandela15-droid/cristaleriabv", sha: SHA, entorno: "Preview", rama: "release/1.12.0", pausaMs: 0, avisar: () => {} };
   const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), { status, headers: { "content-type": "application/json" } });
 
   /** Simula GitHub y el sitio. Cada opción es lo que contesta esa parte (o un número: ese error HTTP). */
@@ -130,16 +130,16 @@ describe("esperar la preview de una release (peticiones simuladas)", () => {
   });
 
   it("si el build de Vercel falla lo dice a la primera, sin agotar el plazo", async () => {
-    simular({ estados: [{ state: "failure", context: "Vercel", description: "Deployment has failed", target_url: "https://vercel.com/oficiososia/cristaleriabv/XyZ" }] });
-    expect(await esperar({ ...base, minutos: 20 })).toEqual({ estado: "fallido", detalle: "Vercel: failure: Deployment has failed (https://vercel.com/oficiososia/cristaleriabv/XyZ)" });
+    simular({ estados: [{ state: "failure", context: "Vercel", description: "Deployment has failed", target_url: "https://vercel.com/pablocandela15-droid/cristaleriabv/XyZ" }] });
+    expect(await esperar({ ...base, minutos: 20 })).toEqual({ estado: "fallido", detalle: "Vercel: failure: Deployment has failed (https://vercel.com/pablocandela15-droid/cristaleriabv/XyZ)" });
   });
 
   it("si Vercel sí crea el deployment en GitHub, usa su URL", async () => {
     simular({
       despliegues: [{ id: 7, environment: "Preview", created_at: "2026-11-14T10:57:10Z" }],
-      estadosDespliegue: [{ state: "success", environment_url: "https://cristaleriabv-3czt4m0c3-oficiososia.vercel.app" }],
+      estadosDespliegue: [{ state: "success", environment_url: "https://cristaleriabv-3czt4m0c3-pablo1505.vercel.app" }],
     });
-    expect(await esperar({ ...base, minutos: 20 })).toEqual({ estado: "listo", url: "https://cristaleriabv-3czt4m0c3-oficiososia.vercel.app" });
+    expect(await esperar({ ...base, minutos: 20 })).toEqual({ estado: "listo", url: "https://cristaleriabv-3czt4m0c3-pablo1505.vercel.app" });
   });
 
   it("en producción comprueba la URL que se le pasa", async () => {

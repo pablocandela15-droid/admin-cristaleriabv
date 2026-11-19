@@ -38,8 +38,8 @@ const BASE_ENV: Record<string, string> = {
   SUPABASE_SERVICE_ROLE_KEY: "service-role-secreta",
 };
 const USUARIOS: Record<string, { id: string; email: string; superadmin: boolean; admin?: boolean }> = {
-  "jwt-super": { id: "11111111-1111-4111-8111-111111111111", email: "dueno@casatomas.test", superadmin: true },
-  "jwt-admin": { id: "22222222-2222-4222-8222-222222222222", email: "admin@casatomas.test", superadmin: false, admin: true },
+  "jwt-super": { id: "11111111-1111-4111-8111-111111111111", email: "dueno@cristaleriabv.test", superadmin: true },
+  "jwt-admin": { id: "22222222-2222-4222-8222-222222222222", email: "admin@cristaleriabv.test", superadmin: false, admin: true },
 };
 
 function crearCliente(_url: string, _key: string) {
@@ -200,7 +200,7 @@ describe("fórmulas del Excel, en TS", () => {
   });
 
   it("normalizar compara como Excel (sin mayúsculas, acentos ni espacios de más)", () => {
-    expect(normalizar("  CASA   Tomas ")).toBe(normalizar("Casa Tomás"));
+    expect(normalizar("  CRISTALERIA   bv ")).toBe(normalizar("Cristalería BV"));
     expect(revisionDe({ md5Checksum: "m", modifiedTime: "t" })).toBe("m");
     expect(revisionDe({})).toBe("");
   });
@@ -228,12 +228,12 @@ describe("autorización", () => {
 });
 
 describe("leer", () => {
-  it("da el estado SOLO de Casa Tomás, calculado (no los valores guardados del Excel)", async () => {
+  it("da el estado SOLO de Cristalería BV, calculado (no los valores guardados del Excel)", async () => {
     await conMovimientosDeNexo();
     const r = await pedir({ accion: "leer" });
     expect(r.status).toBe(200);
     const e = r.json;
-    expect(e).toMatchObject({ ok: true, disponible: true, cliente: "Casa Tomás", revision: "rev-1", soloLectura: false });
+    expect(e).toMatchObject({ ok: true, disponible: true, cliente: "Cristalería BV", revision: "rev-1", soloLectura: false });
     expect(e.archivo).toEqual({
       id: ID_EXCEL_POR_DEFECTO,
       nombre: "Control_OFICIOSOSIA.xlsm",
@@ -315,7 +315,7 @@ describe("guardar", () => {
     expect(subidas()).toHaveLength(1);
     const libro = await LibroXlsx.abrir(drive.bytes);
     const hoja = await libro.hoja("COBROS");
-    expect(hoja.celda("C10")?.valor).toBe("Casa Tomás");
+    expect(hoja.celda("C10")?.valor).toBe("Cristalería BV");
     expect(hoja.celda("H10")).toMatchObject({ formula: true, valor: 600 });
     expect(hoja.celda("I10")).toMatchObject({ formula: true, valor: "Pendiente" });
     expect((await estadoEnDrive()).cobros).toEqual(r.json.cobros);
@@ -441,7 +441,7 @@ describe("guardar", () => {
     expect(e.resumen.gastosRepercutibles).toBe(56.5);
     expect(e.filasLibres.gastos).toBe(19);
     const libro = await LibroXlsx.abrir(drive.bytes);
-    expect((await libro.hoja("GASTOS CLIENTES")).celda("B12")?.valor).toBe("Casa Tomás");
+    expect((await libro.hoja("GASTOS CLIENTES")).celda("B12")?.valor).toBe("Cristalería BV");
     expect((await libro.hoja("GASTOS CLIENTES")).celda("K10")?.formula).toBe(true);
     expect((await libro.hoja("CLIENTES")).celda("K7")).toMatchObject({ formula: true, valor: 56.5 });
     expect(subidas()).toHaveLength(3);
@@ -456,7 +456,7 @@ describe("guardar", () => {
     const r2 = await pedir({ accion: "guardar_ficha", revision: r.json.revision, ficha: { estado: "Activo", desde: null, instalacionPactada: null, cuotaPactada: null, diaCobro: null, notas: "" } });
     expect(r2.json.ficha).toEqual({ estado: "Activo", desde: null, instalacionPactada: null, cuotaPactada: null, diaCobro: null, notas: "" });
     // El nombre del cliente (columna A) no se toca nunca.
-    expect((await (await LibroXlsx.abrir(drive.bytes)).hoja("CLIENTES")).celda("A7")?.valor).toBe("Casa Tomás");
+    expect((await (await LibroXlsx.abrir(drive.bytes)).hoja("CLIENTES")).celda("A7")?.valor).toBe("Cristalería BV");
   });
 
   it("cuando no quedan filas libres lo dice y no sube nada", async () => {
@@ -477,7 +477,7 @@ describe("cuando no se puede usar el Excel", () => {
   it("sin secretos de Google (la demo): «sin_config» limpio, sin llamar a nadie", async () => {
     const r = await pedir<ControlNoDisponible>({ accion: "leer" }, { env: {} });
     expect(r.status).toBe(200);
-    expect(r.json).toMatchObject({ ok: true, disponible: false, motivo: "sin_config", cliente: "Casa Tomás" });
+    expect(r.json).toMatchObject({ ok: true, disponible: false, motivo: "sin_config", cliente: "Cristalería BV" });
     expect(r.json.mensaje).toMatch(/cuenta de Google/);
     const g = await pedir<ErrorControlRespuesta>({ accion: "borrar_cobro", fila: 8, revision: "x" }, { env: {} });
     expect(g.status).toBe(409);

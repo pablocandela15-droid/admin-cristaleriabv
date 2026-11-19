@@ -3,7 +3,8 @@
 // ----------------------------------------------------------------------------
 //  El Excel de control de OficiosOsIA (Control_OFICIOSOSIA.xlsm, en Google
 //  Drive) lo comparten todos los proyectos. Cada panel ve y edita SOLO lo de
-//  su cliente (aquí «Cristalería Baix Vinalopó»; otro nombre, con CONTROL_EXCEL_CLIENTE):
+//  su cliente (aquí «Cristalería BV», como se llama en el Excel; otro nombre,
+//  con CONTROL_EXCEL_CLIENTE):
 //    · su fila de CLIENTES (estado, desde, instalación, cuota, día de cobro, notas)
 //    · sus filas de COBROS
 //    · sus filas de GASTOS CLIENTES
@@ -43,7 +44,7 @@ export const CORS = {
 
 /** Control_OFICIOSOSIA.xlsm (el mismo fichero para todos los proyectos). */
 export const ID_EXCEL_POR_DEFECTO = "1N-V65dStG5umn0j3gKRZzT1REzlIaciL";
-export const CLIENTE_POR_DEFECTO = "Cristalería Baix Vinalopó";
+export const CLIENTE_POR_DEFECTO = "Cristalería BV";
 
 export const HOJA_CLIENTES = "CLIENTES";
 export const HOJA_COBROS = "COBROS";

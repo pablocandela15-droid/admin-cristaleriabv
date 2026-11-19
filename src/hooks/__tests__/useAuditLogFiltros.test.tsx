@@ -20,7 +20,7 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: () => query,
-      rpc: async () => ({ data: [{ tabla: "Platos" }], error: null }),
+      rpc: async () => ({ data: [{ tabla: "peticiones" }], error: null }),
     },
   };
 });
@@ -46,17 +46,18 @@ describe("consulta de filtros de auditoría", () => {
       "historico",
     ]);
   });
-  it("aplica el mismo filtro de IA y origen en las vistas por día y mes", async () => {
+  it("aplica el mismo filtro de usuarios y permisos y origen en las vistas por día y mes", async () => {
     const { result } = renderHook(() =>
-      useAuditLogAgrupado({ accion: "grupo_ia", origen: "sin_servidor" }, 3),
+      useAuditLogAgrupado({ accion: "grupo_usuarios", origen: "sin_servidor" }, 3),
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(mocks.in).toHaveBeenCalledWith("tipo_evento", [
-      "consulta_ia",
-      "regeneracion_ia",
-      "crear_chat_ia",
-      "eliminar_chat_ia",
-      "mensaje_ia",
+    expect(mocks.in).toHaveBeenCalledWith("tabla", [
+      "auth.users",
+      "user_permissions",
+      "user_roles",
+      "super_admins",
+      "user_access_status",
+      "user_role_presets",
     ]);
     expect(mocks.in).toHaveBeenCalledWith("actor_origin", [
       "usuario",
