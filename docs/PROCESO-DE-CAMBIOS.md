@@ -30,7 +30,7 @@ Con un único PR `staging → main` que se actualizara solo, aceptarlo publicar�
 | `feature/*`, `fix/*` | Un cambio cada una | No (el CI corre en su PR) | — |
 
 - Demo del panel: la URL de la rama `staging` en Vercel (proyecto `admin-cristaleriabv`, *Domains* de la rama).
-- Producción del panel: https://admin-cristaleriabv.vercel.app (o el dominio propio que se le asigne en Vercel).
+- Producción del panel: https://admin-cristaleriabv-pablo1505.vercel.app (proyecto `admin-cristaleriabv` de Vercel; o el dominio propio que se le asigne).
 - La demo y las previews usan una **copia de los datos reales**, sin Stripe ni Resend: no cobran ni mandan correos. Desde el 04/11/2026 se abren sin la cuenta de Vercel (se quitó *Vercel Authentication*; para volver a cerrarlas: Vercel → proyecto → *Settings → Deployment Protection*). El panel sigue pidiendo usuario y contraseña.
 
 ## Guía práctica

@@ -65,7 +65,7 @@ describe("estado «Vercel» del commit (lo que hay cuando Vercel no crea deploym
 
 describe("juntar las señales de una vuelta", () => {
   const esperando = { estado: "esperando" };
-  const url = "https://cristaleriabv-git-release-1120-jpr8.vercel.app";
+  const url = "https://cristaleriabv-git-release-1120-pablo1505.vercel.app";
   it("si la URL ya sirve el commit está listo, digan lo que digan las demás", () => {
     expect(resolverEspera({ sirve: true, url, github: esperando, vercel: esperando })).toEqual({ estado: "listo", url });
     expect(resolverEspera({ sirve: true, url, github: esperando, vercel: { estado: "fallido", detalle: "x" } })).toEqual({ estado: "listo", url });
@@ -84,7 +84,7 @@ describe("juntar las señales de una vuelta", () => {
 
 describe("esperar la preview de una release (peticiones simuladas)", () => {
   const SHA = "49e44170f80f0d7798978b4357b50b5f24f974cc";
-  const ALIAS = "https://cristaleriabv-git-release-1120-jpr8.vercel.app";
+  const ALIAS = "https://cristaleriabv-git-release-1120-pablo1505.vercel.app";
   const base = { repo: "pablocandela15-droid/cristaleriabv", sha: SHA, entorno: "Preview", rama: "release/1.12.0", pausaMs: 0, avisar: () => {} };
   const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), { status, headers: { "content-type": "application/json" } });
 
@@ -137,9 +137,9 @@ describe("esperar la preview de una release (peticiones simuladas)", () => {
   it("si Vercel sí crea el deployment en GitHub, usa su URL", async () => {
     simular({
       despliegues: [{ id: 7, environment: "Preview", created_at: "2026-11-14T10:57:10Z" }],
-      estadosDespliegue: [{ state: "success", environment_url: "https://cristaleriabv-3czt4m0c3-jpr8.vercel.app" }],
+      estadosDespliegue: [{ state: "success", environment_url: "https://cristaleriabv-3czt4m0c3-pablo1505.vercel.app" }],
     });
-    expect(await esperar({ ...base, minutos: 20 })).toEqual({ estado: "listo", url: "https://cristaleriabv-3czt4m0c3-jpr8.vercel.app" });
+    expect(await esperar({ ...base, minutos: 20 })).toEqual({ estado: "listo", url: "https://cristaleriabv-3czt4m0c3-pablo1505.vercel.app" });
   });
 
   it("en producción comprueba la URL que se le pasa", async () => {

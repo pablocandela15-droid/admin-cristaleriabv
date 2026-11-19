@@ -169,7 +169,7 @@ describe("analizar-peticion · enviar_linear", () => {
     expect(crear.variables.input).toMatchObject({ teamId: "eq-cbv", title: "No se guarda la nueva contraseña", priority: 1, labelIds: ["et-bug"] });
     const descripcion = String((crear.variables.input as Fila).description);
     // Sin PANEL_URL ni PANEL_URL_DEMO, el panel por defecto.
-    expect(descripcion).toContain("https://admin-cristaleriabv.vercel.app/super-admin/tickets?ticket=" + ID);
+    expect(descripcion).toContain("https://admin-cristaleriabv-pablo1505.vercel.app/super-admin/tickets?ticket=" + ID);
     expect(descripcion).not.toContain("ana@cristaleria.es");
     expect(h.otrasLlamadas).toBe(0);
   });

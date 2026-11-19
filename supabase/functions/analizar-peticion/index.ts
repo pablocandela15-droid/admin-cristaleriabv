@@ -74,7 +74,7 @@ function urlPanel(): string {
   const produccion = entornoDeSupabase(env("SUPABASE_URL")) === "produccion";
   return env("LOGS_WEB_URL_PANEL")
     || (produccion ? env("PANEL_URL") : env("PANEL_URL_DEMO") || env("PANEL_URL"))
-    || "https://admin-cristaleriabv.vercel.app";
+    || "https://admin-cristaleriabv-pablo1505.vercel.app";
 }
 
 /** «Enviar a Linear» (ya comprobado: super admin). Toda la lógica, en linear.ts. */
