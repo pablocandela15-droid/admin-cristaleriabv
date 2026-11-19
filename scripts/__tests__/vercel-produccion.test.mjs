@@ -5,7 +5,7 @@ const PROD = { VERCEL_ENV: "production" };
 
 describe("solo se publica en producción una release aceptada en un PR", () => {
   it("publica el merge commit de un PR desde release/X.Y.Z con la misma versión en versionado.json", () => {
-    expect(debeConstruir(PROD, "Merge pull request #31 from oficiososia/release/1.2.0\n\nRelease v1.2.0", "1.2.0")).toBe(true);
+    expect(debeConstruir(PROD, "Merge pull request #31 from pablocandela15-droid/release/1.2.0\n\nRelease v1.2.0", "1.2.0")).toBe(true);
     expect(versionAceptada("Merge pull request #31 from org/release/1.2.0")).toBe("1.2.0");
   });
   it("no publica si versionado.json no coincide con la rama", () => {
@@ -13,7 +13,7 @@ describe("solo se publica en producción una release aceptada en un PR", () => {
     expect(debeConstruir(PROD, "Merge pull request #31 from org/release/1.2.0", null)).toBe(false);
   });
   it("no publica staging entero, un push directo, un squash ni otras ramas", () => {
-    expect(debeConstruir(PROD, "Merge pull request #12 from oficiososia/staging", "1.2.0")).toBe(false);
+    expect(debeConstruir(PROD, "Merge pull request #12 from pablocandela15-droid/staging", "1.2.0")).toBe(false);
     expect(debeConstruir(PROD, "fix(usuarios): arreglo rápido", "1.2.0")).toBe(false);
     expect(debeConstruir(PROD, "Release v1.2.0 (#31)", "1.2.0")).toBe(false); // squash
     expect(debeConstruir(PROD, "Merge pull request #13 from org/feature/x", "1.2.0")).toBe(false);

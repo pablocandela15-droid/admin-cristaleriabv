@@ -50,14 +50,14 @@ function repo({ version = "1.0.0" } = {}) {
 describe("URL de la rama en Vercel", () => {
   it("quita los puntos de la versión en vez de cambiarlos por guiones", () => {
     // Alias reales de las candidatas: con «release-1-32-0» Vercel responde DEPLOYMENT_NOT_FOUND.
-    expect(urlRamaVercel("admin-cristaleriabv", "release/1.32.0")).toBe("https://admin-cristaleriabv-git-release-1320-oficiososia.vercel.app");
-    expect(urlRamaVercel("cristaleriabv", "release/1.12.0")).toBe("https://cristaleriabv-git-release-1120-oficiososia.vercel.app");
-    expect(urlRamaVercel("cristaleriabv", "release/2.0.10")).toBe("https://cristaleriabv-git-release-2010-oficiososia.vercel.app");
+    expect(urlRamaVercel("admin-cristaleriabv", "release/1.32.0")).toBe("https://admin-cristaleriabv-git-release-1320-jpr8.vercel.app");
+    expect(urlRamaVercel("cristaleriabv", "release/1.12.0")).toBe("https://cristaleriabv-git-release-1120-jpr8.vercel.app");
+    expect(urlRamaVercel("cristaleriabv", "release/2.0.10")).toBe("https://cristaleriabv-git-release-2010-jpr8.vercel.app");
   });
   it("cambia «/» por «-», conserva los guiones y pasa a minúsculas", () => {
-    expect(urlRamaVercel("cristaleriabv", "staging")).toBe("https://cristaleriabv-git-staging-oficiososia.vercel.app");
-    expect(urlRamaVercel("cristaleriabv", "feature/galeria-mamparas")).toBe("https://cristaleriabv-git-feature-galeria-mamparas-oficiososia.vercel.app");
-    expect(urlRamaVercel("cristaleriabv", "Fix/Aviso-Presupuesto")).toBe("https://cristaleriabv-git-fix-aviso-presupuesto-oficiososia.vercel.app");
+    expect(urlRamaVercel("cristaleriabv", "staging")).toBe("https://cristaleriabv-git-staging-jpr8.vercel.app");
+    expect(urlRamaVercel("cristaleriabv", "feature/galeria-mamparas")).toBe("https://cristaleriabv-git-feature-galeria-mamparas-jpr8.vercel.app");
+    expect(urlRamaVercel("cristaleriabv", "Fix/Aviso-Presupuesto")).toBe("https://cristaleriabv-git-fix-aviso-presupuesto-jpr8.vercel.app");
   });
 });
 
@@ -281,9 +281,9 @@ describe("comprobar e informe", () => {
     expect(texto).toContain("### Reversión");
     expect(texto).toContain("**las migraciones de Supabase**");
     // Sin resultados del workflow enseña la URL de la rama en Vercel (sin puntos); con ellos, la comprobada.
-    expect(texto).toContain("- Candidata desplegada en preview: ⏳ pendiente https://app-git-release-110-oficiososia.vercel.app (URL prevista");
-    const fallida = generarInforme(r.git, { base: "main", head: "release/1.1.0", desde: "staging", repo: "org/app", resultados: { preview: { ok: false, url: "https://app-git-release-110-oficiososia.vercel.app", detalle: "Vercel: failure: Deployment has failed" } } });
-    expect(fallida.texto).toContain("- Candidata desplegada en preview: ❌ https://app-git-release-110-oficiososia.vercel.app · Vercel: failure: Deployment has failed");
+    expect(texto).toContain("- Candidata desplegada en preview: ⏳ pendiente https://app-git-release-110-jpr8.vercel.app (URL prevista");
+    const fallida = generarInforme(r.git, { base: "main", head: "release/1.1.0", desde: "staging", repo: "org/app", resultados: { preview: { ok: false, url: "https://app-git-release-110-jpr8.vercel.app", detalle: "Vercel: failure: Deployment has failed" } } });
+    expect(fallida.texto).toContain("- Candidata desplegada en preview: ❌ https://app-git-release-110-jpr8.vercel.app · Vercel: failure: Deployment has failed");
   });
 
   it("avisa si la diferencia trae algo que no está en la lista", () => {

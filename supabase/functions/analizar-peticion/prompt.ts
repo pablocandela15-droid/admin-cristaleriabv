@@ -28,8 +28,8 @@ export const FUNCION = "analizar-peticion";
 export const MODELO_POR_DEFECTO = "gpt-4.1-mini";
 export const MAX_TOKENS = 1800;
 
-export const REPO_PANEL = "oficiososia/admin-cristaleriabv";
-export const REPO_WEB = "oficiososia/cristaleriabv";
+export const REPO_PANEL = "pablocandela15-droid/admin-cristaleriabv";
+export const REPO_WEB = "pablocandela15-droid/cristaleriabv";
 
 /** Lo que se lee de la petición para analizarla (nada de quién la envió). */
 export interface PeticionParaIa {

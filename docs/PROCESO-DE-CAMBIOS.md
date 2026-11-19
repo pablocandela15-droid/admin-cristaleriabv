@@ -1,6 +1,6 @@
 # Proceso de cambios: del desarrollo a producción
 
-Vale para los dos repos, `oficiososia/cristaleriabv` (web) y `oficiososia/admin-cristaleriabv` (panel).
+Vale para los dos repos, `pablocandela15-droid/cristaleriabv` (web) y `pablocandela15-droid/admin-cristaleriabv` (panel).
 
 ```
  feature/x ──PR──┐

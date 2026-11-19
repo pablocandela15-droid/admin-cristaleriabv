@@ -54,7 +54,7 @@ export const TIMEOUT_MS = 15_000;
 export const RETENCION_DIAS = 400;
 /** Sin SERVICIOS_VERCEL_TEAM_ID no hay equipo por defecto: la tarjeta pide el secreto. */
 export const VERCEL_TEAM_POR_DEFECTO = "";
-export const GITHUB_OWNER_POR_DEFECTO = "oficiososia";
+export const GITHUB_OWNER_POR_DEFECTO = "pablocandela15-droid";
 const GIB = 1024 ** 3;
 
 /** Nombres de todos los secretos que lee la función (para no devolverlos nunca). */
@@ -849,7 +849,7 @@ export interface UsoGithub {
   conRepositorio: boolean;
 }
 
-/** «oficiososia/cristaleriabv» o «cristaleriabv» → «cristaleriabv». */
+/** «pablocandela15-droid/cristaleriabv» o «cristaleriabv» → «cristaleriabv». */
 const nombreRepo = (v: unknown): string | null => {
   const t = typeof v === "string" ? v.trim() : "";
   return t ? (t.split("/").pop() ?? t).toLowerCase() : null;
