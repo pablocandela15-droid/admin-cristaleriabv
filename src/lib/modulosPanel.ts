@@ -17,7 +17,7 @@
 // ============================================================================
 import type { ComponentType, SVGProps } from "react";
 import { matchPath } from "react-router-dom";
-import { Bell, HelpCircle, LayoutDashboard, MessageSquarePlus, Shield, UserRound } from "lucide-react";
+import { Bell, HelpCircle, LayoutDashboard, MessageSquarePlus, Receipt, Shield, UserRound } from "lucide-react";
 import type { SectionKey } from "@/hooks/useUserRole";
 
 export type IconoModulo = ComponentType<SVGProps<SVGSVGElement>>;
@@ -25,6 +25,7 @@ export type IconoModulo = ComponentType<SVGProps<SVGSVGElement>>;
 /** Grupos de Control del Panel, en el orden del menú lateral. */
 export const GRUPOS_MODULOS = [
   { id: "dia", titulo: "Día a día" },
+  { id: "compras", titulo: "Compras" },
   { id: "gestion", titulo: "Equipo" },
   { id: "ayuda", titulo: "Ayuda y cuenta" },
 ] as const;
@@ -77,6 +78,18 @@ export const MODULOS_PANEL: readonly ModuloPanel[] = [
     secciones: ["dashboard"],
     desactivable: false,
     motivoSiempreActivo: "Es la portada del panel: ahí se lleva a quien entra en un módulo desactivado.",
+    enMenu: true,
+  },
+  {
+    clave: "facturas",
+    nombre: "Facturas",
+    descripcion: "Facturas de proveedores: se suben, se leen solas (OCR con IA) y se consultan compras, productos y precios.",
+    rutas: ["/facturas"],
+    icono: Receipt,
+    grupo: "compras",
+    // Con solo «Facturas · Subida» también sale (entra en la pestaña Cargar).
+    secciones: ["facturas", "facturas_subida"],
+    desactivable: true,
     enMenu: true,
   },
   {

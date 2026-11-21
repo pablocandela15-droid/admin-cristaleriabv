@@ -17,6 +17,7 @@ import { z } from "zod";
 import type { QueryClient } from "@tanstack/react-query";
 import { emitirRevalidacionSesion } from "@/lib/revalidacion-sesion";
 import { borrarPermisosRecordados } from "@/lib/cachePermisos";
+import { borrarCopiasLista } from "@/lib/facturas/copiaListaCompras";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
 import {
   limpiarAvisoSesionCaducada,
@@ -207,6 +208,8 @@ export function AuthProvider({
   const idPintado = useRef<string | null>(null);
   /** Cancela y VACÍA la caché: invalidar no basta, serviría datos viejos en el primer render. */
   const vaciarCache = useCallback(() => {
+    // La copia de la lista de Compras (Facturas) guardada en el dispositivo (`copiaListaCompras.ts`).
+    borrarCopiasLista();
     // El rol y los permisos recordados en el dispositivo (`cachePermisos.ts`).
     borrarPermisosRecordados();
     const qc = clienteConsultas.current;

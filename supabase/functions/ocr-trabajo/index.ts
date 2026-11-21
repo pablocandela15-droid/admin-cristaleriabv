@@ -1,0 +1,157 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { claveOpenAI } from "../_shared/clave-openai.ts";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
+import { jsonResponse, verificarSecreto } from "../_shared/secreto-servidor.ts";
+import { configModelo } from "../procesar-factura/modelo.ts";
+import { type ClienteSupabase, modeloDeFuncion } from "../_shared/modelo-funcion.ts";
+import { crearClienteOpenAI } from "../procesar-factura/openai.ts";
+import { cargarIndicaciones, conIndicaciones } from "../procesar-factura/indicaciones.ts";
+import { crearRegistroUso } from "../procesar-factura/registroUso.ts";
+import { procesarConsolidacion, procesarPagina } from "../procesar-factura/trabajos.ts";
+import { limpiarPendientesTrabajo } from "../procesar-factura/archivo.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "ocr-trabajo");
+
+// ============================================================================
+//  ocr-trabajo  ·  Lectura en segundo plano de las facturas subidas
+// ----------------------------------------------------------------------------
+//  La llama SOLO Postgres (pg_net, desde ocr_despachar / el cron
+//  reanudar-trabajos-ocr), nunca el panel. verify_jwt = false (pg_net no tiene
+//  JWT) y autenticación propia: cabecera x-ocr-secret == OCR_TRABAJOS_SECRET,
+//  comparación en tiempo constante, FALLA CERRADO (sin secreto → 500).
+//  El mismo valor vive en Vault como «ocr_trabajos_secret».
+//
+//  No acepta rutas ni datos del cuerpo: solo un id, y todo lo demás lo lee de
+//  la base de datos. Conocer el secreto solo permite reprocesar piezas que ya
+//  existen.
+//
+//   POST { modo: "pagina", pagina_id }       → 202 {aceptada:true} | 200 {aceptada:false, motivo}
+//   POST { modo: "consolidar", trabajo_id }  → 202 {aceptada:true} | 200 {aceptada:false, motivo}
+//   POST { modo: "limpiar" }                 → 200 {limpiados, ficheros}  (cron limpiar-pendientes-ocr:
+//        borra de pendientes/ las piezas de los trabajos terminados hace más de 7 días)
+//
+//  Responde en cuanto reclama (lease de 180 s) y sigue en segundo plano con
+//  EdgeRuntime.waitUntil (si no existe, espera).
+//
+//  Trabajos de UNA pieza (documentos de una página leídos en segundo plano): la pieza se lee con el código y el modelo (OCR_MODELO) del
+//  camino síncrono y la «consolidación» solo guarda (procesar-factura/unico.ts
+//  y trabajos.ts). Lectura ≤ 4 llamadas a OpenAI en serie (extracción,
+//  relectura por cuadre, pie, contador): cabe de sobra en los 150 s; guardar
+//  va en otra invocación (consolidar).
+// ============================================================================
+
+const SECRETO = Deno.env.get("OCR_TRABAJOS_SECRET");
+const URL_SB = Deno.env.get("SUPABASE_URL")!;
+const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const envModelo = {
+  OCR_MODELO: Deno.env.get("OCR_MODELO"),
+  OCR_MODELO_PIEZAS: Deno.env.get("OCR_MODELO_PIEZAS"),
+  OCR_DETALLE: Deno.env.get("OCR_DETALLE"),
+};
+let cfgModelo = configModelo(envModelo, "piezas");
+// Trabajos de UNA pieza (documento de una página): el modelo y la
+// configuración del camino síncrono (OCR_MODELO), no los de las piezas.
+let cfgModeloUnico = configModelo(envModelo, "unico");
+
+// Manda ia_modelo_funcion: «ocr-trabajo» = OCR_MODELO_PIEZAS
+// y «procesar-factura» = OCR_MODELO (trabajos de una pieza). Sin modelo en la
+// tabla, los secretos de siempre; el resto lo decide modelo.ts.
+async function refrescarModelos(cliente: ClienteSupabase): Promise<void> {
+  const [unico, piezas] = await Promise.all([
+    modeloDeFuncion("procesar-factura", "", { cliente }),
+    modeloDeFuncion("ocr-trabajo", "", { cliente }),
+  ]);
+  const env = {
+    ...envModelo,
+    OCR_MODELO: unico || envModelo.OCR_MODELO,
+    OCR_MODELO_PIEZAS: piezas || envModelo.OCR_MODELO_PIEZAS,
+  };
+  cfgModelo = configModelo(env, "piezas");
+  cfgModeloUnico = configModelo(env, "unico");
+}
+declare const EdgeRuntime: { waitUntil?: (p: Promise<unknown>) => void } | undefined;
+
+async function enSegundoPlano(tarea: Promise<unknown>, etiqueta: string): Promise<void> {
+  const protegida = tarea.catch((err) => {
+    console.error(`[SEGUNDO_PLANO] ${etiqueta}:`, (err as Error)?.message || err);
+  });
+  const runtime = typeof EdgeRuntime !== "undefined" ? EdgeRuntime : undefined;
+  if (runtime && typeof runtime.waitUntil === "function") {
+    runtime.waitUntil(protegida);
+    return;
+  }
+  await protegida;
+}
+
+serve(conAuditoriaDePeticion("ocr-trabajo", createClientBase, async (req) => {
+  if (req.method !== "POST") return jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
+  const denegado = verificarSecreto(req, SECRETO);
+  if (denegado) return denegado;
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return jsonResponse({ ok: false, error: "json_invalido" }, 400);
+  }
+  const supabase = createClient(URL_SB, SERVICE);
+  await refrescarModelos(supabase);
+  // Cada llamada a OpenAI deja su fila en ia_uso (funcion 'ocr-trabajo',
+  // disparador `trabajo:<uuid>#<etapa>`). El INSERT no bloquea la lectura; se
+  // espera al final de la tarea en segundo plano.
+  const clientes = (trabajoId: string) => {
+    const registro = crearRegistroUso({ funcion: "ocr-trabajo", disparador: `trabajo:${trabajoId}`, cliente: supabase });
+    // Indicaciones por proveedor (proveedores.notas_ia) en el prompt de extracción,
+    // igual que en procesar-factura. Se leen una vez por trabajo y solo si se usan.
+    let notas: ReturnType<typeof cargarIndicaciones> | null = null;
+    const obtenerNotas = () => (notas ??= cargarIndicaciones(supabase));
+    const crear = (config: typeof cfgModelo) =>
+      conIndicaciones(crearClienteOpenAI({ apiKey: claveOpenAI("ocr"), config, alUsar: registro.alUsar }), obtenerNotas);
+    return { registro, openai: crear(cfgModelo), openaiUnico: crear(cfgModeloUnico) };
+  };
+
+  if (body.modo === "pagina") {
+    const id = Number(body.pagina_id);
+    if (!Number.isInteger(id) || id <= 0) return jsonResponse({ ok: false, error: "pagina_id" }, 400);
+    const { data, error } = await supabase.rpc("ocr_reclamar_pagina", { p_pagina_id: id, p_lease_seg: 180 });
+    if (error) return jsonResponse({ ok: false, error: error.message }, 500);
+    const pagina = Array.isArray(data) ? data[0] : data;
+    if (!pagina?.id) return jsonResponse({ aceptada: false, motivo: "ya_reclamada_o_no_toca" });
+    const { registro, openai, openaiUnico } = clientes(String(pagina.trabajo_id ?? ""));
+    await enSegundoPlano(
+      procesarPagina(supabase, openai, pagina, openaiUnico).finally(registro.esperar),
+      `pieza ${id}`,
+    );
+    return jsonResponse({ aceptada: true }, 202);
+  }
+
+  if (body.modo === "consolidar") {
+    const id = String(body.trabajo_id ?? "");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return jsonResponse({ ok: false, error: "trabajo_id" }, 400);
+    const { data, error } = await supabase.rpc("ocr_reclamar_consolidacion", { p_trabajo_id: id, p_lease_seg: 180 });
+    if (error) return jsonResponse({ ok: false, error: error.message }, 500);
+    const trabajo = Array.isArray(data) ? data[0] : data;
+    if (!trabajo?.id) return jsonResponse({ aceptada: false, motivo: "no_lista_o_ya_reclamada" });
+    const { registro, openai } = clientes(String(trabajo.id));
+    await enSegundoPlano(
+      procesarConsolidacion({ supabase, openai }, trabajo).finally(registro.esperar),
+      `consolidar ${id}`,
+    );
+    return jsonResponse({ aceptada: true }, 202);
+  }
+
+  if (body.modo === "limpiar") {
+    const { data, error } = await supabase.rpc("ocr_trabajos_por_limpiar", { p_limite: 50 });
+    if (error) return jsonResponse({ ok: false, error: error.message }, 500);
+    const ids = ((data ?? []) as unknown[]).map((x) => String(typeof x === "object" && x ? Object.values(x)[0] : x));
+    let ficheros = 0;
+    for (const id of ids) {
+      ficheros += await limpiarPendientesTrabajo(supabase, id);
+      const { error: eMarca } = await supabase.rpc("ocr_marcar_limpiado", { p_trabajo_id: id });
+      if (eMarca) console.error(`[ocr-trabajo] limpiar ${id}:`, eMarca.message);
+    }
+    return jsonResponse({ ok: true, limpiados: ids.length, ficheros });
+  }
+
+  return jsonResponse({ ok: false, error: "modo_desconocido" }, 400);
+}));

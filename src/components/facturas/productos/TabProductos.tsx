@@ -1,0 +1,649 @@
+import { useMemo, useState } from "react";
+import { FolderTree, Merge, Search, SearchX, SlidersHorizontal, Sparkles, Truck, TrendingUp, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { formatDateCorta, formatEntero, formatImporte, plural } from "@/components/facturas/shared/formatters";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import {
+  useCategoriasProducto,
+  useClasificarConIA,
+  useGastoCategorias,
+  useRecategorizarProductos,
+  useResumenProductos,
+} from "@/hooks/useProductosCatalogo";
+import { useProveedores } from "@/hooks/useProveedores";
+import { useProductosConSubida } from "@/hooks/useCompras";
+import { crearResolverProveedor, type ResolverProveedor } from "@/lib/facturas/proveedores";
+import {
+  ETIQUETAS_PERIODO,
+  filtrarProductos,
+  formatCantidades,
+  indexarCategorias,
+  nombresProveedores,
+  normalizarBusqueda,
+  proveedoresDe,
+  rangoPeriodo,
+  rutaCategoria,
+  totalesPorRaiz,
+  type FiltroCategoria,
+  type Periodo,
+  type ResumenProducto,
+} from "@/lib/facturas/productos";
+import { DetalleProductoDialog } from "./DetalleProductoDialog";
+import { FusionarDialog } from "./FusionarDialog";
+import { CategoriasDialog } from "./CategoriasDialog";
+import { LineasSinClasificar } from "./LineasSinClasificar";
+import { ProveedoresDialog } from "./ProveedoresDialog";
+import { SelectorCategoria } from "./SelectorCategoria";
+import { AvisosPrecio } from "./AvisosPrecio";
+import { CHIP, EstadoError, EstadoVacio, FOCO, Hueso, filaEstado, useDesbordeHorizontal } from "@/components/facturas/compras/estilo";
+import { detalleError } from "@/lib/facturas/listaCompras";
+import { ConfirmarClasificarIA } from "./ConfirmarClasificarIA";
+
+type Orden = "gasto" | "compras" | "nombre";
+const TODOS = "__todos";
+// Columnas de la lista en pantallas anchas (≥ 1024 px; en tablet vertical, nombre entero y datos debajo): casilla · producto · compras · cantidad · gasto · último precio.
+const COLUMNAS = "lg:grid-cols-[2.75rem_minmax(0,2.2fr)_5.5rem_minmax(0,1.2fr)_7rem_6.5rem]";
+
+export interface TabProductosProps {
+  /**
+   * Compras (08/10/2026): el texto viene del buscador único de arriba. Si se
+   * pasa, esta pantalla no pinta su propio buscador.
+   */
+  busqueda?: string;
+  /**
+   * Compras: al tocar un producto se avisa aquí (la ficha vive en el panel de
+   * la derecha) en lugar de abrir el diálogo. Su presencia pone la lista en
+   * modo compacto: una sola columna, filtros recogidos en un desplegable.
+   */
+  onAbrir?: (productoId: number) => void;
+  /** Producto abierto en la ficha (se resalta en la lista). */
+  seleccionadoId?: number | null;
+}
+
+/**
+ * Facturas › Compras › Productos: el catálogo de productos canónicos con su
+ * categoría, cuánto se ha comprado y gastado, y las correcciones (categoría,
+ * nombre, fusionar duplicados, mover líneas). Ocupa el alto de la pestaña y
+ * solo la lista hace scroll por dentro. El buscador es el de Compras y la
+ * ficha del producto se abre a pantalla completa.
+ */
+export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoId = null }: TabProductosProps = {}) {
+  const compacto = onAbrir !== undefined;
+  const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
+  const [busquedaPropia, setBusquedaPropia] = useState("");
+  const busqueda = busquedaExterna ?? busquedaPropia;
+  const [soloSubidas, setSoloSubidas] = useState(false);
+  const [categoria, setCategoria] = useState<FiltroCategoria>("todas");
+  const [proveedor, setProveedor] = useState("");
+  const [periodo, setPeriodo] = useState<Periodo>("todo");
+  const [orden, setOrden] = useState<Orden>("gasto");
+  const [vista, setVista] = useState<"productos" | "pendientes">("productos");
+  const [seleccion, setSeleccion] = useState<Set<number>>(new Set());
+  const [detalle, setDetalle] = useState<number | null>(null);
+  const [fusionando, setFusionando] = useState(false);
+  const [editandoCategorias, setEditandoCategorias] = useState(false);
+  const [viendoProveedores, setViendoProveedores] = useState(false);
+  const [confirmandoIA, setConfirmandoIA] = useState(false);
+  const [refChips, difuminado] = useDesbordeHorizontal();
+
+  const filtroPeriodo = useMemo(() => rangoPeriodo(periodo), [periodo]);
+  const categoriasQ = useCategoriasProducto();
+  const resumenQ = useResumenProductos(filtroPeriodo);
+  const gastoQ = useGastoCategorias(filtroPeriodo);
+  const recategorizar = useRecategorizarProductos();
+  const clasificar = useClasificarConIA();
+  // Proveedores unificados: el filtro y la lista usan el proveedor canónico.
+  const proveedoresQ = useProveedores();
+  const subidasQ = useProductosConSubida(true);
+  const nombresSubida = subidasQ.data ?? null;
+  const resolver = useMemo(() => crearResolverProveedor(proveedoresQ.data?.proveedores), [proveedoresQ.data]);
+
+  const categorias = useMemo(() => categoriasQ.data ?? [], [categoriasQ.data]);
+  const mapa = useMemo(() => indexarCategorias(categorias), [categorias]);
+  const productos = useMemo(() => resumenQ.data ?? [], [resumenQ.data]);
+  const totales = useMemo(() => totalesPorRaiz(gastoQ.data ?? [], mapa), [gastoQ.data, mapa]);
+  const proveedores = useMemo(() => proveedoresDe(productos, resolver), [productos, resolver]);
+
+  const visibles = useMemo(() => {
+    const lista = filtrarProductos(
+      productos,
+      { busqueda, categoria, proveedor, soloConCompras: periodo !== "todo" },
+      mapa,
+      resolver,
+    );
+    const ordenada = (soloSubidas && nombresSubida ? lista.filter((p) => nombresSubida.has(normalizarBusqueda(p.nombre))) : lista).slice();
+    if (orden === "nombre") ordenada.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+    else if (orden === "compras") ordenada.sort((a, b) => b.compras - a.compras || b.gasto - a.gasto);
+    else ordenada.sort((a, b) => b.gasto - a.gasto || a.nombre.localeCompare(b.nombre, "es"));
+    return ordenada;
+  }, [productos, busqueda, categoria, proveedor, periodo, orden, mapa, resolver, soloSubidas, nombresSubida]);
+
+  const gastoTotal = totales.reduce((a, t) => a + t.gasto, 0);
+  const gastoVisible = visibles.reduce((a, p) => a + p.gasto, 0);
+  const pendientes = totales.find((t) => t.clave === "pendiente")?.lineas ?? 0;
+  const seleccionados = productos.filter((p) => seleccion.has(p.producto_id));
+  const productoDetalle = productos.find((p) => p.producto_id === detalle) ?? null;
+
+  const error = resumenQ.error ?? categoriasQ.error ?? gastoQ.error;
+  if (error) {
+    // Frase amable y el detalle técnico plegado.
+    return (
+      <div className={compacto ? "flex h-full min-h-0 flex-col justify-center" : "flex h-full items-center justify-center rounded-xl border bg-card"}>
+        <EstadoError
+          titulo="No se ha podido cargar el catálogo de productos"
+          detalle={detalleError(error)}
+          onReintentar={() => {
+            if (resumenQ.isError) void resumenQ.refetch();
+            if (categoriasQ.isError) void categoriasQ.refetch();
+            if (gastoQ.isError) void gastoQ.refetch();
+          }}
+        />
+      </div>
+    );
+  }
+
+  const alternar = (id: number) =>
+    setSeleccion((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const elegirChip = (c: FiltroCategoria | "pendiente") => {
+    if (c === "pendiente") {
+      setVista("pendientes");
+      return;
+    }
+    setVista("productos");
+    setCategoria(c);
+  };
+  const chipActivo = (c: FiltroCategoria | "pendiente") =>
+    c === "pendiente" ? vista === "pendientes" : vista === "productos" && categoria === c;
+
+  const filtrosSelects = (
+    <>
+      <Select value={periodo} onValueChange={(v) => setPeriodo(v as Periodo)}>
+        <SelectTrigger className={compacto ? "h-11 w-full" : "w-[9.5rem]"} aria-label="Periodo">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {(Object.keys(ETIQUETAS_PERIODO) as Periodo[]).map((p) => (
+            <SelectItem key={p} value={p}>{ETIQUETAS_PERIODO[p]}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={proveedor || TODOS} onValueChange={(v) => setProveedor(v === TODOS ? "" : v)}>
+        <SelectTrigger className={compacto ? "h-11 w-full" : "w-[11rem]"} aria-label="Proveedor">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="max-h-[60vh]">
+          <SelectItem value={TODOS}>Todos los proveedores</SelectItem>
+          {proveedores.map((p) => (
+            <SelectItem key={p.clave} value={p.clave}>{p.nombre}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={orden} onValueChange={(v) => setOrden(v as Orden)}>
+        <SelectTrigger className={compacto ? "h-11 w-full" : "w-[9rem]"} aria-label="Ordenar por">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="gasto">Más gasto</SelectItem>
+          <SelectItem value="compras">Más compras</SelectItem>
+          <SelectItem value="nombre">Nombre</SelectItem>
+        </SelectContent>
+      </Select>
+    </>
+  );
+  const selectorSubcategoria = (
+    <SelectorCategoria
+      categorias={categorias}
+      valor={typeof categoria === "number" ? categoria : null}
+      onCambiar={(c) => setCategoria(c === null ? "todas" : c)}
+      etiqueta="Filtrar por categoría o subcategoría"
+      className={compacto ? "h-11 w-full" : "w-[14rem]"}
+      textoNinguna="Todas las categorías"
+    />
+  );
+  const filtrosActivos =
+    (periodo !== "todo" ? 1 : 0) + (proveedor ? 1 : 0) + (orden !== "gasto" ? 1 : 0) + (typeof categoria === "number" ? 1 : 0);
+
+  return (
+    <div
+      className={
+        compacto
+          ? "flex h-full min-h-0 flex-col"
+          : "flex h-full min-h-0 flex-col gap-2 rounded-xl border border-border/50 bg-card p-2 shadow-sm sm:p-3"
+      }
+    >
+      {/* En Compras, herramientas y chips de categoría van en UNA fila: chips a la izquierda
+          (con scroll horizontal) y las herramientas fijas a la derecha. Fuera de Compras, dos filas. */}
+      <div className={compacto ? "flex shrink-0 items-center gap-1 border-b border-border/60 px-2" : "contents"}>
+      {/* Herramientas: en Compras, botones de icono con etiqueta accesible (nada se corta a 1280). */}
+      <div className={`flex shrink-0 items-center ${compacto ? "order-2 gap-0.5 border-l border-border/60 pl-1" : "flex-wrap gap-2"}`}>
+        {busquedaExterna === undefined && (
+          <div className="relative min-w-[12rem] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input
+              value={busquedaPropia}
+              onChange={(e) => setBusquedaPropia(e.target.value)}
+              placeholder="Buscar producto o categoría"
+              aria-label="Buscar producto"
+              className="pl-9"
+            />
+          </div>
+        )}
+        {compacto ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" className="h-11 shrink-0 gap-1.5 px-3" aria-label="Filtros" title="Filtrar y ordenar">
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                <span>Filtros</span>
+                {filtrosActivos > 0 && (
+                  <span className="rounded-full bg-muted px-1.5 text-xs font-semibold leading-5 text-foreground tabular-nums">
+                    {filtrosActivos}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[min(18rem,calc(100vw-2rem))] space-y-2">
+              <p className="text-sm font-semibold">Filtrar y ordenar productos</p>
+              {filtrosSelects}
+              {selectorSubcategoria}
+            </PopoverContent>
+          </Popover>
+        ) : (
+          filtrosSelects
+        )}
+        {!compacto && (
+          <Button variant="outline" onClick={() => setViendoProveedores(true)}>
+            <Truck className="mr-1 h-4 w-4" aria-hidden="true" /> Proveedores
+          </Button>
+        )}
+        {puedeEditar &&
+          (compacto ? (
+            <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="Categorías" title="Categorías" onClick={() => setEditandoCategorias(true)}>
+              <FolderTree className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => setEditandoCategorias(true)}>
+              <FolderTree className="mr-1 h-4 w-4" aria-hidden="true" /> Categorías
+            </Button>
+          ))}
+        <AvisosPrecio puedeEditar={puedeEditar} soloIcono={compacto} />
+        {puedeEditar &&
+          pendientes > 0 &&
+          (compacto ? (
+            <Button
+              variant="ghost"
+              className="h-11 shrink-0 gap-1.5 px-3 text-primary"
+              disabled={clasificar.isPending}
+              onClick={() => setConfirmandoIA(true)}
+              aria-label={clasificar.isPending ? "Clasificando…" : `Clasificar ${formatEntero(pendientes)} con IA`}
+              title={`Clasificar ${plural(pendientes, "línea", "líneas")} con IA`}
+            >
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              <span className="tabular-nums">{formatEntero(pendientes)}</span>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled={clasificar.isPending} onClick={() => setConfirmandoIA(true)}>
+              <Sparkles className="mr-1 h-4 w-4" aria-hidden="true" />
+              {clasificar.isPending ? "Clasificando…" : `Clasificar ${formatEntero(pendientes)} con IA`}
+            </Button>
+          ))}
+      </div>
+
+      {/* Gasto por categoría (clic = filtrar): una sola fila de chips, con scroll horizontal sin barra */}
+      <div
+        ref={refChips}
+        className={`flex overflow-x-auto no-scrollbar ${compacto ? "order-1 h-11 min-w-0 flex-1 items-center gap-1" : "shrink-0 gap-2 pb-1"} ${difuminado}`}
+        role="toolbar"
+        aria-label="Gasto por categoría"
+      >
+        <button
+          type="button"
+          onClick={() => elegirChip("todas")}
+          aria-pressed={chipActivo("todas")}
+          className={chipCategoria(compacto, "")}
+          title="Gasto sin IVA (importes de línea)"
+        >
+          <span className="font-semibold">Todas</span>
+          <span className="whitespace-nowrap tabular-nums text-muted-foreground">
+            {/* Mientras llega el gasto, «…» y no «0,00 €» (QA de diseño F11). */}
+            {gastoQ.data ? (
+              <>
+                {formatImporte(gastoTotal)} <span className="text-xs">sin IVA</span>
+              </>
+            ) : (
+              "…"
+            )}
+          </span>
+        </button>
+        {totales.map((t) => (
+          <button
+            key={String(t.clave)}
+            type="button"
+            onClick={() => elegirChip(t.clave)}
+            aria-pressed={chipActivo(t.clave)}
+            title="Gasto sin IVA (importes de línea)"
+            className={chipCategoria(compacto, t.clave === "pendiente" ? "!border-amber-400/70 bg-amber-50 dark:bg-amber-950/30" : "")}
+          >
+            <span className="whitespace-nowrap font-semibold">{t.nombre}</span>
+            <span className="whitespace-nowrap tabular-nums text-muted-foreground">
+              {t.clave === "pendiente" ? `${plural(t.lineas, "línea", "líneas")} · ${formatImporte(t.gasto)}` : formatImporte(t.gasto)}
+            </span>
+          </button>
+        ))}
+        {/* Productos cuya última compra es más cara que su referencia (umbral de Avisos de precio). */}
+        {nombresSubida && (
+          <button
+            type="button"
+            onClick={() => {
+              setVista("productos");
+              setSoloSubidas((v) => !v);
+            }}
+            aria-pressed={soloSubidas}
+            className={chipCategoria(compacto, "!border-red-200 aria-pressed:!border-red-500 aria-pressed:bg-red-50 dark:!border-red-900 dark:aria-pressed:bg-red-950/30")}
+          >
+            <span className="flex items-center gap-1 whitespace-nowrap font-semibold">
+              <TrendingUp className="h-3.5 w-3.5 text-red-600" aria-hidden="true" /> Subieron de precio
+            </span>
+            <span className="whitespace-nowrap tabular-nums text-muted-foreground">{plural(nombresSubida.size, "producto", "productos")}</span>
+          </button>
+        )}
+      </div>
+      </div>
+
+      {vista === "productos" && (!compacto || categoria !== "todas" || (puedeEditar && seleccion.size > 0)) && (
+        <div className={`flex shrink-0 flex-wrap items-center gap-2 ${compacto ? "border-b border-border/60 px-2 py-0.5" : ""}`}>
+          {/* En Compras este selector va dentro de «Filtros» (la lista es estrecha y el alto, justo). */}
+          {!compacto && selectorSubcategoria}
+          {categoria !== "todas" && (
+            <Button variant="ghost" size="sm" className={compacto ? "h-11" : undefined} onClick={() => setCategoria("todas")}>
+              <X className="mr-1 h-4 w-4" aria-hidden="true" /> Quitar filtro
+            </Button>
+          )}
+          {puedeEditar && seleccion.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/50 px-2 py-1" aria-label="Acciones sobre la selección">
+              <span className="text-sm font-medium">{plural(seleccion.size, "seleccionado", "seleccionados")}</span>
+              <SelectorCategoria
+                categorias={categorias}
+                valor={undefined}
+                placeholder="Cambiar categoría…"
+                etiqueta="Cambiar la categoría de los seleccionados"
+                className="w-[12rem]"
+                disabled={recategorizar.isPending}
+                onCambiar={(c) => recategorizar.mutate({ ids: [...seleccion], categoriaId: c }, { onSuccess: () => setSeleccion(new Set()) })}
+              />
+              <Button size="sm" className={compacto ? "h-11" : undefined} disabled={seleccion.size < 2} onClick={() => setFusionando(true)}>
+                <Merge className="mr-1 h-4 w-4" aria-hidden="true" /> Fusionar
+              </Button>
+              <Button size="sm" variant="ghost" className={compacto ? "h-11" : undefined} onClick={() => setSeleccion(new Set())}>
+                Quitar selección
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Lista (scroll por dentro) */}
+      <div className={`relative min-h-0 flex-1 overflow-y-auto overscroll-contain ${compacto ? "" : "rounded-lg border"}`} data-testid="lista-productos">
+        {vista === "pendientes" ? (
+          <LineasSinClasificar catalogo={productos} categorias={categorias} puedeEditar={puedeEditar} />
+        ) : resumenQ.isLoading ? (
+          <div role="status" aria-busy="true">
+            <span className="sr-only">Cargando productos…</span>
+            <ul className="divide-y divide-border/50" aria-hidden="true">
+              {Array.from({ length: 8 }, (_, i) => (
+                <li key={i} className="flex min-h-12 items-center gap-3 px-3 py-2">
+                  <Hueso className="h-4 w-4 rounded-full" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Hueso className={`h-3.5 ${i % 2 ? "w-1/3" : "w-1/2"}`} />
+                    <Hueso className="h-3 w-3/5" />
+                  </div>
+                  <Hueso className="h-3.5 w-16" />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : visibles.length === 0 ? (
+          <EstadoVacio
+            icono={<SearchX />}
+            titulo="Ningún producto coincide con los filtros"
+            texto={productos.length === 0 ? "Los productos aparecen al subir facturas y clasificar sus líneas." : "Prueba con otra palabra, otra categoría u otros filtros."}
+            accion={
+              filtrosActivos > 0 || categoria !== "todas" || soloSubidas
+                ? {
+                    etiqueta: "Quitar filtros",
+                    onClick: () => {
+                      setCategoria("todas");
+                      setPeriodo("todo");
+                      setProveedor("");
+                      setOrden("gasto");
+                      setSoloSubidas(false);
+                    },
+                  }
+                : undefined
+            }
+          />
+        ) : (
+          <>
+            {!compacto && (
+              <div
+                className={`sticky top-0 z-10 hidden gap-2 border-b bg-muted/60 px-2 py-2 text-xs font-semibold text-muted-foreground backdrop-blur lg:grid ${COLUMNAS}`}
+              >
+                <span />
+                <span>Producto</span>
+                <span className="text-right">Compras</span>
+                <span className="text-right">Cantidad</span>
+                <span className="text-right">Gasto</span>
+                <span className="text-right">Último precio</span>
+              </div>
+            )}
+            <ul className="divide-y divide-border/50">
+              {visibles.map((p) => (
+                <FilaResumen
+                  key={p.producto_id}
+                  p={p}
+                  ruta={rutaCategoria(mapa, p.categoria_id)}
+                  resolver={resolver}
+                  seleccionado={seleccion.has(p.producto_id)}
+                  conCasilla={puedeEditar}
+                  compacta={compacto}
+                  abierto={seleccionadoId === p.producto_id}
+                  subio={!!nombresSubida?.has(normalizarBusqueda(p.nombre))}
+                  onAlternar={() => alternar(p.producto_id)}
+                  onAbrir={() => (onAbrir ? onAbrir(p.producto_id) : setDetalle(p.producto_id))}
+                />
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+
+      <p className={compacto ? "flex h-9 shrink-0 items-center border-t border-border/60 px-3 text-xs text-muted-foreground" : "shrink-0 text-xs text-muted-foreground"}>
+        {vista === "productos"
+          ? `${plural(visibles.length, "producto", "productos")} · ${formatImporte(gastoVisible)}`
+          : `${plural(pendientes, "línea", "líneas")} sin clasificar`}{" "}
+        · importes de línea sin IVA
+      </p>
+
+      {!compacto && productoDetalle && (
+        <DetalleProductoDialog
+          producto={productoDetalle}
+          catalogo={productos}
+          categorias={categorias}
+          puedeEditar={puedeEditar}
+          onCerrar={() => setDetalle(null)}
+        />
+      )}
+      {fusionando && seleccionados.length >= 2 && (
+        <FusionarDialog
+          productos={seleccionados}
+          onCerrar={() => setFusionando(false)}
+          onHecho={() => {
+            setFusionando(false);
+            setSeleccion(new Set());
+          }}
+        />
+      )}
+      {editandoCategorias && <CategoriasDialog categorias={categorias} onCerrar={() => setEditandoCategorias(false)} />}
+      <ConfirmarClasificarIA abierto={confirmandoIA} lineas={pendientes} onCerrar={() => setConfirmandoIA(false)} onConfirmar={() => clasificar.mutate()} />
+      {viendoProveedores && <ProveedoresDialog puedeEditar={puedeEditar} onCerrar={() => setViendoProveedores(false)} />}
+    </div>
+  );
+}
+
+/**
+ * Chip de categoría. En Compras es de una sola línea (nombre + importe en gris),
+ * visualmente de 32 px pero con zona táctil de 44 (el contenedor mide 44 y el
+ * `before:` amplía el toque); fuera de Compras, la tarjeta de dos líneas de siempre.
+ */
+/**
+ * Hueco de 44×44 de la casilla de 16 px (QA C-14): es un <label>, así que un
+ * toque en cualquier punto del hueco marca o desmarca la casilla.
+ */
+const HUECO_CASILLA = "flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-muted/40";
+
+const chipCategoria = (compacto: boolean, extra: string) =>
+  compacto
+    ? `${CHIP} text-xs ${extra}`
+    : `flex min-h-11 shrink-0 flex-col justify-center rounded-lg border px-3 py-1 text-left text-xs aria-pressed:border-primary aria-pressed:bg-primary/10 ${extra}`;
+
+function FilaResumen({
+  p,
+  ruta,
+  resolver,
+  seleccionado,
+  conCasilla,
+  compacta,
+  abierto,
+  subio,
+  onAlternar,
+  onAbrir,
+}: {
+  p: ResumenProducto;
+  ruta: string | null;
+  resolver: ResolverProveedor;
+  seleccionado: boolean;
+  conCasilla: boolean;
+  /** Compras: una sola columna (nombre + gasto, datos debajo) también en pantallas anchas. */
+  compacta: boolean;
+  /** Es el producto que está abierto en la ficha. */
+  abierto: boolean;
+  /** Su última compra es más cara que su referencia. */
+  subio: boolean;
+  onAlternar: () => void;
+  onAbrir: () => void;
+}) {
+  const nombresProv = nombresProveedores(p, resolver);
+  // `lg:` solo en la lista ancha de siempre; en Compras la lista es una columna estrecha.
+  const lg = (clases: string) => (compacta ? "" : clases);
+  if (compacta) {
+    // Compras: dos líneas como mucho. Nombre (truncado, con tooltip) + importe
+    // arriba; «Categoría · Proveedor · N compras · m2 · últ. €» truncado debajo.
+    const detalle = [
+      ruta ?? "Sin categoría",
+      nombresProv.length > 0 ? nombresProv.join(", ") : null,
+      plural(p.compras, "compra", "compras"),
+      formatCantidades(p.cantidades),
+      p.ultimo_precio !== null ? `últ. ${formatImporte(p.ultimo_precio)}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      <li
+        className={`flex min-h-12 items-center gap-1 py-0.5 pl-1 pr-2 ${filaEstado(abierto)} ${!abierto && seleccionado ? "bg-primary/5" : ""}`}
+        aria-current={abierto ? "true" : undefined}
+      >
+        {conCasilla && (
+          <label className={HUECO_CASILLA} data-testid="hueco-casilla">
+            <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} />
+          </label>
+        )}
+        <button type="button" onClick={onAbrir} className={`min-h-11 min-w-0 flex-1 rounded-md px-1.5 py-1 text-left active:bg-muted/50 ${FOCO}`}>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate text-sm font-medium" title={p.nombre}>
+              {p.nombre}
+            </span>
+            {subio && (
+              <TrendingUp className="h-3.5 w-3.5 shrink-0 text-red-600" role="img" aria-label="Ha subido de precio">
+                <title>Su última compra es más cara que el precio de referencia</title>
+              </TrendingUp>
+            )}
+            {p.origen === "ia" && (
+              <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-600" role="img" aria-label="Clasificado por la IA, sin revisar">
+                <title>Clasificado por la IA; nadie lo ha corregido todavía</title>
+              </Sparkles>
+            )}
+            <span className="ml-auto shrink-0 pl-2 text-sm font-semibold tabular-nums">{formatImporte(p.gasto)}</span>
+          </span>
+          <span className="block truncate text-xs text-muted-foreground" title={detalle}>
+            {detalle}
+          </span>
+        </button>
+      </li>
+    );
+  }
+  return (
+    <li
+      className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 px-2 py-1.5 ${lg(COLUMNAS)} ${
+        abierto ? "bg-muted/70" : seleccionado ? "bg-primary/5" : ""
+      }`}
+      aria-current={abierto ? "true" : undefined}
+    >
+      {conCasilla ? (
+        <label className={HUECO_CASILLA}>
+          <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} />
+        </label>
+      ) : (
+        <div className="h-11 w-11" />
+      )}
+      <button type="button" onClick={onAbrir} className="min-h-11 min-w-0 rounded-md px-1 py-1 text-left hover:bg-muted/40">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className={`min-w-0 break-words font-medium ${lg("lg:truncate")}`}>{p.nombre}</span>
+          {subio && (
+            <TrendingUp className="h-3.5 w-3.5 shrink-0 text-red-600" role="img" aria-label="Ha subido de precio">
+              <title>Su última compra es más cara que el precio de referencia</title>
+            </TrendingUp>
+          )}
+          {p.origen === "ia" && (
+            <Sparkles
+              className="h-3.5 w-3.5 shrink-0 text-amber-600"
+              role="img"
+              aria-label="Clasificado por la IA, sin revisar"
+            >
+              <title>Clasificado por la IA; nadie lo ha corregido todavía</title>
+            </Sparkles>
+          )}
+        </span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {ruta ?? "Sin categoría"}
+          {nombresProv.length > 0 && ` · ${nombresProv.join(", ")}`}
+        </span>
+      </button>
+      {/* Móvil, tablet y Compras: gasto a la derecha; el resto debajo. lg+ (lista ancha): columnas. */}
+      <span className={`text-right font-semibold tabular-nums ${lg("lg:hidden")}`}>{formatImporte(p.gasto)}</span>
+      <span className={`col-start-2 col-end-4 text-xs text-muted-foreground ${lg("lg:hidden")}`}>
+        {plural(p.compras, "compra", "compras")} · {formatCantidades(p.cantidades)}
+        {p.ultimo_precio !== null && ` · últ. ${formatImporte(p.ultimo_precio)}`}
+      </span>
+      {!compacta && (
+        <>
+          <span className="hidden text-right text-sm tabular-nums lg:block">{formatEntero(p.compras)}</span>
+          <span className="hidden truncate text-right text-sm tabular-nums lg:block" title={formatCantidades(p.cantidades)}>
+            {formatCantidades(p.cantidades)}
+          </span>
+          <span className="hidden text-right text-sm font-semibold tabular-nums lg:block">{formatImporte(p.gasto)}</span>
+          <span className="hidden text-right text-sm tabular-nums lg:block" title={p.ultima_fecha ? `Última compra ${formatDateCorta(p.ultima_fecha)}` : undefined}>
+            {p.ultimo_precio === null ? "—" : formatImporte(p.ultimo_precio)}
+          </span>
+        </>
+      )}
+    </li>
+  );
+}
