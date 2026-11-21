@@ -3387,6 +3387,84 @@ begin
 end;
 $$;
 
+-- Productos cuya ÚLTIMA compra (en alguna unidad) llegó con aviso de subida de precio: el filtro «Subieron de
+-- precio» de Compras › Productos. Lee avisos_subida_precio (lo escribe el disparador de productos_factura).
+create or replace function public.productos_con_subida()
+returns table(producto_id bigint, nombre text, unidad text, variacion_pct numeric, fecha date, factura_id bigint)
+language sql stable set search_path = public
+as $$
+  with ultima as (
+    select distinct on (pf.producto_id, coalesce(nullif(btrim(pf.unidad::text), ''), 'ud'))
+           pf.producto_id, coalesce(nullif(btrim(pf.unidad::text), ''), 'ud') as unidad,
+           pf.factura_id, f.fecha
+      from public.productos_factura pf
+      join public.facturas f on f.id = pf.factura_id
+     where pf.producto_id is not null
+     order by pf.producto_id, coalesce(nullif(btrim(pf.unidad::text), ''), 'ud'), f.fecha desc nulls last, pf.factura_id desc
+  )
+  select a.producto_id, p.nombre, a.unidad, a.variacion_pct, u.fecha, a.factura_id
+    from ultima u
+    join public.avisos_subida_precio a
+      on a.producto_id = u.producto_id and a.unidad = u.unidad and a.factura_id = u.factura_id
+    join public.productos_catalogo p on p.id = a.producto_id
+   order by a.variacion_pct desc
+$$;
+
+-- Ficha de un proveedor en Compras › Proveedores: documentos, primero y último, cada cuánto se le compra, gasto
+-- (con IVA) y los productos que más se le compran con su último precio. NULL si no existe.
+create or replace function public.ficha_proveedor(p_proveedor_id bigint)
+returns json language sql stable set search_path = public
+as $$
+  with prov as (
+    select p.id, p.nombre::text as nombre from public.proveedores p where p.id = p_proveedor_id
+  ),
+  docs as (
+    select f.id, f.fecha, f.total from public.facturas f where f.proveedor_id = p_proveedor_id
+  ),
+  fechas as (
+    select distinct d.fecha from docs d where d.fecha is not null
+  ),
+  lineas as (
+    select coalesce(pc.nombre, pf.nombre) as producto,
+           coalesce(nullif(btrim(pf.unidad::text), ''), 'ud') as unidad,
+           coalesce(pf.precio_unitario, round(pf.total / nullif(pf.cantidad, 0), 4)) as precio,
+           f.fecha, f.id as factura_id, pf.id, pf.total
+      from public.productos_factura pf
+      join public.facturas f on f.id = pf.factura_id
+      left join public.productos_catalogo pc on pc.id = pf.producto_id
+     where f.proveedor_id = p_proveedor_id
+       and not public.es_servicio_compras(pf.nombre_busqueda)
+  ),
+  top as (
+    select l.producto, l.unidad, count(*) as n, sum(coalesce(l.total, 0)) as gasto,
+           (array_agg(l.precio order by l.fecha desc nulls last, l.factura_id desc, l.id desc)
+              filter (where l.precio is not null))[1] as ultimo_precio,
+           max(l.fecha) as ultima_fecha
+      from lineas l
+     group by l.producto, l.unidad
+     order by count(*) desc, sum(coalesce(l.total, 0)) desc, l.producto
+     limit 12
+  )
+  select json_build_object(
+    'proveedor', prov.nombre,
+    'otros_parecidos', '[]'::json,
+    'docs', (select count(*) from docs),
+    'primera', (select min(d.fecha) from docs d),
+    'ultima', (select max(d.fecha) from docs d),
+    'intervalo_medio_dias', (select case when count(*) > 1
+                                         then round((max(x.fecha) - min(x.fecha))::numeric / (count(*) - 1), 1) end
+                               from fechas x),
+    'gasto', (select round(sum(d.total), 2) from docs d),
+    'sin_total', (select count(*) from docs d where d.total is null),
+    'top_productos', coalesce((select json_agg(json_build_object('producto', t.producto, 'unidad', t.unidad,
+                                                                 'ultimo_precio', t.ultimo_precio,
+                                                                 'ultima_fecha', t.ultima_fecha)
+                                               order by t.n desc, t.gasto desc, t.producto)
+                                 from top t), '[]'::json)
+  )
+  from prov
+$$;
+
 -- ─── Quién es el cliente, y qué es «suyo» ───────────────────────────────────
 -- En las facturas de proveedor Cristalería BV es el CLIENTE: su nombre o su CIF (configuracion_facturas.cif_empresa)
 -- nunca identifican a un proveedor.
@@ -3697,7 +3775,8 @@ begin
          'ocr_anadir_pagina', 'productos_resumen', 'productos_gasto_por_categoria', 'proveedores_listado',
          'meses_compras_incompletos', 'documentos_lista', 'documento_compras', 'lineas_precio_producto',
          'precio_referencia_producto', 'productos_avisar_subidas', 'proveedor_es_cliente', 'ocr_trabajo_es_mio',
-         'factura_original_es_mio', 'ocr_trabajos_por_limpiar', 'ocr_marcar_limpiado', 'ocr_despachar_limpieza')
+         'factura_original_es_mio', 'ocr_trabajos_por_limpiar', 'ocr_marcar_limpiado', 'ocr_despachar_limpieza',
+         'productos_con_subida', 'ficha_proveedor')
   loop
     execute format('revoke all on function %s from public, anon', f);
     execute format('grant execute on function %s to service_role', f);
@@ -3722,7 +3801,8 @@ grant execute on function
   public.buscar_documentos_compras(text), public.documentos_lista(), public.documento_compras(bigint),
   public.meses_compras_incompletos(), public.ocr_resumen_factura(bigint), public.ocr_descartar_trabajo(uuid),
   public.ocr_reintentar_trabajo(uuid), public.estadisticas_lectura(integer), public.validar_cordura_factura(bigint),
-  public.factura_cumple_autoverificacion(bigint), public.recalcular_alertas_factura(bigint)
+  public.factura_cumple_autoverificacion(bigint), public.recalcular_alertas_factura(bigint),
+  public.productos_con_subida(), public.ficha_proveedor(bigint)
 to authenticated;
 -- Funciones de disparador (las ejecuta el propio disparador, como el usuario que escribe).
 grant execute on function

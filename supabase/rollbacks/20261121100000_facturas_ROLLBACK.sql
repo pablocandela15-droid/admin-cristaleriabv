@@ -114,6 +114,8 @@ drop function if exists public.factura_original_es_mio(text) cascade;
 drop function if exists public.ocr_trabajos_por_limpiar(integer) cascade;
 drop function if exists public.ocr_marcar_limpiado(uuid) cascade;
 drop function if exists public.ocr_despachar_limpieza() cascade;
+drop function if exists public.productos_con_subida() cascade;
+drop function if exists public.ficha_proveedor(bigint) cascade;
 
 -- La sección de los avisos vuelve a la del núcleo (sin Facturas).
 drop policy if exists notificaciones_facturas_solo_seccion on public.notificaciones_dashboard;

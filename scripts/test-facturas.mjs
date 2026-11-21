@@ -129,6 +129,7 @@ await comoUsuario(NADA);
 igual(await cuenta("select count(*)::int n from public.facturas"), 0, "sin Facturas no ve facturas");
 igual(await cuenta("select count(*)::int n from public.proveedores"), 0, "ni proveedores");
 igual((await uno("select json_array_length(public.documentos_lista()->'docs') n")).n, 0, "ni la lista de Compras");
+igual(await cuenta("select count(*)::int n from public.productos_con_subida()"), 0, "ni las subidas de precio");
 igual(await cuenta("select count(*)::int n from public.notificaciones_dashboard where tipo = 'subida_precio'"), 0, "ni sus avisos");
 await falla(q("insert into public.facturas (numero_documento, fecha) values ('X-1', '2026-11-01')"), /row-level security|permission denied/i, "no crea facturas");
 await falla(q("select public.productos_renombrar(1, 'Otro')"), /edición en Facturas/i, "no toca el catálogo");
@@ -140,6 +141,9 @@ igual(await cuenta("select count(*)::int n from public.facturas"), 2, "con «Ver
 igual((await uno("select json_array_length(public.documentos_lista()->'docs') n")).n, 2, "y la lista de Compras");
 igual((await uno("select (public.documento_compras($1)->'productos'->0->>'producto_canonico') p", [f1.id])).p, "Vidrio templado 8 mm", "y la ficha con su producto");
 igual(await cuenta("select count(*)::int n from public.notificaciones_dashboard where tipo = 'subida_precio'"), 1, "y los avisos de Facturas");
+igual((await q("select nombre, unidad from public.productos_con_subida()")).rows, [{ nombre: "Vidrio templado 8 mm", unidad: "m2" }], "y qué productos subieron de precio");
+igual((await uno("select (f->>'docs')::int d, f->'top_productos'->0->>'producto' p from public.ficha_proveedor($1) f", [f1.proveedor_id])), { d: 2, p: "Vidrio templado 8 mm" },
+  "y la ficha del proveedor");
 await q("update public.facturas set observaciones = 'cambio' where id = $1", [f1.id]);
 igual((await uno("select observaciones from public.facturas where id = $1", [f1.id])).observaciones, null, "pero no cambia nada");
 await falla(q("select public.proveedores_editar($1, 'Otro nombre')", [f1.proveedor_id]), /edición en Facturas/i, "ni los proveedores");
