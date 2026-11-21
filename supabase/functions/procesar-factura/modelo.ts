@@ -11,14 +11,12 @@
 //    · OCR_MODELO_PIEZAS  → solo para las piezas de documentos largos
 //                           (páginas/franjas), si se quiere otro distinto.
 //    · OCR_DETALLE        → "high" para forzar el detail clásico.
-//  Por defecto gpt-5.6-luna con detail "original". El dueño pidió gpt-5.4-mini
-//  (05-oct-2026) condicionado al banco de 19 documentos reales, y el banco lo
-//  descarta: empeora documentos cortos (Osborne 21: total 574,40 en vez de
-//  5.713,40 en 3 de 3; Campoluz 30: 16-17 de 19 filas; Candela 24: 13 de 14)
-//  y no termina Luga ni en franjas. gpt-5.6-luna: 313/315 filas en los cortos,
-//  Luga 54/54 de una vez y en franjas, y la mitad de coste. Detalle en
-//  docs/funcionalidades/04b-facturas-multipagina-plan.md §1.14. gpt-5-mini se
-//  apaga el 11-dic-2026.
+//  Por defecto gpt-5.6-luna con detail "original": en el banco de documentos
+//  reales del panel de referencia, gpt-5.4-mini empeoraba los documentos cortos
+//  (totales y filas perdidas) y no terminaba una factura de 54 filas ni en
+//  franjas; gpt-5.6-luna leía 313/315 filas en los cortos y las 54 de una vez,
+//  a la mitad de coste. Desde Super Admin › Servicios › Modelos se puede cambiar
+//  (tabla ia_modelo_funcion). gpt-5-mini se apaga el 11-dic-2026.
 // ============================================================================
 
 import type { EsquemaTokens } from "./imagen.ts";

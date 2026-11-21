@@ -138,7 +138,7 @@ export function crearClienteOpenAI(deps: DependenciasOpenAI): ClienteOpenAI {
     const t0 = Date.now();
     const res = await postConReintento(`${OPENAI}/chat/completions`, JSON.stringify({
         model: cfg.modelo,
-        // 54 filas de concepto (la factura mensual ML/101511 de Luga Sabores)
+        // 54 filas de concepto (la factura mensual ML/101511 de un proveedor)
         // mas el razonamiento no caben en 16k: la respuesta se cortaba por el
         // limite y el documento se perdia entero. El coste no sube por subir el
         // techo, solo por los tokens que de verdad se generen.

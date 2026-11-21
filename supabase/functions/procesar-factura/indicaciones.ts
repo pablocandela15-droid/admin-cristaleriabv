@@ -1,8 +1,8 @@
 // ============================================================================
 //  Indicaciones por proveedor para la lectura (notas_ia de public.proveedores)
 // ----------------------------------------------------------------------------
-//  El dueño escribe en Facturas › Proveedores cosas como «Hermanos Narejos:
-//  los mejillones son LATAS». El proveedor solo se conoce tras leer, así que
+//  El dueño escribe en Facturas › Proveedores cosas como «Vidrios del Vinalopó:
+//  el templado va por m², no por unidades». El proveedor solo se conoce tras leer, así que
 //  el bloque con las notas (acotado) va en el prompt de sistema y el modelo
 //  solo aplica la de quien emite el documento.
 //  Sin Deno ni red: se importa desde vitest. Nunca rompe el OCR: si leer las

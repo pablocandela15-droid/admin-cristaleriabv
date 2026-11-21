@@ -45,6 +45,7 @@ export interface OpcionInicio {
  */
 export const OPCIONES_INICIO: readonly OpcionInicio[] = [
   { clave: "dashboard", titulo: "Dashboard", ruta: "/dashboard", secciones: ["dashboard"] },
+  { clave: "facturas", titulo: "Facturas", ruta: "/facturas", secciones: ["facturas", "facturas_subida"] },
   { clave: "usuarios", titulo: "Usuarios", ruta: "/usuarios", secciones: ["usuarios"] },
   { clave: "ayuda", titulo: "Ayuda", ruta: "/ayuda" },
 ];

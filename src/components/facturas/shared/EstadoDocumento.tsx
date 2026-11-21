@@ -1,0 +1,272 @@
+import { AlertTriangle, CheckCircle2, EyeOff, Sparkles } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { AlertaValidacion } from "@/hooks/useFacturas";
+
+/**
+ * Insignia de estado. El primitivo `Badge` NO lleva `whitespace-nowrap` y lo
+ * comparte toda la app, así que no se toca ahí: sin esto «Sin revisar» rompe
+ * en dos líneas y descuadra el alto de la fila.
+ */
+const INSIGNIA =
+  "inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0 text-xs font-medium leading-none";
+
+// ---------------------------------------------------------------------------
+// Estado de lectura de un documento
+// ---------------------------------------------------------------------------
+// El aviso va junto al estado y lleva el PROBLEMA escrito («IVA no cuadra»,
+// «Precio extremo»): un error de lectura de varias cifras (p. ej. 12 piezas de
+// templado a 9.316,67 €/ud) tiene que saltar a la vista, no esconderse tras un
+// icono. El mensaje completo que generó `validar_cordura_factura` sigue en el
+// tooltip. Y «Sin revisar» es un botón: abre el mismo diálogo donde está el
+// interruptor «Marcar como verificada».
+
+/**
+ * Etiqueta corta de cada codigo de `validar_cordura_factura`. Van cortas a
+ * proposito: la columna mide ~104 px en la franja estrecha y la insignia no
+ * puede romper a dos lineas sin descuadrar el alto de la fila. El texto
+ * completo del aviso se lee en el tooltip.
+ */
+const ETIQUETAS_ALERTA: Record<string, string> = {
+  iva_incoherente: "IVA no cuadra",
+  descuadre_cabecera: "No cuadra",
+  descuadre_linea: "Línea mal",
+  precio_unitario_extremo: "Precio extremo",
+  precio_atipico_historico: "Precio atípico",
+  precio_atipico_pagina: "Precio atípico",
+  total_documento_extremo: "Total enorme",
+  total_documento_irrisorio: "Total ínfimo",
+  total_ausente: "Sin total",
+  subtotal_ausente: "Sin base",
+  // QA 05/11/2026 (C-16): los que salían con el código en crudo.
+  extraccion_historica: "Aviso de importación",
+  numero_ausente: "Sin número",
+  linea_sin_importe: "Línea sin importe",
+  total_deducido: "Total calculado",
+  cliente_ajeno: "Otro cliente",
+};
+
+/** Codigo desconocido: se enseña el codigo en limpio (con mayúscula) antes que un numero suelto. */
+export const etiquetaAlerta = (codigo: string): string => {
+  if (ETIQUETAS_ALERTA[codigo]) return ETIQUETAS_ALERTA[codigo];
+  const limpio = codigo.replace(/_/g, " ").trim();
+  return limpio ? limpio.charAt(0).toUpperCase() + limpio.slice(1) : "Aviso";
+};
+
+export interface GrupoAlertas {
+  etiqueta: string;
+  /** Cuántos avisos con esa etiqueta. */
+  n: number;
+  severidad: "alta" | "media" | string;
+}
+
+/**
+ * Agrupa los avisos repetidos por su etiqueta («Línea mal ×2» y no dos
+ * insignias iguales). Orden: el de la primera aparición; la severidad del
+ * grupo es la más grave.
+ */
+export function agruparAlertas(alertas: Pick<AlertaValidacion, "codigo" | "severidad">[]): GrupoAlertas[] {
+  const grupos = new Map<string, GrupoAlertas>();
+  for (const a of alertas) {
+    const etiqueta = etiquetaAlerta(a.codigo);
+    const g = grupos.get(etiqueta);
+    if (g) {
+      g.n += 1;
+      if (a.severidad === "alta") g.severidad = "alta";
+    } else grupos.set(etiqueta, { etiqueta, n: 1, severidad: a.severidad });
+  }
+  return [...grupos.values()];
+}
+
+interface EstadoDocumentoProps {
+  alertas: AlertaValidacion[];
+  verificada: boolean;
+  /**
+   * Quien la dio por revisada. 'auto' = la regla de la base (sin avisos,
+   * total y base presentes, no duplicado, proveedor ya conocido); no la ha
+   * mirado nadie. Se pinta distinta de la revision humana.
+   */
+  origen?: "auto" | "manual" | null;
+  /**
+   * Abre el dialogo de edicion, que es donde se marca como verificada. Sin
+   * él (quien no tiene permiso de edición), «Sin revisar» es solo una marca.
+   */
+  onRevisar?: () => void;
+  /** En las tarjetas hay sitio de sobra: se pintan todas las alertas. */
+  compacto?: boolean;
+  /** En una fila (cabecera de la ficha): las insignias una al lado de otra, no apiladas. */
+  enLinea?: boolean;
+}
+
+/**
+ * Insignias tocables: el texto mide 12 px y la caja 28 px, pero un `::before`
+ * agranda la zona sensible hasta 44 px de alto sin mover nada del diseño.
+ */
+const INSIGNIA_TACTIL = `${INSIGNIA} relative h-7 text-xs before:absolute before:-inset-x-1 before:-inset-y-3 before:content-['']`;
+
+export function EstadoDocumento({ alertas, verificada, origen = null, onRevisar, compacto = true, enLinea = false }: EstadoDocumentoProps) {
+  // Verificada = sus avisos ya están revisados: no se enseñan (14/11/2026, «al
+  // verificar, que desaparezcan sus avisos»). Siguen guardados en el documento.
+  const lista = verificada ? [] : (alertas ?? []);
+  const graves = lista.filter((a) => a.severidad === "alta");
+  // Repetidos juntos («Línea mal ×2»). En la tabla solo cabe una insignia de
+  // aviso; el resto se resume en "+N".
+  const grupos = agruparAlertas(lista);
+  const visibles = compacto ? grupos.slice(0, 1) : grupos;
+  const ocultas = lista.length - visibles.reduce((n, g) => n + g.n, 0);
+
+  return (
+    <div className={enLinea ? "flex flex-wrap items-center gap-1.5" : "flex flex-col items-start gap-1"}>
+      {visibles.map((a, i) => {
+        const color =
+          a.severidad === "alta"
+            ? "border-red-200 bg-red-50 text-red-700"
+            : "border-amber-200 bg-amber-50 text-amber-700";
+        return (
+          // Popover y no Tooltip: el mensaje completo del aviso se tiene que poder
+          // leer con un toque (en una tablet no hay hover).
+          <Popover key={i}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`${a.etiqueta}${a.n > 1 ? ` (${a.n})` : ""}: ver el aviso completo`}
+                className={`${INSIGNIA_TACTIL} ${color}`}
+              >
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                {a.etiqueta}
+                {a.n > 1 && <span className="tabular-nums">×{a.n}</span>}
+                {ocultas > 0 && i === visibles.length - 1 && <span className="opacity-70">+{ocultas}</span>}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              collisionPadding={12}
+              onClick={(e) => e.stopPropagation()}
+              className="w-[min(20rem,calc(100vw-1.5rem))] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto"
+            >
+              <p className="mb-1 text-sm font-semibold">
+                {graves.length > 0 ? "Importes que no cuadran" : "Importes que conviene revisar"}
+              </p>
+              <ul className="list-disc space-y-1 pl-4 text-sm">
+                {lista.slice(0, 4).map((x, j) => (
+                  <li key={j}>{x.mensaje}</li>
+                ))}
+              </ul>
+              {lista.length > 4 && <p className="mt-1 text-xs text-muted-foreground">y {lista.length - 4} más…</p>}
+              <p className="mt-2 text-xs text-muted-foreground">
+                Lo leyó el OCR: comprueba el documento original y corrígelo en "Editar".
+              </p>
+            </PopoverContent>
+          </Popover>
+        );
+      })}
+
+      {verificada && origen === "auto" ? (
+        // Popover y no title: en la tablet no hay hover.
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Revisada automáticamente: cuadra todo y el proveedor es conocido; no la ha mirado nadie"
+              className={`${INSIGNIA_TACTIL} border-emerald-200 bg-transparent text-emerald-700 dark:border-emerald-800 dark:text-emerald-300`}
+            >
+              <Sparkles className="h-3 w-3 shrink-0" />
+              Revisada auto
+            </button>
+          </PopoverTrigger>
+          <PopoverContent collisionPadding={12} onClick={(e) => e.stopPropagation()} className="w-[min(18rem,calc(100vw-1.5rem))] text-sm">
+            Cuadra todo y el proveedor es conocido; no la ha mirado nadie.
+          </PopoverContent>
+        </Popover>
+      ) : verificada ? (
+        <span className={`${INSIGNIA} h-7 text-xs border-emerald-200 bg-emerald-50 text-emerald-700`}>
+          <CheckCircle2 className="h-3 w-3 shrink-0" />
+          Revisada
+        </span>
+      ) : !onRevisar ? (
+        <span className={`${INSIGNIA} h-7 text-xs border-border bg-muted/50 text-muted-foreground`}>
+          <EyeOff className="h-3 w-3 shrink-0" />
+          Sin revisar
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRevisar();
+          }}
+          aria-label='Sin revisar: nadie ha comprobado todavía que lo leído coincide con el papel. Pulsa para abrirlo y, si está bien, activa "Marcar como verificada".'
+          className={`${INSIGNIA_TACTIL} border-border bg-muted/50 text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground`}
+        >
+          <EyeOff className="h-3 w-3 shrink-0" />
+          Sin revisar
+        </button>
+      )}
+    </div>
+  );
+}
+
+export type FiltroRevision = "todos" | "avisos" | "sin_revisar";
+
+/**
+ * Resumen de la pestaña, y a la vez su filtro.
+ *
+ * Antes el pie de la tabla decia solo "5 total", que no invita a nada. Con los
+ * datos reales de produccion —5 documentos, NINGUNO verificado, 2 con avisos y
+ * siete meses sin subir nada— la pregunta que uno se hace al abrir la pantalla
+ * es "¿que me falta por mirar?", y no habia forma de responderla sin recorrer
+ * los documentos de uno en uno. Los contadores son botones: filtran.
+ */
+export function ResumenRevision({
+  total,
+  conAvisos,
+  sinRevisar,
+  filtro,
+  onFiltro,
+}: {
+  total: number;
+  conAvisos: number;
+  sinRevisar: number;
+  filtro: FiltroRevision;
+  onFiltro: (f: FiltroRevision) => void;
+}) {
+  const chip = (activo: boolean, tono: string) =>
+    `inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-sm font-medium transition-colors ${
+      activo ? tono : "border-border/60 bg-background text-muted-foreground hover:bg-muted/60"
+    }`;
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <button
+        type="button"
+        onClick={() => onFiltro("todos")}
+        className={chip(filtro === "todos", "border-primary/40 bg-primary/10 text-primary")}
+        title="Ver todos los documentos"
+      >
+        <span className="tabular-nums">{total}</span> en total
+      </button>
+      {conAvisos > 0 && (
+        <button
+          type="button"
+          onClick={() => onFiltro(filtro === "avisos" ? "todos" : "avisos")}
+          className={chip(filtro === "avisos", "border-red-300 bg-red-50 text-red-700")}
+          title="Solo los documentos cuyos importes no cuadran"
+        >
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span className="tabular-nums">{conAvisos}</span> con avisos
+        </button>
+      )}
+      {sinRevisar > 0 && (
+        <button
+          type="button"
+          onClick={() => onFiltro(filtro === "sin_revisar" ? "todos" : "sin_revisar")}
+          className={chip(filtro === "sin_revisar", "border-input bg-muted text-foreground")}
+          title="Solo los documentos que nadie ha comprobado todavía"
+        >
+          <EyeOff className="h-3.5 w-3.5 shrink-0" />
+          <span className="tabular-nums">{sinRevisar}</span> sin revisar
+        </button>
+      )}
+    </div>
+  );
+}

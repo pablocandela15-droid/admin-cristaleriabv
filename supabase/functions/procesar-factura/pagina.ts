@@ -602,7 +602,7 @@ export function motivosLocales(
   if (!r.sin_importes) {
     for (const d of comprobarCuadre(paginaComoDocumento(r))) {
       // Una línea que se factura por KILOS (columna de peso aparte) no cuadra
-      // con cantidad × precio y está bien leída: peso × precio = importe (Luga:
+      // con cantidad × precio y está bien leída: peso × precio = importe (proveedor B:
       // NATOP 12 uds / 24 kg × 4,14 = 99,46). No es motivo de relectura.
       if (d.codigo === "descuadre_linea" && cuadraPorPeso(lineas[Number(d.detalle?.indice)])) continue;
       if (d.codigo === "descuadre_linea" || d.codigo === "precio_unitario_extremo") {
@@ -613,7 +613,7 @@ export function motivosLocales(
       if (!l.importe_literal || !esNum(l.total)) return;
       // Se acepta cualquiera de las lecturas posibles del literal (es, en, o la
       // heurística del separador más a la derecha): el formato que declara el
-      // modelo no es fiable (Luga: dice 'es' con importes '1,547.26').
+      // modelo no es fiable (proveedor B: dice 'es' con importes '1,547.26').
       const lecturas = (["es", "en", "desconocido"] as FormatoNumerico[])
         .map((f) => leerImporteConFormato(l.importe_literal!, f))
         .filter((x): x is number => x !== null);
@@ -691,7 +691,7 @@ const claveFila = (l: LineaPagina) =>
  * Un bloque de 4+ filas consecutivas idéntico (nombre, cantidad e importe) a
  * otro bloque anterior de la MISMA imagen: síntoma de que el modelo ha
  * entrado en bucle y ha escrito filas dos veces (visto con gpt-5.4-mini en la
- * franja 2 de Luga). En el papel real, dos entregas del mismo producto
+ * franja 2 del proveedor B). En el papel real, dos entregas del mismo producto
  * cambian casi siempre en cantidad o importe.
  */
 export function bloqueRepetido(

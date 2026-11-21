@@ -110,6 +110,62 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       },
     ],
   },
+  {
+    seccion: "facturas",
+    titulo: "Facturas",
+    ruta: "/facturas?tab=compras",
+    queEs:
+      "Aquí se guardan las facturas de los proveedores. Les haces una foto o subes el PDF, la aplicación las lee sola, comprueba que cuadren y luego puedes buscar qué compraste, a quién, cuándo y a qué precio.",
+    grupos: [
+      {
+        titulo: "Subir facturas",
+        pasos: [
+          "Entra en «Facturas» y abre la pestaña «Cargar».",
+          "Pulsa «Hacer foto» para usar la cámara o elige PDF y fotos del dispositivo. Puedes subir varias a la vez, y las páginas de una misma factura juntas.",
+          "Se leen solas en unos segundos (las largas, por trozos en el servidor). Puedes seguir trabajando: el aviso del menú te dice cuántas quedan.",
+          "Si una factura ya estaba subida, te lo dice: puedes dejar la que había, sustituirla por la nueva o, si es otra página, añadírsela.",
+        ],
+      },
+      {
+        titulo: "Revisar lo leído",
+        pasos: [
+          "En «Compras» › «Documentos» están todas, por meses. Las que cuadran (base + IVA = total, sin precios raros, de un proveedor conocido) se marcan solas como «Revisada auto».",
+          "Abre una para ver sus datos y sus líneas con el original al lado. Con «Editar» corriges lo que se haya leído mal y la das por revisada.",
+          "Los avisos (un total que no cuadra, un precio que dobla lo normal…) salen en la fila y en la ficha. Al marcarla como revisada desaparecen.",
+        ],
+      },
+      {
+        titulo: "Productos, precios y proveedores",
+        pasos: [
+          "En «Productos» tienes lo que compras agrupado (por ejemplo «Vidrio templado 8 mm incoloro» o «Silicona neutra transparente»), con su categoría y lo que has gastado.",
+          "Toca un producto para ver la gráfica de su precio con cada proveedor y en qué facturas aparece. «Subieron de precio» te enseña los que han llegado más caros.",
+          "En «Proveedores» ves a quién le compras más; toca uno para ver cada cuánto le compras, qué le compras y sus facturas.",
+        ],
+      },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿Tengo que revisar todas las facturas?",
+        respuesta:
+          "No. Las que cuadran se dan por revisadas solas. Mira las que tienen avisos o salen como «Sin revisar»: con el original al lado se hace rápido.",
+      },
+      {
+        pregunta: "¿Cómo sé si algo ha subido de precio?",
+        respuesta:
+          "Te avisa la campana cuando una compra llega más cara que lo normal (el porcentaje se cambia en «Productos» › «Avisos de precio»). También puedes filtrar «Subieron de precio» en «Productos».",
+      },
+      {
+        pregunta: "¿Dónde está el papel original?",
+        respuesta:
+          "Se guarda con la factura. Ábrelo desde la ficha (sale al lado de los datos) o con el icono de la derecha de cada fila de la lista.",
+      },
+      {
+        pregunta: "Solo puedo subir, ¿por qué no veo «Compras»?",
+        respuesta:
+          "Con el permiso «Facturas · Subida» subes facturas y corriges lo que has subido tú. Para consultar todas hace falta «Ver» en Facturas: pídeselo al encargado.",
+      },
+    ],
+  },
 ];
 
 /** ¿Es un archivo de vídeo (se enseña con <video>) y no un enlace de inserción (<iframe>)? */

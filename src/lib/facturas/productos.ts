@@ -1,0 +1,441 @@
+// ============================================================================
+//  Facturas › Productos — cuentas puras (sin React ni Supabase)
+// ----------------------------------------------------------------------------
+//  Catálogo de productos canónicos con categoría (migración
+//  20261121100000_facturas): árbol de dos niveles,
+//  filtros de la pantalla, totales por categoría y periodos.
+// ============================================================================
+import type { ResolverProveedor } from "./proveedores";
+
+export interface CategoriaProducto {
+  id: number;
+  clave: string | null;
+  nombre: string;
+  descripcion: string | null;
+  padre_id: number | null;
+  orden: number;
+  activa: boolean;
+}
+
+/** Una fila de `productos_resumen`. */
+export interface ResumenProducto {
+  producto_id: number;
+  nombre: string;
+  categoria_id: number | null;
+  origen: "ia" | "manual" | string;
+  unidad_habitual: string | null;
+  compras: number;
+  documentos: number;
+  /** Suma de cantidades por unidad: {"m2": 48, "ud": 12}. "" = sin unidad. */
+  cantidades: Record<string, number>;
+  /** Suma de importes de línea (base, sin IVA). */
+  gasto: number;
+  lineas_sin_importe: number;
+  ultimo_precio: number | null;
+  ultima_fecha: string | null;
+  proveedores: string[];
+}
+
+/** Una fila de `productos_gasto_por_categoria`. */
+export interface GastoCategoria {
+  categoria_id: number | null;
+  categoria: string;
+  padre_id: number | null;
+  padre: string | null;
+  sin_clasificar: boolean;
+  gasto: number;
+  lineas: number;
+  productos: number;
+  lineas_sin_importe: number;
+}
+
+export type MapaCategorias = Map<number, CategoriaProducto>;
+
+export const indexarCategorias = (cats: CategoriaProducto[]): MapaCategorias => new Map(cats.map((c) => [c.id, c]));
+
+/** «Vidrio › Templado»; null si no hay categoría o no se conoce. */
+export function rutaCategoria(mapa: MapaCategorias, id: number | null | undefined): string | null {
+  if (id === null || id === undefined) return null;
+  const c = mapa.get(id);
+  if (!c) return null;
+  const padre = c.padre_id !== null ? mapa.get(c.padre_id) : undefined;
+  return padre ? `${padre.nombre} › ${c.nombre}` : c.nombre;
+}
+
+/** La categoría de primer nivel de `id` (ella misma si ya lo es). */
+export function categoriaRaiz(mapa: MapaCategorias, id: number | null | undefined): number | null {
+  if (id === null || id === undefined) return null;
+  const c = mapa.get(id);
+  if (!c) return null;
+  return c.padre_id ?? c.id;
+}
+
+const porOrden = (a: CategoriaProducto, b: CategoriaProducto) => a.orden - b.orden || a.nombre.localeCompare(b.nombre, "es");
+
+export interface OpcionCategoria {
+  id: number;
+  etiqueta: string;
+  nivel: 0 | 1;
+  activa: boolean;
+}
+
+/**
+ * Opciones en árbol (madre y debajo sus hijas). Las desactivadas solo salen si
+ * `incluir` es una de ellas (la categoría actual de un producto).
+ */
+export function opcionesCategoria(cats: CategoriaProducto[], incluir?: number | null): OpcionCategoria[] {
+  const visibles = cats.filter((c) => c.activa || c.id === incluir);
+  const raices = visibles.filter((c) => c.padre_id === null).sort(porOrden);
+  const salida: OpcionCategoria[] = [];
+  for (const r of raices) {
+    salida.push({ id: r.id, etiqueta: r.nombre, nivel: 0, activa: r.activa });
+    for (const h of visibles.filter((c) => c.padre_id === r.id).sort(porOrden)) {
+      salida.push({ id: h.id, etiqueta: `${r.nombre} › ${h.nombre}`, nivel: 1, activa: h.activa });
+    }
+  }
+  return salida;
+}
+
+const fmtNum = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
+
+/** «48 m2 · 12 ud». Unidad vacía → «12 (sin unidad)». */
+export function formatCantidades(cantidades: Record<string, number> | null | undefined): string {
+  const partes = Object.entries(cantidades ?? {})
+    .filter(([, v]) => Number.isFinite(Number(v)) && Number(v) !== 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .map(([u, v]) => (u ? `${fmtNum.format(Number(v))} ${u}` : `${fmtNum.format(Number(v))} (sin unidad)`));
+  return partes.length ? partes.join(" · ") : "—";
+}
+
+export const normalizarBusqueda = (s: string | null | undefined) =>
+  (s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+
+/** Clave de proveedor: sin mayúsculas, tildes, puntuación ni forma jurídica. */
+export const claveProveedor = (s: string) =>
+  normalizarBusqueda(s).replace(/[.,]/g, " ").replace(/\b(s\s?l\s?u?|s\s?a|c\s?b|slu)\b/g, "").replace(/\s+/g, " ").trim();
+
+/** Sin proveedores unificados: la clave de texto de siempre y el propio texto. */
+const resolverPorTexto: ResolverProveedor = (texto) => ({ clave: claveProveedor(texto), nombre: texto });
+
+/**
+ * Proveedores distintos (por clave), con el primer nombre visto. Orden alfabético.
+ * Con `resolver` (proveedores unificados, `crearResolverProveedor`) la clave y el
+ * nombre son los del proveedor canónico: «VINALOPO (Vidrios del Vinalopó)» y
+ * «Vidrios del Vinalopó S.L.» salen una sola vez.
+ */
+export function proveedoresDe(
+  lista: Pick<ResumenProducto, "proveedores">[],
+  resolver: ResolverProveedor = resolverPorTexto,
+): { clave: string; nombre: string }[] {
+  const mapa = new Map<string, string>();
+  for (const p of lista) for (const n of p.proveedores ?? []) {
+    const r = resolver(n);
+    if (r.clave && !mapa.has(r.clave)) mapa.set(r.clave, r.nombre);
+  }
+  return [...mapa].map(([clave, nombre]) => ({ clave, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+/** Nombres de proveedor de un producto, ya canónicos y sin repetir. */
+export function nombresProveedores(
+  p: Pick<ResumenProducto, "proveedores">,
+  resolver: ResolverProveedor = resolverPorTexto,
+): string[] {
+  const vistos = new Map<string, string>();
+  for (const n of p.proveedores ?? []) {
+    const r = resolver(n);
+    if (r.clave && !vistos.has(r.clave)) vistos.set(r.clave, r.nombre);
+  }
+  return [...vistos.values()];
+}
+
+/** «todas» · «sin» (productos sin categoría) · id de categoría (incluye sus hijas). */
+export type FiltroCategoria = "todas" | "sin" | number;
+
+export interface FiltrosProductos {
+  busqueda: string;
+  categoria: FiltroCategoria;
+  /** Clave de proveedor (la de `proveedoresDe` con el mismo resolver) o "" para todos. */
+  proveedor: string;
+  /** Ocultar productos sin compras en el periodo. */
+  soloConCompras: boolean;
+}
+
+export function filtrarProductos(
+  lista: ResumenProducto[],
+  f: FiltrosProductos,
+  mapa: MapaCategorias,
+  resolver: ResolverProveedor = resolverPorTexto,
+): ResumenProducto[] {
+  // Cada palabra por separado: «templado 8» encuentra «Vidrio templado 8 mm
+  // incoloro» (no se busca la frase entera).
+  const palabras = palabrasProducto(f.busqueda);
+  return lista.filter((p) => {
+    if (f.soloConCompras && p.compras === 0) return false;
+    if (f.categoria === "sin" && p.categoria_id !== null) return false;
+    if (typeof f.categoria === "number" && p.categoria_id !== f.categoria && categoriaRaiz(mapa, p.categoria_id) !== f.categoria) {
+      return false;
+    }
+    if (f.proveedor && !(p.proveedores ?? []).some((n) => resolver(n).clave === f.proveedor)) return false;
+    if (palabras.length > 0) {
+      const pajar = `${normalizarBusqueda(p.nombre)} ${normalizarBusqueda(rutaCategoria(mapa, p.categoria_id))}`;
+      if (!palabras.every((w) => pajar.includes(w))) return false;
+    }
+    return true;
+  });
+}
+
+/** Palabras de la búsqueda (sin tildes ni mayúsculas); [] = sin búsqueda. */
+export const palabrasProducto = (texto: string | null | undefined): string[] => {
+  const q = normalizarBusqueda(texto);
+  return q ? q.split(" ") : [];
+};
+
+// ─── Evolución del precio de UN producto, desde sus líneas ───────────────────
+
+/** Lo que hace falta de una línea para la gráfica (`useLineasProducto`). */
+export interface LineaSerie {
+  fecha: string | null;
+  proveedor: string | null;
+  cantidad: number | null;
+  unidad: string | null;
+  precio_unitario: number | null;
+  total: number | null;
+}
+
+/** Máximo de puntos de la gráfica (los más recientes). */
+export const MAX_PUNTOS_SERIE = 60;
+
+const unidadSerie = (u: string | null | undefined) => (u ?? "").trim().toLowerCase() || "ud";
+
+/**
+ * Serie de precio de un producto del catálogo con SUS líneas (las de su
+ * `producto_id`, no una búsqueda por texto, que mezclaría productos parecidos
+ * como «Templado 8 mm» y «Templado 8 mm extraclaro»). Un punto por fecha y
+ * proveedor (media ponderada por cantidad, sin IVA), una sola unidad (la más
+ * comprada), sin precios a 0, máx. 60 puntos. `nombreProveedor` unifica el
+ * texto del proveedor (opcional).
+ *
+ * Con varias unidades (m2, ml, ud…) no se descartan en silencio: devuelve
+ * `unidades` (cada una con sus compras = puntos) para que la ficha pinte un
+ * selector; `unidadElegida` cambia la que se dibuja (si no existe, la más comprada).
+ */
+export function serieDesdeLineas(
+  producto: string,
+  lineas: LineaSerie[],
+  nombreProveedor: (texto: string | null) => string = (t) => (t ?? "").trim() || "Sin proveedor",
+  unidadElegida?: string | null,
+): DatosSerieProducto {
+  const validas = lineas
+    .map((l) => {
+      const precio = l.precio_unitario ?? (l.total !== null && l.cantidad ? l.total / l.cantidad : null);
+      return { l, precio };
+    })
+    .filter(
+      (x): x is { l: LineaSerie; precio: number } =>
+        x.precio !== null &&
+        Number.isFinite(x.precio) &&
+        x.precio > 0 &&
+        !!x.l.fecha &&
+        /^\d{4}-\d{2}-\d{2}/.test(x.l.fecha),
+    );
+  if (validas.length === 0) return { sin_datos: true, buscado: producto };
+
+  // La unidad más comprada (a igualdad, la primera por orden alfabético).
+  const cuentaUnidad = new Map<string, number>();
+  for (const { l } of validas) cuentaUnidad.set(unidadSerie(l.unidad), (cuentaUnidad.get(unidadSerie(l.unidad)) ?? 0) + 1);
+  const orden = [...cuentaUnidad].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([u]) => u);
+  const elegida = unidadElegida ? unidadSerie(unidadElegida) : null;
+  const unidad = elegida && cuentaUnidad.has(elegida) ? elegida : orden[0];
+
+  // Compras (puntos: fecha + proveedor distintos) de cada unidad, para el selector.
+  const clavesUnidad = new Map<string, Set<string>>();
+  for (const { l } of validas) {
+    const u = unidadSerie(l.unidad);
+    const claves = clavesUnidad.get(u) ?? new Set<string>();
+    claves.add(`${(l.fecha as string).slice(0, 10)}\u0000${nombreProveedor(l.proveedor)}`);
+    clavesUnidad.set(u, claves);
+  }
+  const unidades: UnidadSerie[] = orden.map((u) => ({ unidad: u, n: clavesUnidad.get(u)?.size ?? 0 }));
+
+  // Un punto por fecha y proveedor.
+  const grupos = new Map<string, { fecha: string; prov: string; suma: number; cant: number; precios: number[] }>();
+  for (const { l, precio } of validas) {
+    if (unidadSerie(l.unidad) !== unidad) continue;
+    const fecha = (l.fecha as string).slice(0, 10);
+    const prov = nombreProveedor(l.proveedor);
+    const k = `${fecha}\u0000${prov}`;
+    const g = grupos.get(k) ?? { fecha, prov, suma: 0, cant: 0, precios: [] };
+    if (l.cantidad !== null && l.cantidad > 0) {
+      g.suma += precio * l.cantidad;
+      g.cant += l.cantidad;
+    }
+    g.precios.push(precio);
+    grupos.set(k, g);
+  }
+  const todos = [...grupos.values()]
+    .map((g) => ({ fecha: g.fecha, prov: g.prov, precio: g.cant > 0 ? g.suma / g.cant : g.precios.reduce((a, b) => a + b, 0) / g.precios.length }))
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.prov.localeCompare(b.prov)));
+  const ultimos = todos.slice(-MAX_PUNTOS_SERIE);
+  // Proveedores por orden de primera aparición (como la RPC).
+  const proveedores: string[] = [];
+  for (const p of ultimos) if (!proveedores.includes(p.prov)) proveedores.push(p.prov);
+  const redondeo = (n: number) => Math.round(n * 10_000) / 10_000;
+  const puntos: [string, number, number][] = ultimos.map((p) => [p.fecha, redondeo(p.precio), proveedores.indexOf(p.prov)]);
+  const precios = puntos.map((p) => p[1]);
+  const primero = precios[0];
+  const ultimo = precios[precios.length - 1];
+  return {
+    producto,
+    unidad,
+    proveedores,
+    puntos,
+    n: puntos.length,
+    min: Math.min(...precios),
+    max: Math.max(...precios),
+    ultimo,
+    // Solo con un proveedor: entre proveedores es una comparativa, no una evolución.
+    variacion_pct: puntos.length >= 2 && proveedores.length === 1 && primero > 0 ? Math.round((ultimo / primero - 1) * 1000) / 10 : null,
+    unidades,
+  };
+}
+
+/** Lo que devuelve `serieDesdeLineas` (el contrato de `serie_precios_agente`). */
+export type DatosSerieProducto =
+  | {
+      producto: string;
+      unidad: string | null;
+      proveedores: string[];
+      puntos: [string, number, number][];
+      n: number;
+      min: number | null;
+      max: number | null;
+      ultimo: number | null;
+      variacion_pct: number | null;
+      /** Todas las unidades con precio (la más comprada primero) y sus compras. */
+      unidades: UnidadSerie[];
+    }
+  | { sin_datos: true; buscado: string };
+
+/** Una unidad de compra de un producto y cuántas compras (puntos) tiene. */
+export interface UnidadSerie {
+  unidad: string;
+  n: number;
+}
+
+export interface TotalCategoria {
+  /** id de la categoría raíz; "sin" = productos sin categoría; "pendiente" = líneas sin producto. */
+  clave: number | "sin" | "pendiente";
+  nombre: string;
+  gasto: number;
+  lineas: number;
+}
+
+/** Suma el gasto de las subcategorías en su categoría madre. Orden: más gasto primero, «Sin clasificar» al final. */
+export function totalesPorRaiz(gastos: GastoCategoria[], mapa: MapaCategorias): TotalCategoria[] {
+  const acc = new Map<TotalCategoria["clave"], TotalCategoria>();
+  for (const g of gastos) {
+    let clave: TotalCategoria["clave"];
+    let nombre: string;
+    if (g.sin_clasificar) {
+      clave = "pendiente";
+      nombre = "Sin clasificar";
+    } else if (g.categoria_id === null) {
+      clave = "sin";
+      nombre = "Sin categoría";
+    } else {
+      clave = g.padre_id ?? g.categoria_id;
+      nombre = g.padre ?? mapa.get(clave)?.nombre ?? g.categoria;
+    }
+    const t = acc.get(clave) ?? { clave, nombre, gasto: 0, lineas: 0 };
+    t.gasto = Math.round((t.gasto + Number(g.gasto || 0)) * 100) / 100;
+    t.lineas += Number(g.lineas || 0);
+    acc.set(clave, t);
+  }
+  const peso = (t: TotalCategoria) => (t.clave === "pendiente" ? 2 : t.clave === "sin" ? 1 : 0);
+  return [...acc.values()].sort((a, b) => peso(a) - peso(b) || b.gasto - a.gasto);
+}
+
+export type Periodo = "todo" | "mes" | "mes_anterior" | "trimestre" | "anio" | "anio_anterior";
+
+export const ETIQUETAS_PERIODO: Record<Periodo, string> = {
+  todo: "Todo",
+  mes: "Este mes",
+  mes_anterior: "Mes pasado",
+  trimestre: "Últimos 3 meses",
+  anio: "Este año",
+  anio_anterior: "Año pasado",
+};
+
+const iso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Fechas (YYYY-MM-DD, inclusivas) del periodo; null = sin límite. */
+export function rangoPeriodo(p: Periodo, hoy: Date = new Date()): { desde: string | null; hasta: string | null } {
+  const y = hoy.getFullYear();
+  const m = hoy.getMonth();
+  switch (p) {
+    case "mes":
+      return { desde: iso(new Date(y, m, 1)), hasta: iso(new Date(y, m + 1, 0)) };
+    case "mes_anterior":
+      return { desde: iso(new Date(y, m - 1, 1)), hasta: iso(new Date(y, m, 0)) };
+    case "trimestre":
+      return { desde: iso(new Date(y, m - 2, 1)), hasta: iso(new Date(y, m + 1, 0)) };
+    case "anio":
+      return { desde: `${y}-01-01`, hasta: `${y}-12-31` };
+    case "anio_anterior":
+      return { desde: `${y - 1}-01-01`, hasta: `${y - 1}-12-31` };
+    default:
+      return { desde: null, hasta: null };
+  }
+}
+
+/** El que queda al fusionar: el de más compras (y, a igualdad, más gasto; luego el más antiguo). */
+export function destinoFusionSugerido(seleccion: Pick<ResumenProducto, "producto_id" | "compras" | "gasto" | "origen">[]): number | null {
+  if (seleccion.length === 0) return null;
+  const orden = [...seleccion].sort(
+    (a, b) =>
+      (a.origen === "manual" ? 0 : 1) - (b.origen === "manual" ? 0 : 1) ||
+      b.compras - a.compras ||
+      b.gasto - a.gasto ||
+      a.producto_id - b.producto_id,
+  );
+  return orden[0].producto_id;
+}
+
+/** Normaliza una fila cruda de la RPC (numeric llega como string o número). */
+export function aResumen(f: Record<string, unknown>): ResumenProducto {
+  const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
+  const nn = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  const cant: Record<string, number> = {};
+  const c = f.cantidades;
+  if (c && typeof c === "object") for (const [k, v] of Object.entries(c as Record<string, unknown>)) cant[k] = Number(v);
+  return {
+    producto_id: Number(f.producto_id),
+    nombre: String(f.nombre ?? ""),
+    categoria_id: nn(f.categoria_id),
+    origen: String(f.origen ?? "manual"),
+    unidad_habitual: (f.unidad_habitual as string | null) ?? null,
+    compras: n(f.compras),
+    documentos: n(f.documentos),
+    cantidades: cant,
+    gasto: n(f.gasto),
+    lineas_sin_importe: n(f.lineas_sin_importe),
+    ultimo_precio: nn(f.ultimo_precio),
+    ultima_fecha: (f.ultima_fecha as string | null) ?? null,
+    proveedores: Array.isArray(f.proveedores) ? (f.proveedores as string[]) : [],
+  };
+}
+
+export function aGastoCategoria(f: Record<string, unknown>): GastoCategoria {
+  return {
+    categoria_id: f.categoria_id === null || f.categoria_id === undefined ? null : Number(f.categoria_id),
+    categoria: String(f.categoria ?? ""),
+    padre_id: f.padre_id === null || f.padre_id === undefined ? null : Number(f.padre_id),
+    padre: (f.padre as string | null) ?? null,
+    sin_clasificar: Boolean(f.sin_clasificar),
+    gasto: Number(f.gasto ?? 0),
+    lineas: Number(f.lineas ?? 0),
+    productos: Number(f.productos ?? 0),
+    lineas_sin_importe: Number(f.lineas_sin_importe ?? 0),
+  };
+}

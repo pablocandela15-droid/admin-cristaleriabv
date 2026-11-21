@@ -1148,7 +1148,7 @@ export function descuadresComoAlertas(descuadres: Descuadre[], origen: string) {
 
 // ─── 3b. La cita: un importe del pie que no se puede citar, no se ha leido ──
 //
-//  EL CASO QUE LO MOTIVA. Factura 40295280 de Osborne (foto de la pantalla de
+//  EL CASO QUE LO MOTIVA. Factura 40295280 de un proveedor (foto de la pantalla de
 //  un PDF, cortada por abajo). El papel imprime BASE I.V.A. 342,10 y cuota
 //  34,21; la fila del TOTAL queda por debajo del borde de la imagen. El
 //  sistema guardaba total = 376,31 (= 342,10 + 34,21) marcado como LEIDO y sin
@@ -1390,7 +1390,7 @@ export function retirarImportesNoImpresos(
 //  POR QUE HACE FALTA UNA SEGUNDA LLAMADA
 //  --------------------------------------
 //  Con la cita del total puesta la primera del esquema, la factura 40295280 de
-//  Osborne pasa de fabricar el total SIEMPRE a fabricarlo 1 de cada 3 veces.
+//  proveedor A pasa de fabricar el total SIEMPRE a fabricarlo 1 de cada 3 veces.
 //  Mejor, pero 1 de cada 3 sigue siendo un numero inventado entrando en la
 //  contabilidad, y ninguna comprobacion aritmetica puede cazarlo: 376,31 es
 //  exactamente 342,10 + 34,21, igual que en cualquier factura correcta.
@@ -1483,7 +1483,7 @@ export const VERIFICACION_PIE_SCHEMA = {
 //  POR QUE HACE FALTA
 //  ------------------
 //  `filas_tabla` lo cuenta el mismo modelo que luego escribe las filas, y en la
-//  factura mensual ML/101511 de Luga (54 filas impresas) se midio que no sirve:
+//  factura mensual ML/101511 del proveedor B (54 filas impresas) se midio que no sirve:
 //  en tres ejecuciones devolvio 10 filas diciendo `filas_tabla: 10`, 5 filas
 //  diciendo `filas_tabla: null`, y 6 filas. Cuando el recuento COINCIDE con las
 //  filas que ha escrito, ninguna de las tres senales de `deducirImportes` salta
@@ -1641,14 +1641,14 @@ export function aplicarRecuentoVerificado(
 //  ----------------------------------------
 //  De las lineas solas sale la BASE IMPONIBLE: su suma. El IVA sale de las
 //  lineas SOLO si cada una trae IMPRESO su tipo (columna «IVA» por fila, como
-//  en las facturas mensuales de Luga: 10 % casi todo, 4 % el pan sin gluten y
+//  en las facturas mensuales del proveedor B: 10 % casi todo, 4 % el pan sin gluten y
 //  las rosquillas). Sin esa columna el tipo puede ser el 10 %, el 21 % o una
 //  mezcla, y elegir uno seria inventarselo. De ahi las reglas:
 //
 //    A. `subtotal` e `iva` LEIDOS y `total` ausente -> total = subtotal + iva.
 //       Aritmetica exacta sobre dos importes impresos. Cero supuestos.
 //    B. NI `subtotal` NI `iva` NI `total` impresos, TODAS las lineas con
-//       importe y la lectura COMPLETA (ver mas abajo, caso Luga):
+//       importe y la lectura COMPLETA (ver mas abajo, caso del proveedor B):
 //       B1. Todas las lineas con importe traen su tipo de IVA ->
 //           subtotal = suma de lineas; iva = suma, POR TIPO, de base x tipo,
 //           con cada cuota redondeada a centimos (asi lo hacen las facturas
@@ -1665,7 +1665,7 @@ export function aplicarRecuentoVerificado(
 //  POR QUE B2 YA NO GUARDA LA SUMA COMO TOTAL (06/10/2026)
 //  -------------------------------------------------------
 //  Hasta hoy B guardaba `total = suma de lineas` con un aviso que decia "si
-//  habia IVA, el total real sera mayor". En Luga ML/101511 (factura 54) eso
+//  habia IVA, el total real sera mayor". En el proveedor B ML/101511 (factura 54) eso
 //  dejo total = 3.787,53, que es la BASE: el total real era 4.162,54. Y el
 //  chatbot trata `facturas.total` como IVA INCLUIDO (herramientas.ts y las
 //  RPC *_agente: "Gasto por proveedor: suma del total (IVA incluido)"), asi
@@ -1694,7 +1694,7 @@ export function aplicarRecuentoVerificado(
 //  POR QUE LA REGLA B EXIGE ADEMAS QUE LA LECTURA ESTE COMPLETA
 //  ------------------------------------------------------------
 //  La regla B suponia que el unico riesgo era un bloque de IVA no visto. Hay
-//  otro peor, y se midio en la factura ML/101511 de Luga Sabores: el modelo
+//  otro peor, y se midio en la factura ML/101511 de un proveedor: el modelo
 //  habia extraido 11 de las 54 filas impresas, asi que la "suma de lineas" era
 //  1.772,82 EUR cuando el documento vale 3.787,53. Se guardo ese 1.772,82
 //  marcado como `deducido`, con su aviso. Antes ese campo estaba a NULL.
@@ -1898,7 +1898,7 @@ export function deducirImportes(datos: DocumentoExtraido): {
   const lineas = datos.productos ?? [];
   if (lineas.length === 0) return sinDeducir;
 
-  //    ...pero SOLO si estan TODAS. Ver la explicacion de arriba (caso Luga):
+  //    ...pero SOLO si estan TODAS. Ver la explicacion de arriba (caso del proveedor B):
   //    sumar una lectura incompleta da un importe con pinta de calculado y
   //    con una fraccion del valor real, que es peor que no tenerlo.
   const motivos: string[] = [];
