@@ -18,10 +18,12 @@ const AUTENTICACION_PROPIA: Record<string, { mecanismo: string; patrones: RegExp
   "sincronizar-costes-openai": { mecanismo: "x-ocr-secret en tiempo constante", patrones: [/verificarSecreto/] },
   "ia-modelos-openai": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (pg_cron o SQL con el secreto de Vault) o JWT de super admin", patrones: [/x-ocr-secret/, /compararTiempoConstante/, /exigirSuperAdmin/] },
   "avisos-telegram": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (pg_cron o SQL con el secreto de Vault) o JWT de super admin", patrones: [/x-ocr-secret/, /compararTiempoConstante/, /exigirSuperAdmin/] },
+  "ocr-trabajo": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (solo pg_net desde Postgres)", patrones: [/verificarSecreto/] },
+  "clasificar-productos": { mecanismo: "x-ocr-secret en tiempo constante (pg_cron) o JWT con «Editar» en Facturas", patrones: [/verificarSecreto/, /autenticar\(req, cfgAuth, "edit"\)/] },
 };
 
 /** Funciones del panel que actúan en nombre de un usuario: nunca pueden estar en la lista. */
-const DE_USUARIO = ["analizar-peticion", "servicios-uso", "control-excel", "admin-create-user", "admin-set-super-admin", "auditoria-revertir", "cambiar-mi-contrasena"];
+const DE_USUARIO = ["analizar-peticion", "procesar-factura", "servicios-uso", "control-excel", "admin-create-user", "admin-set-super-admin", "auditoria-revertir", "cambiar-mi-contrasena"];
 
 function fuentes(dir: string): string {
   let total = "";
@@ -38,8 +40,8 @@ function fuentes(dir: string): string {
 }
 
 describe("ADMITE_INTEGRACION", () => {
-  it("son solo los procesos programados (costes de OpenAI, modelos de IA y avisos por Telegram)", () => {
-    expect([...ADMITE_INTEGRACION].sort()).toEqual(["avisos-telegram", "ia-modelos-openai", "sincronizar-costes-openai"]);
+  it("son solo los procesos programados (costes de OpenAI, modelos de IA, avisos por Telegram y lectura de facturas)", () => {
+    expect([...ADMITE_INTEGRACION].sort()).toEqual(["avisos-telegram", "clasificar-productos", "ia-modelos-openai", "ocr-trabajo", "sincronizar-costes-openai"]);
   });
 
   it.each(DE_USUARIO)("no incluye %s (actúa en nombre de un usuario)", (fn) => {

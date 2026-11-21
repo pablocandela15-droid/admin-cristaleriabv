@@ -5,14 +5,17 @@
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { avisoCaducado } from "@/lib/avisos";
 
-export type SeccionAviso = "super_admin" | "general";
+export type SeccionAviso = "super_admin" | "facturas" | "general";
 
 export interface PermisosAvisos {
   superAdmin: boolean;
+  /** Ve Facturas («Ver» o «Editar», o «Facturas · Subida»): sus avisos de subida de precio y de subidas. */
+  facturas?: boolean;
 }
 
 export const ETIQUETA_SECCION_AVISO: Record<SeccionAviso, string> = {
   super_admin: "Super Admin",
+  facturas: "Facturas",
   general: "Panel",
 };
 
@@ -20,12 +23,15 @@ export const ETIQUETA_SECCION_AVISO: Record<SeccionAviso, string> = {
 export function seccionDeAviso(n: Pick<NotificacionDashboard, "tipo" | "referencia_tipo">): SeccionAviso {
   if (n.tipo.startsWith("ia_modelo") || n.referencia_tipo === "ia_modelos") return "super_admin";
   if (n.tipo === "peticion_urgente" || n.referencia_tipo === "peticion") return "super_admin";
+  // Facturas (migración 20261121100000_facturas): subidas de precio y fin de una tanda de subida.
+  if (n.tipo === "subida_precio" || n.tipo.startsWith("facturas_") || (n.referencia_tipo ?? "").startsWith("facturas")) return "facturas";
   return "general";
 }
 
 export function puedeVerAviso(n: Pick<NotificacionDashboard, "tipo" | "referencia_tipo">, p: PermisosAvisos): boolean {
   const s = seccionDeAviso(n);
   if (s === "general") return true;
+  if (s === "facturas") return p.superAdmin || p.facturas === true;
   return p.superAdmin;
 }
 
@@ -45,7 +51,7 @@ export function avisosParaDashboard(
 
 /** Sin leer por sección (las fichas de arriba), en el orden del menú. */
 export function sinLeerPorSeccion(lista: NotificacionDashboard[]): { seccion: SeccionAviso; n: number }[] {
-  const orden: SeccionAviso[] = ["super_admin", "general"];
+  const orden: SeccionAviso[] = ["super_admin", "facturas", "general"];
   const cuenta = new Map<SeccionAviso, number>();
   for (const a of lista) if (!a.leida) cuenta.set(seccionDeAviso(a), (cuenta.get(seccionDeAviso(a)) ?? 0) + 1);
   return orden.flatMap((seccion) => (cuenta.get(seccion) ? [{ seccion, n: cuenta.get(seccion) as number }] : []));

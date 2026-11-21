@@ -1,0 +1,330 @@
+// ============================================================================
+//  Facturas › Compras — cuentas puras (sin React ni Supabase)
+// ----------------------------------------------------------------------------
+//  «Documentos», «Productos» y «Proveedores» son tres formas de mirar lo mismo (lo que se ha comprado) detrás de UN buscador.
+//  Aquí vive lo que reparte el texto buscado entre los tres modos (contadores),
+//  los filtros de cada modo y la traducción de un documento a su proveedor.
+// ============================================================================
+import type { Factura, ProductoFactura } from "@/hooks/useFacturas";
+import { filtrarProductos, normalizarBusqueda, type MapaCategorias, type ResumenProducto } from "./productos";
+import { filtrarProveedores, type Proveedor, type ResolverProveedor } from "./proveedores";
+import { esAbono } from "./resumenCompras";
+
+export type ModoCompras = "documentos" | "productos" | "proveedores";
+
+export const MODOS_COMPRAS: { valor: ModoCompras; etiqueta: string }[] = [
+  { valor: "documentos", etiqueta: "Documentos" },
+  { valor: "productos", etiqueta: "Productos" },
+  { valor: "proveedores", etiqueta: "Proveedores" },
+];
+
+export type FiltroDocumentos = "todo" | "abonos" | "con_avisos" | "sin_revisar";
+
+export const FILTROS_DOCUMENTOS: { valor: FiltroDocumentos; etiqueta: string }[] = [
+  { valor: "todo", etiqueta: "Todo" },
+  { valor: "abonos", etiqueta: "Abonos" },
+  { valor: "con_avisos", etiqueta: "Con avisos" },
+  { valor: "sin_revisar", etiqueta: "Sin revisar" },
+];
+
+/** Palabras del texto buscado, sin tildes ni mayúsculas. [] = sin búsqueda. */
+export const palabrasBusqueda = (texto: string): string[] => {
+  const q = normalizarBusqueda(texto);
+  return q ? q.split(" ") : [];
+};
+
+/**
+ * Lo mínimo de un documento para buscarlo y filtrarlo. `observaciones` y
+ * `productos` son opcionales: la cabecera de la lista (`documentos_lista()`)
+ * no los trae y su búsqueda por línea la hace el servidor (ver `extra`).
+ */
+export type DocumentoBuscable = Pick<Factura, "id" | "numero_documento" | "proveedor" | "cif" | "total" | "verificada" | "fecha"> & {
+  observaciones?: string | null;
+  productos?: Pick<ProductoFactura, "producto_nombre" | "producto_canonico">[];
+};
+
+/**
+ * Ids de documentos que el SERVIDOR dice que casan con el texto (por sus
+ * líneas u observaciones, `buscar_documentos_compras`). null = no hay.
+ */
+export type CasanEnServidor = ReadonlySet<number> | null | undefined;
+
+/** Todo lo que se puede buscar de un documento: cabecera y nombre de cada línea (si las trae). */
+function pajarDocumento(d: DocumentoBuscable): string {
+  return normalizarBusqueda(
+    [
+      d.numero_documento,
+      d.proveedor,
+      d.cif,
+      d.observaciones,
+      ...(d.productos ?? []).flatMap((p) => [p.producto_nombre, p.producto_canonico]),
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+}
+
+// El pajar de cada documento se calcula una vez por objeto (la lista de
+// react-query conserva las referencias entre renders): buscar letra a letra
+// no vuelve a recorrer todas las líneas.
+const cachePajar = new WeakMap<DocumentoBuscable, string>();
+const pajar = (d: DocumentoBuscable): string => {
+  let v = cachePajar.get(d);
+  if (v === undefined) {
+    v = pajarDocumento(d);
+    cachePajar.set(d, v);
+  }
+  return v;
+};
+
+/** ¿Casa con las palabras? En lo que trae el documento o, si no, según el servidor (`extra`). */
+export const coincideDocumento = (d: DocumentoBuscable, palabras: string[], extra?: CasanEnServidor): boolean => {
+  if (palabras.length === 0) return true;
+  if (extra?.has(d.id)) return true;
+  const h = pajar(d);
+  return palabras.every((w) => h.includes(w));
+};
+
+type Avisos = Map<number, unknown[]>;
+
+function pasaFiltroDocumento(d: DocumentoBuscable, filtro: FiltroDocumentos, avisos: Avisos): boolean {
+  switch (filtro) {
+    case "abonos":
+      return esAbono(d);
+    case "con_avisos":
+      return (avisos.get(d.id) ?? []).length > 0;
+    case "sin_revisar":
+      return !d.verificada;
+    default:
+      return true;
+  }
+}
+
+/** Documentos que cumplen el texto y el chip elegido, del más reciente al más antiguo. */
+export function filtrarDocumentos<D extends DocumentoBuscable>(
+  docs: D[],
+  texto: string,
+  filtro: FiltroDocumentos,
+  avisos: Avisos,
+  extra?: CasanEnServidor,
+): D[] {
+  const palabras = palabrasBusqueda(texto);
+  return docs
+    .filter((d) => coincideDocumento(d, palabras, extra) && pasaFiltroDocumento(d, filtro, avisos))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+}
+
+/** Cuántos documentos salen con cada chip (para el texto buscado). */
+export function contarFiltrosDocumentos(
+  docs: DocumentoBuscable[],
+  texto: string,
+  avisos: Avisos,
+  extra?: CasanEnServidor,
+): Record<FiltroDocumentos, number> {
+  const palabras = palabrasBusqueda(texto);
+  const base = docs.filter((d) => coincideDocumento(d, palabras, extra));
+  const cuenta = (f: FiltroDocumentos) => base.filter((d) => pasaFiltroDocumento(d, f, avisos)).length;
+  return {
+    todo: base.length,
+    abonos: cuenta("abonos"),
+    con_avisos: cuenta("con_avisos"),
+    sin_revisar: cuenta("sin_revisar"),
+  };
+}
+
+/** Clave del proveedor canónico de un documento (la de `crearResolverProveedor`). */
+export const claveProveedorDocumento = (d: Pick<Factura, "proveedor">, resolver: ResolverProveedor): string =>
+  d.proveedor ? resolver(d.proveedor).clave : "";
+
+/**
+ * Proveedores del texto buscado: los que se llaman así (nombre, comercial,
+ * CIF, variantes) y los que tienen algún documento con ese texto (p. ej.
+ * «templado» → quien te lo vende).
+ */
+export function proveedoresDelTexto(
+  proveedores: Proveedor[],
+  docs: DocumentoBuscable[],
+  texto: string,
+  resolver: ResolverProveedor,
+  extra?: CasanEnServidor,
+): Proveedor[] {
+  const palabras = palabrasBusqueda(texto);
+  if (palabras.length === 0) return proveedores;
+  const porNombre = new Set(filtrarProveedores(proveedores, texto).map((p) => p.id));
+  const clavesConDocumento = new Set<string>();
+  for (const d of docs) if (coincideDocumento(d, palabras, extra)) clavesConDocumento.add(claveProveedorDocumento(d, resolver));
+  return proveedores.filter((p) => porNombre.has(p.id) || clavesConDocumento.has(`#${p.id}`));
+}
+
+/** Lista final del modo Proveedores: los del texto, por documentos de más a menos. */
+export function filtrarProveedoresCompras(
+  proveedores: Proveedor[],
+  docs: DocumentoBuscable[],
+  texto: string,
+  resolver: ResolverProveedor,
+): Proveedor[] {
+  return proveedoresDelTexto(proveedores, docs, texto, resolver)
+    .sort((a, b) => b.documentos - a.documentos || a.nombre.localeCompare(b.nombre, "es"));
+}
+
+export interface ContadoresCompras {
+  documentos: number;
+  productos: number;
+  proveedores: number;
+}
+
+/** Resultados por modo para el texto buscado (sin chips: el contador es del texto). */
+export function contarPorModo(args: {
+  texto: string;
+  documentos: DocumentoBuscable[];
+  productos: ResumenProducto[];
+  proveedores: Proveedor[];
+  mapaCategorias: MapaCategorias;
+  resolver: ResolverProveedor;
+  extra?: CasanEnServidor;
+}): ContadoresCompras {
+  const palabras = palabrasBusqueda(args.texto);
+  return {
+    documentos: args.documentos.filter((d) => coincideDocumento(d, palabras, args.extra)).length,
+    productos: filtrarProductos(
+      args.productos,
+      { busqueda: args.texto, categoria: "todas", proveedor: "", soloConCompras: false },
+      args.mapaCategorias,
+      args.resolver,
+    ).length,
+    proveedores: proveedoresDelTexto(args.proveedores, args.documentos, args.texto, args.resolver, args.extra).length,
+  };
+}
+
+/** Documentos de un proveedor canónico (clave `#id`), el más reciente primero. */
+export function documentosDeProveedor<D extends DocumentoBuscable>(docs: D[], proveedor: Pick<Proveedor, "id">, resolver: ResolverProveedor): D[] {
+  const clave = `#${proveedor.id}`;
+  return docs
+    .filter((d) => claveProveedorDocumento(d, resolver) === clave)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+}
+
+// ─── Fichas en el historial del navegador ───────────────────────────────────
+// Abrir una ficha (documento o producto) es una entrada nueva del historial con
+// `?doc=` o `?producto=` en la URL y, en el `state` de la navegación, la PILA de
+// fichas abiertas desde la lista (la actual, la última). «Atrás» del navegador
+// y «Volver a …» retroceden una ficha; «Volver a la lista», todas.
+
+export type FichaCompras = { tipo: "documento"; id: number } | { tipo: "producto"; id: number };
+
+/** Parámetros de la URL que son enlaces de Compras (se quitan al cambiar de pestaña). */
+export const PARAMS_ENLACE_COMPRAS = ["modo", "doc", "mes", "prov", "producto"] as const;
+
+/** La pila de fichas guardada en el `state` de la navegación ([] = la lista). */
+export function pilaDeFichas(estado: unknown): FichaCompras[] {
+  const pila = (estado as { fichaCompras?: { pila?: unknown } } | null)?.fichaCompras?.pila;
+  if (!Array.isArray(pila)) return [];
+  return pila.filter(
+    (f): f is FichaCompras =>
+      !!f &&
+      typeof f === "object" &&
+      ((f as FichaCompras).tipo === "documento" || (f as FichaCompras).tipo === "producto") &&
+      Number.isInteger((f as FichaCompras).id),
+  );
+}
+
+/** ¿Esta navegación es abrir/cerrar una ficha de Compras? (Facturas no debe tratarla como un enlace nuevo.) */
+export const esNavegacionDeFicha = (estado: unknown): boolean => pilaDeFichas(estado).length > 0;
+
+/** El `state` de la navegación con esa pila. */
+export const estadoConFichas = (pila: FichaCompras[]) => ({ fichaCompras: { pila } });
+
+/** La búsqueda de la URL (`?…`) con la ficha (o sin ninguna, `null`) y sin otros enlaces de Compras. */
+export function busquedaConFicha(busqueda: string, ficha: FichaCompras | null): string {
+  const p = new URLSearchParams(busqueda);
+  for (const k of PARAMS_ENLACE_COMPRAS) p.delete(k);
+  p.set("tab", "compras");
+  if (ficha) p.set(ficha.tipo === "documento" ? "doc" : "producto", String(ficha.id));
+  return `?${p.toString()}`;
+}
+
+// ─── Productos que han subido de precio ─────────────────────────────────────
+
+/** Nombres (normalizados) de los productos de `productos_con_subida()` (filas con `nombre`). */
+export function nombresConSubida(datos: unknown): Set<string> {
+  const salida = new Set<string>();
+  if (!Array.isArray(datos)) return salida;
+  for (const p of datos) {
+    const nombre = (p as { nombre?: unknown } | null)?.nombre;
+    if (typeof nombre === "string" && nombre.trim()) salida.add(normalizarBusqueda(nombre));
+  }
+  return salida;
+}
+
+// ─── Ficha de proveedor (RPC `ficha_proveedor`) ─────────────────────────────
+
+export interface TopProductoProveedor {
+  producto: string;
+  unidad: string | null;
+  ultimo_precio: number | null;
+  ultima_fecha: string | null;
+}
+
+export interface FichaProveedorDatos {
+  proveedor: string;
+  otros_parecidos: string[];
+  docs: number;
+  primera: string | null;
+  ultima: string | null;
+  intervalo_medio_dias: number | null;
+  /** Total con IVA de sus facturas. */
+  gasto: number | null;
+  sin_total: number | null;
+  top_productos: TopProductoProveedor[];
+}
+
+const num = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const x = Number(v);
+  return Number.isFinite(x) ? x : null;
+};
+const cadena = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+
+/**
+ * Valida el JSON de la RPC. `null` = no es una ficha (ni `sin_datos` ni
+ * `error`): `{ sinDatos: true }` si la RPC dice que no hay tal proveedor.
+ */
+export function normalizarFichaProveedor(entrada: unknown): FichaProveedorDatos | { sinDatos: true; nota: string | null } | null {
+  if (!entrada || typeof entrada !== "object") return null;
+  const d = entrada as Record<string, unknown>;
+  if (d.sin_datos === true || typeof d.error === "string") {
+    return { sinDatos: true, nota: cadena(d.nota) ?? cadena(d.error) };
+  }
+  if (typeof d.proveedor !== "string") return null;
+  return {
+    proveedor: d.proveedor,
+    otros_parecidos: Array.isArray(d.otros_parecidos) ? d.otros_parecidos.filter((x): x is string => typeof x === "string") : [],
+    docs: num(d.docs) ?? 0,
+    primera: cadena(d.primera),
+    ultima: cadena(d.ultima),
+    intervalo_medio_dias: num(d.intervalo_medio_dias),
+    gasto: num(d.gasto),
+    sin_total: num(d.sin_total),
+    top_productos: Array.isArray(d.top_productos)
+      ? d.top_productos
+          .filter((t): t is Record<string, unknown> => !!t && typeof t === "object" && typeof (t as { producto?: unknown }).producto === "string")
+          .map((t) => ({
+            producto: String(t.producto),
+            unidad: cadena(t.unidad),
+            ultimo_precio: num(t.ultimo_precio),
+            ultima_fecha: cadena(t.ultima_fecha),
+          }))
+      : [],
+  };
+}
+
+/** «cada 9 días», «cada semana»… a partir del intervalo medio. */
+export function textoFrecuencia(dias: number | null): string | null {
+  if (dias === null || !Number.isFinite(dias) || dias <= 0) return null;
+  if (dias < 1.5) return "casi a diario";
+  if (dias < 5) return `cada ${Math.round(dias)} días`;
+  if (dias < 10) return "cada semana";
+  if (dias < 17) return "cada dos semanas";
+  if (dias < 45) return "cada mes";
+  return `cada ${Math.round(dias / 30)} meses`;
+}

@@ -20,6 +20,8 @@ interface ProtectedRouteProps {
 const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   "/dashboard": "dashboard",
   "/": "dashboard",
+  // Con solo «Facturas · Subida» se entra a la pestaña Cargar.
+  "/facturas": ["facturas", "facturas_subida"],
   "/usuarios": "usuarios",
 };
 // Las páginas de /super-admin/* no tienen ruta aquí: las protege SuperAdminRoute.

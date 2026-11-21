@@ -5,6 +5,7 @@
  */
 export const CARGADORES_SECCION = {
   "/dashboard": () => import("@/pages/Dashboard"),
+  "/facturas": () => import("@/pages/Facturas"),
   "/usuarios": () => import("@/pages/Usuarios"),
   "/avisos": () => import("@/pages/Avisos"),
   "/ayuda": () => import("@/pages/Ayuda"),

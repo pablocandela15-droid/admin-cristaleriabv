@@ -26,6 +26,8 @@ describe("Dashboard › Avisos: cada aviso solo a quien ve su sección", () => {
     expect(seccionDeAviso(n("4", "peticion_urgente"))).toBe("super_admin");
     expect(seccionDeAviso(n("5", "otro", { referencia_tipo: "peticion" }))).toBe("super_admin");
     expect(seccionDeAviso(n("6", "sistema"))).toBe("general");
+    expect(seccionDeAviso(n("8", "subida_precio"))).toBe("facturas");
+    expect(seccionDeAviso(n("9", "facturas_subida", { referencia_tipo: "facturas_cargar" }))).toBe("facturas");
     // Los tipos del panel del restaurante (si quedara alguno en la tabla) ya no tienen sección propia.
     expect(seccionDeAviso(n("7", "reserva_nueva"))).toBe("general");
   });
@@ -37,6 +39,10 @@ describe("Dashboard › Avisos: cada aviso solo a quien ve su sección", () => {
     expect(puedeVerAviso(n("2", "peticion_urgente", { referencia_tipo: "peticion" }), SUPER)).toBe(true);
     expect(puedeVerAviso(n("3", "sistema"), EQUIPO)).toBe(true);
     expect(puedeVerAviso(n("3", "sistema"), SUPER)).toBe(true);
+    // Los de Facturas, solo con la sección (o super admin).
+    expect(puedeVerAviso(n("4", "subida_precio"), EQUIPO)).toBe(false);
+    expect(puedeVerAviso(n("4", "subida_precio"), { superAdmin: false, facturas: true })).toBe(true);
+    expect(puedeVerAviso(n("4", "subida_precio"), SUPER)).toBe(true);
   });
 
   it("fuera caducados y los que no van a la campana; sin leer primero y, dentro, del más nuevo al más viejo", () => {

@@ -27,6 +27,7 @@ import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
 import { MODULOS_MENU, moduloActivo, tienePermisoModulo } from "@/lib/modulosPanel";
 import { NEGOCIO } from "@/config/negocio";
 import { Logotipo } from "@/components/marca/Logotipo";
+import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
 
 // Las entradas del menú salen del catálogo de módulos (`lib/modulosPanel.ts`, 14/11/2026), en su orden:
 // el mismo que manda en Control del Panel y en las rutas. Cada una se ve si el usuario tiene alguno de
@@ -168,6 +169,14 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="shrink-0 border-t border-sidebar-border p-2">
+        {/* Facturas subiéndose o leyéndose en segundo plano (no se pinta si no hay ninguna). */}
+        {!isMobile && (
+          <IndicadorSubidasFacturas
+            variante="menu"
+            colapsado={isCollapsed}
+            className={isCollapsed ? "flex justify-center" : ""}
+          />
+        )}
         <SidebarMenu>
           {/* Quién ha iniciado sesión; abre «Mi cuenta» (datos, permisos y contraseña). */}
           <BotonUsuarioMenu

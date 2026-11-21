@@ -72,6 +72,9 @@ export const ADMITE_INTEGRACION: ReadonlySet<string> = new Set([
   "sincronizar-costes-openai", "ia-modelos-openai",
   // Avisos por Telegram: pg_cron con x-ocr-secret o un super admin.
   "avisos-telegram",
+  // Facturas: la lectura en segundo plano (pg_net desde Postgres, solo x-ocr-secret) y la clasificación del
+  // catálogo (pg_cron con x-ocr-secret o un usuario con «Editar» en Facturas).
+  "ocr-trabajo", "clasificar-productos",
 ]);
 
 /** La autenticación y autorización de negocio siguen en cada handler. */
