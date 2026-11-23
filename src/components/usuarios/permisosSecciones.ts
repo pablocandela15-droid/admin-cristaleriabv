@@ -41,6 +41,10 @@ export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = [...SECTIONS];
  */
 export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   dashboard: "sin efecto aquí: con «Ver» se entra en la portada del panel.",
+  facturas:
+    "modificar, verificar y borrar documentos, clasificar productos, cambiar los ajustes de Facturas y subir (pestaña Cargar). Con solo «Ver» se consulta Compras.",
+  facturas_subida:
+    "pestaña Cargar: subir facturas, decidir sobre las repetidas y corregir los datos leídos de lo que sube él mismo (no lo de otros). No necesita «Ver» en Facturas: sin él, solo ve Cargar.",
   usuarios:
     "consultar en el admin panel la lista de usuarios y sus permisos. Crear, borrar, bloquear y cambiar permisos es solo del super admin.",
 };
@@ -51,6 +55,8 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
  * de «Puede editar» queda vacía.
  */
 export const SECCIONES_UN_INTERRUPTOR: Partial<Record<SeccionConfigurable["key"], { etiqueta: string }>> = {
+  // Subir no se divide en ver/editar (en la BD, facturas_puede_subir()).
+  facturas_subida: { etiqueta: "Puede subir" },
   usuarios: { etiqueta: "Puede ver" },
 };
 
@@ -113,9 +119,9 @@ export function sinEdicion(permisos: PermisoSeccion[]): PermisoSeccion[] {
 
 /**
  * Secciones que NO cuentan para decidir el rol por los permisos: el Dashboard («Editar»
- * no hace nada) y «Usuarios» (un solo interruptor).
+ * no hace nada), «Facturas · Subida» y «Usuarios» (un solo interruptor cada una).
  */
-const SECCIONES_FUERA_DEL_ROL = new Set(["dashboard", "usuarios"]);
+const SECCIONES_FUERA_DEL_ROL = new Set(["dashboard", "facturas_subida", "usuarios"]);
 
 /**
  * Rol base que corresponde a unos permisos (06/11/2026, «cuando cambias los permisos no se

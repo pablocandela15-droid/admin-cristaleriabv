@@ -21,8 +21,12 @@ describe("tours de ayuda", () => {
     }
   });
 
-  it("solo hay tours de Peticiones y Usuarios (los del restaurante ya no están)", () => {
-    expect(Object.keys(TOURS).sort()).toEqual(["peticiones", "usuarios"]);
+  it("hay tours de Facturas, Peticiones y Usuarios", () => {
+    expect(Object.keys(TOURS).sort()).toEqual(["facturas", "peticiones", "usuarios"]);
+  });
+
+  it("el tour de Facturas recorre Compras y luego Cargar", () => {
+    expect(pestanasDelTour(TOURS.facturas)).toEqual(["facturas-pestana-compras", "facturas-pestana-cargar"]);
   });
 
   it("el tour de Peticiones avisa de que «Urgente» es solo si no puedes trabajar", () => {
@@ -102,9 +106,10 @@ describe("tours de ayuda", () => {
   it("reconoce el estado de navegación que pide lanzar un tour", () => {
     expect(esEstadoLanzarTour({ lanzarTour: "peticiones" })).toBe(true);
     expect(esEstadoLanzarTour({ lanzarTour: "usuarios" })).toBe(true);
+    expect(esEstadoLanzarTour({ lanzarTour: "facturas" })).toBe(true);
     expect(esEstadoLanzarTour({ lanzarTour: "nada" })).toBe(false);
-    // Un tour que ya no existe (del panel del restaurante) no se lanza.
-    expect(esEstadoLanzarTour({ lanzarTour: "facturas" })).toBe(false);
+    // Un tour que no existe (de otra versión del panel) no se lanza.
+    expect(esEstadoLanzarTour({ lanzarTour: "reservas" })).toBe(false);
     expect(esEstadoLanzarTour(null)).toBe(false);
   });
 

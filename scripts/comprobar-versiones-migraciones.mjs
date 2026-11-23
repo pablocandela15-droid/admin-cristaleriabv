@@ -7,8 +7,8 @@
 // Si alguna vez una repetida llega a aplicarse en demo y producción, NO se
 // renombra (cambiar el nombre de una migración aplicada descuadra el
 // historial): se apunta en REPETIDAS_HISTORICAS. Cualquier otra repetida falla.
-// Hoy no hay ninguna: el esquema es una sola migración inicial
-// (20261118120000_nucleo_panel.sql).
+// Hoy no hay ninguna: el núcleo (20261118120000_nucleo_panel.sql) y Facturas
+// (20261121100000_facturas.sql).
 //
 //   npm run test:migraciones
 import { readdir } from "node:fs/promises";

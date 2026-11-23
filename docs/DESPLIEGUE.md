@@ -10,14 +10,17 @@ Guía para montar el panel de Cristalería BV desde cero en un proyecto de Supab
 
 ## 2. Esquema de la base de datos
 
-Una sola migración inicial con todo el núcleo: [`supabase/migrations/20261118120000_nucleo_panel.sql`](../supabase/migrations/20261118120000_nucleo_panel.sql) (vuelta atrás en `supabase/rollbacks/`).
+Dos migraciones, en este orden (cada una con su vuelta atrás en `supabase/rollbacks/`):
+
+1. [`20261118120000_nucleo_panel.sql`](../supabase/migrations/20261118120000_nucleo_panel.sql): el núcleo del panel (login, usuarios, permisos, auditoría, avisos, servicios, IA…).
+2. [`20261121100000_facturas.sql`](../supabase/migrations/20261121100000_facturas.sql): el módulo **Facturas** (facturas de proveedores con lectura automática, catálogo de productos, proveedores, avisos de subida de precio, el bucket privado `facturas-originales` y sus tareas programadas). Ver [FACTURAS.md](FACTURAS.md).
 
 ```bash
 npx supabase link --project-ref <ref>
 npx supabase db push
 ```
 
-(O pega el fichero en *SQL Editor* y ejecútalo entero.) Antes, en local: `npm run test:nucleo:db`.
+(O pega cada fichero en *SQL Editor*, en orden, y ejecútalo entero.) Antes, en local: `npm run test:nucleo:db` (prueba las dos, su vuelta atrás y que se pueden volver a aplicar).
 
 ## 3. Primer super admin
 
@@ -33,14 +36,16 @@ Desde ahí, el resto de usuarios y permisos se gestionan en **Super Admin › Us
 
 ## 4. Vault (tareas programadas)
 
-Las tareas de pg_cron (avisos por Telegram, vigilante de fallos, centro de modelos de IA y costes reales de OpenAI) llaman a las Edge Functions con un secreto. En *SQL Editor*:
+Las tareas de pg_cron (avisos por Telegram, vigilante de fallos, centro de modelos de IA, costes reales de OpenAI y, de Facturas, la lectura de documentos en segundo plano, la clasificación de productos y la limpieza diaria) llaman a las Edge Functions con un secreto. En *SQL Editor*:
 
 ```sql
 select vault.create_secret('https://<ref>.supabase.co', 'project_url');
 select vault.create_secret('<una frase larga aleatoria>', 'ocr_trabajos_secret');
 ```
 
-El mismo valor de `ocr_trabajos_secret` va en el secreto `OCR_TRABAJOS_SECRET` de las funciones (paso 5). Sin Vault las tareas no llaman a nada (no fallan).
+El mismo valor de `ocr_trabajos_secret` va en el secreto `OCR_TRABAJOS_SECRET` de las funciones (paso 5). Sin Vault las tareas no llaman a nada (no fallan); en Facturas, sin Vault **no se lee ningún documento**: la lectura va siempre por trabajos que Postgres despacha a `ocr-trabajo` con este secreto, y se quedan en cola hasta que esté.
+
+Tareas de Facturas (las instala su migración si hay pg_cron): `reanudar-trabajos-ocr` (cada minuto: rescata lecturas paradas; sin trabajos activos no hace nada), `clasificar-productos` (cada 5 minutos: asigna las líneas nuevas a su producto, primero por lo ya conocido y, si quedan, con IA) y `limpiar-pendientes-ocr` (3:40 cada día: borra del bucket las piezas de lecturas terminadas hace más de 7 días).
 
 ## 5. Edge Functions
 
@@ -48,8 +53,9 @@ Despliega todas las de `supabase/functions/` (la configuración de `verify_jwt` 
 
 ```bash
 for f in admin-create-user admin-delete-user admin-set-super-admin admin-set-user-access admin-update-user-password \
-         analizar-peticion auditoria-revertir avisos-telegram cambiar-mi-contrasena control-excel ia-modelos-openai \
-         leer-metricas list-users panel-auth registrar-metrica servicios-uso sincronizar-costes-openai; do
+         analizar-peticion auditoria-revertir avisos-telegram cambiar-mi-contrasena clasificar-productos control-excel \
+         ia-modelos-openai leer-metricas list-users ocr-trabajo panel-auth procesar-factura registrar-metrica servicios-uso \
+         sincronizar-costes-openai; do
   npx supabase functions deploy "$f" --project-ref <ref>
 done
 ```
@@ -61,7 +67,11 @@ Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extr
 | `OCR_TRABAJOS_SECRET` | Que pg_cron pueda llamar a las funciones (mismo valor que en Vault) | Las tareas programadas no funcionan |
 | `SUPABASE_REF_PRODUCCION`, `SUPABASE_REF_DEMO` | Saber en qué entorno corre cada función | Todo se trata como «local» |
 | `PANEL_URL` (y `PANEL_URL_DEMO`) | Enlaces al panel en Telegram y en los tickets enviados a Linear | Sin enlaces |
-| `OPENAI_API_KEY` | Análisis de los tickets con IA | El análisis no se hace |
+| `OPENAI_API_KEY` | Análisis de los tickets con IA (y, si no hay `OPENAI_API_KEY_OCR`, la lectura de facturas) | El análisis no se hace |
+| `OPENAI_API_KEY_OCR` | Facturas: leer los documentos y clasificar productos (proceso «ocr»; si falta, usa `OPENAI_API_KEY`) | Facturas no lee nada: la subida falla con «falta la clave» |
+| `OCR_MODELO`, `OCR_MODELO_PIEZAS`, `OCR_DETALLE` | Facturas: modelo de lectura (todo / solo las piezas de documentos largos) y `detail` de las imágenes (`high` o el de por defecto). Opcionales: manda el modelo elegido en *Super Admin › Servicios › Modelos* | `gpt-5.6-luna` con `detail` «original» |
+| `CLASIFICAR_PRODUCTOS_MODELO` | Facturas: modelo de la clasificación de productos. Opcional (igual que arriba) | `gpt-5.6-luna` |
+| `FACTURAS_CIF_EMPRESA` | Facturas: el CIF de Cristalería BV, que en las facturas es el del CLIENTE y nunca se toma por el del proveedor. Conviene ponerlo también en la base (`update configuracion_facturas set cif_empresa = '…'`) | Solo se reconoce a la empresa por su nombre |
 | `OPENAI_ADMIN_KEY` | Costes reales de OpenAI y centro de modelos | Solo el estimado de `ia_uso` |
 | `TELEGRAM_BOT_TOKEN` | Avisos por Telegram (el chat se configura en Super Admin › Servicios) | «Telegram sin configurar» |
 | `LINEAR_API_KEY` | «Enviar a Linear» desde Tickets (modo en `web_logs_config.linear_modo`: `prueba` por defecto) | Solo modo prueba |
@@ -85,3 +95,4 @@ Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extr
 - *Super Admin › Auditoría* debe enseñar el acceso que acabas de hacer.
 - Crea un usuario de prueba en *Super Admin › Usuarios*, dale solo «Dashboard» y comprueba que no ve Usuarios.
 - Envía una petición urgente desde *Nueva petición*: el super admin la ve en la campana y en *Tickets*.
+- *Facturas › Cargar*: sube una factura de prueba (PDF o foto). Debe leerse sola y salir en *Compras › Documentos* con su original al lado; en *Super Admin › Servicios* aparece el coste de la lectura. Un usuario con solo «Facturas · Subida» ve únicamente *Cargar*.

@@ -41,6 +41,8 @@ describe("SECCIONES_CONFIGURABLES", () => {
   it("son todas las secciones del panel, «usuarios» incluida (configurable desde el 06/11/2026)", () => {
     expect(SECCIONES_CONFIGURABLES.map((s) => [s.key, s.label])).toEqual([
       ["dashboard", "Dashboard"],
+      ["facturas", "Facturas"],
+      ["facturas_subida", "Facturas · Subida"],
       ["usuarios", "Usuarios"],
     ]);
   });
@@ -77,7 +79,12 @@ describe("permisosParaEditar", () => {
 
     expect(permisos.map((p) => p.section_key)).toEqual(SECCIONES_CONFIGURABLES.map((s) => s.key));
     expect(de(permisos, "usuarios")).toEqual(permiso("usuarios", false, false));
-    expect(permisosParaEditar([])).toEqual([permiso("dashboard", false, false), permiso("usuarios", false, false)]);
+    expect(permisosParaEditar([])).toEqual([
+      permiso("dashboard", false, false),
+      permiso("facturas", false, false),
+      permiso("facturas_subida", false, false),
+      permiso("usuarios", false, false),
+    ]);
   });
 
   it("editar implica ver (una fila con solo can_edit se muestra con las dos)", () => {
@@ -88,20 +95,27 @@ describe("permisosParaEditar", () => {
   it("ignora secciones retiradas (las del panel de restaurante, «trabajadores»…)", () => {
     const permisos = permisosParaEditar([
       permiso("reservas", true, true),
-      permiso("facturas", true, true),
+      permiso("facturas_albaranes", true, true),
       permiso("trabajadores", true, true),
     ]);
-    expect(permisos.map((p) => p.section_key)).toEqual(["dashboard", "usuarios"]);
+    expect(permisos.map((p) => p.section_key)).toEqual(["dashboard", "facturas", "facturas_subida", "usuarios"]);
     expect(permisos.every((p) => !p.can_view && !p.can_edit)).toBe(true);
   });
 });
 
-describe("«Usuarios»: un solo interruptor («Puede ver», en can_view)", () => {
-  it("solo «Usuarios» lo tiene; Dashboard lleva «Ver» y «Puede editar»", () => {
-    expect(Object.keys(SECCIONES_UN_INTERRUPTOR)).toEqual(["usuarios"]);
+describe("«Usuarios» y «Facturas · Subida»: un solo interruptor (en can_view)", () => {
+  it("«Usuarios» («Puede ver») y «Facturas · Subida» («Puede subir»); Dashboard y Facturas llevan «Ver» y «Puede editar»", () => {
+    expect(Object.keys(SECCIONES_UN_INTERRUPTOR)).toEqual(["facturas_subida", "usuarios"]);
     expect(interruptorUnico("usuarios")).toBe("Puede ver");
+    expect(interruptorUnico("facturas_subida")).toBe("Puede subir");
     expect(interruptorUnico("dashboard")).toBeNull();
-    expect(interruptorUnico("facturas_subida")).toBeNull();
+    expect(interruptorUnico("facturas")).toBeNull();
+  });
+
+  it("Facturas: «Puede editar» cuenta para el rol; «Facturas · Subida» no", () => {
+    expect(rolSegunPermisos([permiso("facturas", true, true)])).toBe("admin");
+    expect(rolSegunPermisos([permiso("facturas", true, false), permiso("facturas_subida", true, false)])).toBe("staff");
+    expect(AYUDA_EDICION.facturas_subida).toMatch(/Cargar/);
   });
 
   it("lo guardado en can_view o en can_edit (por SQL) es «sí», y se guarda en can_view sin edición", () => {

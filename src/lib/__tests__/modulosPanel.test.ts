@@ -36,7 +36,7 @@ describe("catálogo completo: cada ruta de App.tsx está en un módulo o fuera c
   it("lee las rutas de App.tsx (si cambia la forma de escribirlas, hay que cambiar esta prueba)", () => {
     expect(App).toBeTypeOf("function");
     expect(rutasApp.length).toBeGreaterThan(10);
-    expect(paginasEquipo).toEqual(["/", "/dashboard", "/usuarios", "/avisos", "/ayuda", "/peticiones"]);
+    expect(paginasEquipo).toEqual(["/", "/dashboard", "/facturas", "/usuarios", "/avisos", "/ayuda", "/peticiones"]);
   });
 
   it.each(rutasApp)("%s", (ruta) => {
@@ -96,8 +96,8 @@ describe("forma del catálogo", () => {
     }
   });
 
-  it("los módulos del restaurante ya no están en el catálogo", () => {
-    for (const clave of ["reservas", "gestion_web", "marketing", "rrss", "cheques", "tienda", "facturas", "albaranes"]) {
+  it("los módulos del restaurante ya no están en el catálogo (Facturas sí, sin albaranes)", () => {
+    for (const clave of ["reservas", "gestion_web", "marketing", "rrss", "cheques", "tienda", "albaranes"]) {
       expect(moduloPorClave(clave), clave).toBeUndefined();
     }
   });
@@ -113,7 +113,14 @@ describe("forma del catálogo", () => {
   });
 
   it("el menú lateral, en el orden de siempre", () => {
-    expect(MODULOS_MENU.map((m) => m.nombre)).toEqual(["Dashboard", "Usuarios", "Nueva petición", "Ayuda"]);
+    expect(MODULOS_MENU.map((m) => m.nombre)).toEqual(["Dashboard", "Facturas", "Usuarios", "Nueva petición", "Ayuda"]);
+  });
+
+  it("Facturas: se puede apagar y sale con «Ver» en Facturas o con solo «Facturas · Subida»", () => {
+    const f = moduloPorClave("facturas")!;
+    expect(f).toMatchObject({ rutas: ["/facturas"], desactivable: true, enMenu: true, grupo: "compras" });
+    expect(tienePermisoModulo(f, [{ section_key: "facturas_subida", can_view: true }], false)).toBe(true);
+    expect(tienePermisoModulo(f, [{ section_key: "dashboard", can_view: true }], false)).toBe(false);
   });
 
   it("los permisos de cada módulo existen", () => {
@@ -138,6 +145,7 @@ describe("moduloDeRuta", () => {
     ["/dashboard/", "dashboard"],
     ["/usuarios", "usuarios"],
     ["/usuarios/", "usuarios"],
+    ["/facturas", "facturas"],
     ["/peticiones", "peticiones"],
     ["/avisos", "avisos"],
     ["/ayuda", "ayuda"],
@@ -146,7 +154,7 @@ describe("moduloDeRuta", () => {
   });
 
   it("lo que no es del equipo, ninguno", () => {
-    for (const ruta of ["/super-admin", "/super-admin/tickets", "/auth", "/no-existe", "/usuarios/otra", "/reservas", "/facturas"]) {
+    for (const ruta of ["/super-admin", "/super-admin/tickets", "/auth", "/no-existe", "/usuarios/otra", "/reservas", "/albaranes"]) {
       expect(moduloDeRuta(ruta), ruta).toBeUndefined();
     }
   });
