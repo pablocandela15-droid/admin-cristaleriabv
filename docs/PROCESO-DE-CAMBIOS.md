@@ -11,7 +11,7 @@ Vale para los dos repos, `pablocandela15-droid/cristaleriabv` (web) y `pablocand
  main ──────────►  release/1.4.0 = main + SOLO #12 y #15 + versión + CHANGELOG
                          │  preview propia, CI, prueba rápida, capturas
                          ▼
-                   PR release/1.4.0 → main  ──►  TÚ lo aceptas en GitHub  ──►  producción v1.4.0
+                   PR release/1.4.0 → main  ──►  se fusiona (tú o Claude, si lo pides)  ──►  producción v1.4.0
 ```
 
 Nada llega a producción sin que el dueño acepte en GitHub el PR de una release, y una release solo lleva los cambios que se eligen.
@@ -24,7 +24,7 @@ Con un único PR `staging → main` que se actualizara solo, aceptarlo publicar�
 
 | Rama | Para qué | Vercel despliega | Supabase |
 |---|---|---|---|
-| `main` | Lo que está en producción | **Producción**, solo al aceptar un PR desde `release/X.Y.Z` | proyecto de producción (`SUPABASE_REF_PRODUCCION`) |
+| `main` | Lo que está en producción | **Producción**, solo al fusionar un PR desde `release/X.Y.Z` | proyecto de producción (`SUPABASE_REF_PRODUCCION`) |
 | `staging` | Integración: todo lo terminado, junto | **Demo**, en cada subida | proyecto de demo (`SUPABASE_REF_DEMO`) |
 | `release/X.Y.Z` | Una publicación: `main` + la selección | **Preview de la candidata**, en cada subida | demo |
 | `feature/*`, `fix/*` | Un cambio cada una | No (el CI corre en su PR) | — |
@@ -137,7 +137,7 @@ Dónde se ve:
 
 - **Vercel** solo publica producción si el último commit de `main` es la aceptación de un PR desde `release/X.Y.Z` **y** `versionado.json` dice esa versión (`scripts/vercel-produccion.mjs`, en `vercel.json` → `ignoreCommand`). Un push directo, un *squash*, un *rebase* o un PR desde `staging` se cancelan (*Canceled by Ignored Build Step*). La demo (`staging`) tampoco se construye si desde su último despliegue solo cambian docs, Markdown, tests, `e2e/` o `.github/` (ahorra despliegues); las previews `release/*` se construyen siempre.
 - El check **Validar release a producción** falla en cualquier PR a `main` que no sea una release correcta.
-- **Claude** no empuja a `main` ni fusiona PR hacia `main` (`CLAUDE.md`).
+- **Claude** no empuja a `main`. Desde el 23/11/2026 el dueño le autoriza a fusionar él mismo el PR `release/X.Y.Z → main` cuando el dueño pida publicar, con *merge commit* y los checks en verde (`CLAUDE.md`).
 - **Límite conocido:** en repos privados del plan gratuito GitHub no permite reglas de protección; alguien con permiso de escritura podría escribir en `main`, pero no se publicaría. Con GitHub Team se cierra del todo (ver abajo).
 - **Límite conocido:** el control de Vercel solo actúa sobre lo que llega desde git. Un despliegue a mano con la CLI o la API de Vercel (`vercel --prod`, `vercel deploy --prod`, `vercel promote`, o sus equivalentes desde una integración) con una cuenta del equipo publica lo que haya en ese ordenador sin pasar por nada. Pasó el 09/11/2026: las dos producciones se desplegaron así (con el mismo código, pero sin versión ni commit en `/version.json` y, en el panel, sin identificador para el service worker) y se volvieron a poner los despliegues de git con **Promote**. Por eso está prohibido (ver *Reglas*). Señal de alarma: `/version.json` de producción sin `commit` o con una versión que no es la de `main`.
 
@@ -153,9 +153,9 @@ Dónde se ve:
 
 ## Reglas para quien desarrolla
 
-- Un cambio por rama `feature/*` o `fix/*`, PR a `staging`. Nunca empujar a `main`, nunca *force push*, nunca fusionar hacia `main`.
+- Un cambio por rama `feature/*` o `fix/*`, PR a `staging`. Nunca empujar a `main`, nunca *force push*. Hacia `main` solo PR de release, que Claude fusiona cuando el dueño pide publicar (con los checks en verde).
 - **Nunca desplegar ni promocionar en Vercel a mano** (CLI, API o integraciones): producción solo se publica desde git, al aceptar el PR de una release. La única excepción es volver atrás cuando el dueño lo pida expresamente.
 - Commits a nombre de alguien del equipo de Vercel o de `Claude <noreply@anthropic.com>` (el plan Hobby **bloquea** los de autores con cuenta de Vercel que no son del equipo).
 - Las releases llevan solo lo que pide el dueño. Si `preparar` se bloquea, se le explica qué falta; no se añaden cambios por cuenta propia.
 - `versionado.json` y `CHANGELOG.md` solo los escribe `scripts/release.mjs`.
-- Supabase: demo primero; producción solo después de aceptar el PR de la release y con el «sí» del dueño.
+- Supabase: demo primero; producción solo después de fusionar el PR de una release que el dueño haya pedido publicar.
