@@ -49,6 +49,16 @@ verify_jwt = false
 [functions.clasificar-productos]
 verify_jwt = false
 
+# Web pública › solicitud de presupuesto (20261123100000_web_y_presupuestos.sql): la llama la
+# calculadora de la web (cristaleriabv) desde el navegador de cualquier visitante, sin sesión y con
+# la clave publicable (sb_publishable_…, que no es un JWT: con `true` la pasarela la rechazaría).
+# Pública a propósito, con su propio control de abuso: campo trampa, validación de cada campo y
+# límite por huella de IP (HMAC con sal, 5 por hora) en la RPC web_solicitud_presupuesto_registrar
+# (solo service role). No acepta rutas ni ids: solo crea un presupuesto «solicitud» con su línea.
+# Ver supabase/functions/web-solicitud-presupuesto/solicitud.ts.
+[functions.web-solicitud-presupuesto]
+verify_jwt = false
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — autenticación propia REAL + filtro barato encima
