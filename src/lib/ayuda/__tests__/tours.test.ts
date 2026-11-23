@@ -21,8 +21,16 @@ describe("tours de ayuda", () => {
     }
   });
 
-  it("hay tours de Facturas, Peticiones y Usuarios", () => {
-    expect(Object.keys(TOURS).sort()).toEqual(["facturas", "peticiones", "usuarios"]);
+  it("hay tours de Facturas, Peticiones, Presupuestos y Usuarios", () => {
+    expect(Object.keys(TOURS).sort()).toEqual(["facturas", "peticiones", "presupuestos", "usuarios"]);
+  });
+
+  it("el tour de Presupuestos enseña la lista (sin pestañas) y explica las solicitudes de la web", () => {
+    expect(TOURS.presupuestos.map((p) => p.elemento).filter(Boolean)).toEqual([
+      "presupuestos-nuevo", "presupuestos-filtros", "presupuestos-buscar", "presupuestos-lista", TOUR_BOTON_AYUDA,
+    ]);
+    expect(pestanasDelTour(TOURS.presupuestos)).toEqual([]);
+    expect(TOURS.presupuestos.find((p) => p.elemento === "presupuestos-filtros")?.texto).toMatch(/Solicitudes.*web/);
   });
 
   it("el tour de Facturas recorre Compras y luego Cargar", () => {

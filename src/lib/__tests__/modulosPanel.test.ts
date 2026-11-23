@@ -36,7 +36,7 @@ describe("catálogo completo: cada ruta de App.tsx está en un módulo o fuera c
   it("lee las rutas de App.tsx (si cambia la forma de escribirlas, hay que cambiar esta prueba)", () => {
     expect(App).toBeTypeOf("function");
     expect(rutasApp.length).toBeGreaterThan(10);
-    expect(paginasEquipo).toEqual(["/", "/dashboard", "/facturas", "/usuarios", "/avisos", "/ayuda", "/peticiones"]);
+    expect(paginasEquipo).toEqual(["/", "/dashboard", "/facturas", "/web", "/presupuestos", "/usuarios", "/avisos", "/ayuda", "/peticiones"]);
   });
 
   it.each(rutasApp)("%s", (ruta) => {
@@ -113,7 +113,7 @@ describe("forma del catálogo", () => {
   });
 
   it("el menú lateral, en el orden de siempre", () => {
-    expect(MODULOS_MENU.map((m) => m.nombre)).toEqual(["Dashboard", "Facturas", "Usuarios", "Nueva petición", "Ayuda"]);
+    expect(MODULOS_MENU.map((m) => m.nombre)).toEqual(["Dashboard", "Facturas", "Web", "Presupuestos", "Usuarios", "Nueva petición", "Ayuda"]);
   });
 
   it("Facturas: se puede apagar y sale con «Ver» en Facturas o con solo «Facturas · Subida»", () => {
@@ -121,6 +121,23 @@ describe("forma del catálogo", () => {
     expect(f).toMatchObject({ rutas: ["/facturas"], desactivable: true, enMenu: true, grupo: "compras" });
     expect(tienePermisoModulo(f, [{ section_key: "facturas_subida", can_view: true }], false)).toBe(true);
     expect(tienePermisoModulo(f, [{ section_key: "dashboard", can_view: true }], false)).toBe(false);
+  });
+
+  it("Web: se puede apagar y sale con cualquiera de sus tres secciones (Fotos, Tarifas, Contenido)", () => {
+    const w = moduloPorClave("web")!;
+    expect(w).toMatchObject({ rutas: ["/web"], desactivable: true, enMenu: true, grupo: "web" });
+    for (const s of ["web_fotos", "web_tarifas", "web_contenido"]) {
+      expect(tienePermisoModulo(w, [{ section_key: s, can_view: true }], false), s).toBe(true);
+    }
+    expect(tienePermisoModulo(w, [{ section_key: "presupuestos", can_view: true }], false)).toBe(false);
+  });
+
+  it("Presupuestos: se puede apagar, va junto a Web («Web y clientes») y sale con «Ver» en Presupuestos", () => {
+    const p = moduloPorClave("presupuestos")!;
+    expect(p).toMatchObject({ rutas: ["/presupuestos"], desactivable: true, enMenu: true, grupo: "web", secciones: ["presupuestos"] });
+    expect(MODULOS_PANEL.map((m) => m.clave).indexOf("presupuestos")).toBe(MODULOS_PANEL.map((m) => m.clave).indexOf("web") + 1);
+    expect(tienePermisoModulo(p, [{ section_key: "presupuestos", can_view: true }], false)).toBe(true);
+    expect(tienePermisoModulo(p, [{ section_key: "web_tarifas", can_view: true }], false)).toBe(false);
   });
 
   it("los permisos de cada módulo existen", () => {
@@ -146,6 +163,8 @@ describe("moduloDeRuta", () => {
     ["/usuarios", "usuarios"],
     ["/usuarios/", "usuarios"],
     ["/facturas", "facturas"],
+    ["/web", "web"],
+    ["/presupuestos", "presupuestos"],
     ["/peticiones", "peticiones"],
     ["/avisos", "avisos"],
     ["/ayuda", "ayuda"],

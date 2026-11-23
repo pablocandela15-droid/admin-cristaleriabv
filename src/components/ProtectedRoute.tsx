@@ -22,6 +22,9 @@ const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   "/": "dashboard",
   // Con solo «Facturas · Subida» se entra a la pestaña Cargar.
   "/facturas": ["facturas", "facturas_subida"],
+  // Una pestaña por sección (Fotos, Tarifas, Contenido): con ver una se entra.
+  "/web": ["web_fotos", "web_tarifas", "web_contenido"],
+  "/presupuestos": "presupuestos",
   "/usuarios": "usuarios",
 };
 // Las páginas de /super-admin/* no tienen ruta aquí: las protege SuperAdminRoute.
