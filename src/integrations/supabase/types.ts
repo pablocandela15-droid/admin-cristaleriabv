@@ -6,7 +6,8 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Generado a partir de supabase/migrations/20261118120000_nucleo_panel.sql y 20261121100000_facturas.sql (esquema público).
+// Generado a partir de supabase/migrations/20261118120000_nucleo_panel.sql, 20261121100000_facturas.sql y
+// 20261123100000_web_y_presupuestos.sql (esquema público).
 // Para regenerarlo con la CLI: npx supabase gen types typescript --project-id <ref> > src/integrations/supabase/types.ts
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -1321,6 +1322,152 @@ export type Database = {
         }
         Relationships: []
       }
+      presupuesto_lineas: {
+        Row: {
+          id: string
+          presupuesto_id: string
+          orden: number
+          categoria: string | null
+          valores: Json | null
+          descripcion: string
+          detalle: string | null
+          cantidad: number
+          precio_unitario: number
+          importe: number
+          precio_calculado: number | null
+          creado_en: string
+        }
+        Insert: {
+          id?: string
+          presupuesto_id: string
+          orden?: number
+          categoria?: string | null
+          valores?: Json | null
+          descripcion: string
+          detalle?: string | null
+          cantidad?: number
+          precio_unitario?: number
+          importe?: never
+          precio_calculado?: number | null
+          creado_en?: string
+        }
+        Update: {
+          id?: string
+          presupuesto_id?: string
+          orden?: number
+          categoria?: string | null
+          valores?: Json | null
+          descripcion?: string
+          detalle?: string | null
+          cantidad?: number
+          precio_unitario?: number
+          importe?: never
+          precio_calculado?: number | null
+          creado_en?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuesto_lineas_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: false
+            referencedRelation: "presupuestos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      presupuestos: {
+        Row: {
+          id: string
+          numero: string
+          estado: string
+          origen: string
+          cliente_nombre: string
+          cliente_telefono: string | null
+          cliente_email: string | null
+          cliente_direccion: string | null
+          cliente_poblacion: string | null
+          notas_cliente: string | null
+          notas_internas: string | null
+          condiciones: string | null
+          fecha: string
+          validez_dias: number
+          descuento_pct: number
+          iva_pct: number
+          subtotal: number
+          total: number
+          enviado_en: string | null
+          respondido_en: string | null
+          creado_por: string | null
+          creado_en: string
+          actualizado_en: string
+        }
+        Insert: {
+          id?: string
+          numero?: string
+          estado?: string
+          origen?: string
+          cliente_nombre: string
+          cliente_telefono?: string | null
+          cliente_email?: string | null
+          cliente_direccion?: string | null
+          cliente_poblacion?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          condiciones?: string | null
+          fecha?: string
+          validez_dias?: number
+          descuento_pct?: number
+          iva_pct?: number
+          subtotal?: number
+          total?: number
+          enviado_en?: string | null
+          respondido_en?: string | null
+          creado_por?: string | null
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Update: {
+          id?: string
+          numero?: string
+          estado?: string
+          origen?: string
+          cliente_nombre?: string
+          cliente_telefono?: string | null
+          cliente_email?: string | null
+          cliente_direccion?: string | null
+          cliente_poblacion?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          condiciones?: string | null
+          fecha?: string
+          validez_dias?: number
+          descuento_pct?: number
+          iva_pct?: number
+          subtotal?: number
+          total?: number
+          enviado_en?: string | null
+          respondido_en?: string | null
+          creado_por?: string | null
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Relationships: []
+      }
+      presupuestos_numeracion: {
+        Row: {
+          anio: number
+          ultimo: number
+        }
+        Insert: {
+          anio: number
+          ultimo?: number
+        }
+        Update: {
+          anio?: number
+          ultimo?: number
+        }
+        Relationships: []
+      }
       productos_alias: {
         Row: {
           texto_normalizado: string
@@ -1858,6 +2005,119 @@ export type Database = {
         }
         Relationships: []
       }
+      web_albumes: {
+        Row: {
+          id: string
+          slug: string
+          titulo: string
+          descripcion: string | null
+          servicio: string | null
+          portada_foto_id: string | null
+          orden: number
+          publicado: boolean
+          creado_en: string
+          actualizado_en: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          titulo: string
+          descripcion?: string | null
+          servicio?: string | null
+          portada_foto_id?: string | null
+          orden?: number
+          publicado?: boolean
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          titulo?: string
+          descripcion?: string | null
+          servicio?: string | null
+          portada_foto_id?: string | null
+          orden?: number
+          publicado?: boolean
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Relationships: []
+      }
+      web_contenido: {
+        Row: {
+          clave: string
+          valor: Json
+          actualizado_en: string
+          actualizado_por: string | null
+        }
+        Insert: {
+          clave: string
+          valor?: Json
+          actualizado_en?: string
+          actualizado_por?: string | null
+        }
+        Update: {
+          clave?: string
+          valor?: Json
+          actualizado_en?: string
+          actualizado_por?: string | null
+        }
+        Relationships: []
+      }
+      web_fotos: {
+        Row: {
+          id: string
+          album_id: string | null
+          ruta: string
+          titulo: string | null
+          alt: string
+          ancho: number | null
+          alto: number | null
+          orden: number
+          publicado: boolean
+          destacada: boolean
+          creado_en: string
+          actualizado_en: string
+        }
+        Insert: {
+          id?: string
+          album_id?: string | null
+          ruta: string
+          titulo?: string | null
+          alt?: string
+          ancho?: number | null
+          alto?: number | null
+          orden?: number
+          publicado?: boolean
+          destacada?: boolean
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Update: {
+          id?: string
+          album_id?: string | null
+          ruta?: string
+          titulo?: string | null
+          alt?: string
+          ancho?: number | null
+          alto?: number | null
+          orden?: number
+          publicado?: boolean
+          destacada?: boolean
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_fotos_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "web_albumes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       web_linear_prueba: {
         Row: {
           id: number
@@ -1919,6 +2179,48 @@ export type Database = {
           linear_equipo_id?: string | null
           linear_proyecto_id?: string | null
           linear_etiquetas?: string[]
+          actualizado_en?: string
+          actualizado_por?: string | null
+        }
+        Relationships: []
+      }
+      web_solicitudes_limite: {
+        Row: {
+          id: number
+          ip_hash: string
+          creado_en: string
+        }
+        Insert: {
+          id?: never
+          ip_hash: string
+          creado_en?: string
+        }
+        Update: {
+          id?: never
+          ip_hash?: string
+          creado_en?: string
+        }
+        Relationships: []
+      }
+      web_tarifas: {
+        Row: {
+          id: number
+          config: Json
+          catalogo: Json
+          actualizado_en: string
+          actualizado_por: string | null
+        }
+        Insert: {
+          id?: number
+          config: Json
+          catalogo?: Json
+          actualizado_en?: string
+          actualizado_por?: string | null
+        }
+        Update: {
+          id?: number
+          config?: Json
+          catalogo?: Json
           actualizado_en?: string
           actualizado_por?: string | null
         }
@@ -2956,6 +3258,14 @@ export type Database = {
         Args: {
             p_tipo: string
           }
+      web_solicitud_presupuesto_registrar: {
+        Args: {
+            p_ip_hash: string
+            p_datos: Json
+            p_max_hora?: number
+          }
+        Returns: Json
+      }
         Returns: string
       }
       servicios_limites_validos: {

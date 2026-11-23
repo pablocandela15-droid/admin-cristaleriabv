@@ -166,6 +166,61 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       },
     ],
   },
+  {
+    seccion: "presupuestos",
+    titulo: "Presupuestos",
+    ruta: "/presupuestos",
+    queEs:
+      "Aquí haces los presupuestos de los clientes con la calculadora de la web y tus tarifas, los descargas en PDF con el logotipo y los envías por WhatsApp o por correo. Las solicitudes que mandan los clientes desde la calculadora de la web también llegan aquí.",
+    grupos: [
+      {
+        titulo: "Hacer un presupuesto",
+        pasos: [
+          "Pulsa «Nuevo presupuesto», escribe el nombre del cliente (y su teléfono si lo tienes) y pulsa «Crear y abrir». El número (P-2026-0001…) lo pone el panel.",
+          "«Añadir desde calculadora»: elige qué es (mampara, espejo, cerramiento…), rellena las medidas y las opciones y pulsa «Añadir al presupuesto». La línea sale con el detalle de lo elegido y el precio de tus tarifas de hoy.",
+          "Lo que no está en la calculadora (desplazamiento, retirar un cristal…) va con «Línea manual».",
+          "En cada línea puedes cambiar la descripción, el detalle, la cantidad y el precio; se guarda al salir del campo. Ordénalas arrastrando o con las flechas.",
+          "En «Totales» pon el descuento y el IVA (21 % de serie). Revisa las condiciones y la validez y pulsa «Guardar cambios».",
+        ],
+      },
+      {
+        titulo: "Enviarlo",
+        pasos: [
+          "«Descargar PDF» baja el presupuesto con el logotipo, tus datos (los de Web › Contenido), el cliente, las líneas, los totales y las condiciones.",
+          "«Enviar por WhatsApp» abre WhatsApp con el móvil del cliente y un mensaje con el número, el total y la validez.",
+          "«Enviar por email» descarga el PDF y abre tu correo con el asunto y el texto puestos: adjunta tú el PDF antes de enviarlo.",
+          "Después pulsa «Marcar como enviado». Cuando el cliente conteste, márcalo como «Aceptado» o «Rechazado».",
+        ],
+      },
+      {
+        titulo: "Solicitudes de la web",
+        pasos: [
+          "Cuando un cliente pide presupuesto desde la calculadora de la web, te llega un aviso a la campana y sale en «Solicitudes» con lo que escribió y el precio que le dio la web.",
+          "Pulsa «Convertir en borrador» para trabajarlo: revisa las medidas con «Recalcular», añade lo que falte y envíaselo.",
+        ],
+      },
+    ],
+    preguntas: [
+      {
+        pregunta: "He cambiado las tarifas, ¿se cambian los presupuestos que ya tenía?",
+        respuesta:
+          "No: cada línea guarda su precio. Si con las tarifas de hoy sale otro, la línea lo avisa («Tarifa de hoy») y con «Recalcular» la pones al día si quieres.",
+      },
+      {
+        pregunta: "¿Por qué el total es más alto que el precio que vio el cliente en la web?",
+        respuesta:
+          "El precio de la web va como precio de la línea y el presupuesto le suma el IVA. Si ese precio ya llevaba el IVA, cambia el precio de la línea o pon el IVA que corresponda.",
+      },
+      {
+        pregunta: "¿Qué significa «Caducado»?",
+        respuesta: "Que se envió y ya ha pasado su validez sin que el cliente conteste. Puedes duplicarlo para hacerle uno nuevo con fecha de hoy.",
+      },
+      {
+        pregunta: "No puedo cambiar nada, ¿por qué?",
+        respuesta: "Tienes permiso para ver los presupuestos pero no para cambiarlos (sale «Solo lectura»). Pídeselo al encargado.",
+      },
+    ],
+  },
 ];
 
 /** ¿Es un archivo de vídeo (se enseña con <video>) y no un enlace de inserción (<iframe>)? */

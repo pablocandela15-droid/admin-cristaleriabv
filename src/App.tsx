@@ -20,6 +20,8 @@ const Dashboard = lazy(CARGADORES_SECCION["/dashboard"]);
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Usuarios = lazy(CARGADORES_SECCION["/usuarios"]);
 const Facturas = lazy(CARGADORES_SECCION["/facturas"]);
+const Web = lazy(CARGADORES_SECCION["/web"]);
+const Presupuestos = lazy(CARGADORES_SECCION["/presupuestos"]);
 const Ayuda = lazy(CARGADORES_SECCION["/ayuda"]);
 const Avisos = lazy(CARGADORES_SECCION["/avisos"]);
 const Peticiones = lazy(CARGADORES_SECCION["/peticiones"]);
@@ -141,6 +143,10 @@ const App = () => (
                     <Route path="/dashboard" element={pagina(<Dashboard />)} />
                     {/* Con solo «Facturas · Subida» se entra a la pestaña Cargar. */}
                     <Route path="/facturas" element={pagina(<Facturas />, ["facturas", "facturas_subida"])} />
+                    {/* La web: una pestaña por sección (Fotos, Tarifas, Contenido). */}
+                    <Route path="/web" element={pagina(<Web />, ["web_fotos", "web_tarifas", "web_contenido"])} />
+                    {/* Gestor de presupuestos (y solicitudes de la calculadora de la web): «Ver» lee, «Editar» todo. */}
+                    <Route path="/presupuestos" element={pagina(<Presupuestos />, "presupuestos")} />
                     <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                     {/* Historial de avisos (campana): para todos los roles. */}
                     <Route path="/avisos" element={pagina(<Avisos />)} />

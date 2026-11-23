@@ -43,6 +43,10 @@ describe("SECCIONES_CONFIGURABLES", () => {
       ["dashboard", "Dashboard"],
       ["facturas", "Facturas"],
       ["facturas_subida", "Facturas · Subida"],
+      ["web_fotos", "Web · Fotos"],
+      ["web_tarifas", "Web · Tarifas"],
+      ["web_contenido", "Web · Contenido"],
+      ["presupuestos", "Presupuestos"],
       ["usuarios", "Usuarios"],
     ]);
   });
@@ -83,6 +87,10 @@ describe("permisosParaEditar", () => {
       permiso("dashboard", false, false),
       permiso("facturas", false, false),
       permiso("facturas_subida", false, false),
+      permiso("web_fotos", false, false),
+      permiso("web_tarifas", false, false),
+      permiso("web_contenido", false, false),
+      permiso("presupuestos", false, false),
       permiso("usuarios", false, false),
     ]);
   });
@@ -98,7 +106,9 @@ describe("permisosParaEditar", () => {
       permiso("facturas_albaranes", true, true),
       permiso("trabajadores", true, true),
     ]);
-    expect(permisos.map((p) => p.section_key)).toEqual(["dashboard", "facturas", "facturas_subida", "usuarios"]);
+    expect(permisos.map((p) => p.section_key)).toEqual([
+      "dashboard", "facturas", "facturas_subida", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "usuarios",
+    ]);
     expect(permisos.every((p) => !p.can_view && !p.can_edit)).toBe(true);
   });
 });
@@ -113,7 +123,9 @@ describe("«Usuarios» y «Facturas · Subida»: un solo interruptor (en can_vie
   });
 
   it("Facturas: «Puede editar» cuenta para el rol; «Facturas · Subida» no", () => {
-    expect(rolSegunPermisos([permiso("facturas", true, true)])).toBe("admin");
+    // Admin si edita en todas las que cuentan (Facturas, las tres de Web y Presupuestos); en alguna, manager.
+    expect(rolSegunPermisos(["facturas", "web_fotos", "web_tarifas", "web_contenido", "presupuestos"].map((k) => permiso(k, true, true)))).toBe("admin");
+    expect(rolSegunPermisos([permiso("facturas", true, true)])).toBe("manager");
     expect(rolSegunPermisos([permiso("facturas", true, false), permiso("facturas_subida", true, false)])).toBe("staff");
     expect(AYUDA_EDICION.facturas_subida).toMatch(/Cargar/);
   });
@@ -243,5 +255,16 @@ describe("rol que sigue a los permisos (06/11/2026)", () => {
     expect(rolAlGuardar([permiso("dashboard", true, false), permiso("usuarios", true, false)], presets, null)).toBe("admin");
     // Un id que ya no existe se ignora: manda lo marcado.
     expect(rolAlGuardar([permiso("dashboard", true, true)], presets, "p-borrado")).toBe("manager");
+  });
+});
+
+describe("Web y Presupuestos (migración 20261123100000_web_y_presupuestos)", () => {
+  it("una sección por pestaña de Web y otra para Presupuestos, con «Ver» y «Puede editar»", () => {
+    for (const k of ["web_fotos", "web_tarifas", "web_contenido", "presupuestos"]) {
+      expect(interruptorUnico(k), k).toBeNull();
+      expect(AYUDA_EDICION[k as keyof typeof AYUDA_EDICION], k).toMatch(/Con solo «Ver»/);
+    }
+    expect(rolSegunPermisos([permiso("web_tarifas", true, true)])).toBe("manager");
+    expect(rolSegunPermisos([permiso("web_fotos", true, false), permiso("presupuestos", true, false)])).toBe("staff");
   });
 });

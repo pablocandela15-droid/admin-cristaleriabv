@@ -16,7 +16,7 @@
 // Texto: para el dueño y el personal; llano, de tú, sin palabras técnicas.
 // ---------------------------------------------------------------------------
 
-export type SeccionAyuda = "facturas" | "peticiones" | "usuarios";
+export type SeccionAyuda = "facturas" | "peticiones" | "presupuestos" | "usuarios";
 
 export type LadoPaso = "top" | "right" | "bottom" | "left";
 
@@ -201,6 +201,48 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
         "Cada fila es una persona: su nombre, su tipo de usuario y sus accesos. Con «Permisos» ves sección a sección qué puede ver («Ver») y qué puede cambiar («Editar»).",
       opcional: true,
       lado: "top",
+    },
+    PASO_FINAL,
+  ],
+  presupuestos: [
+    {
+      titulo: "Presupuestos",
+      texto:
+        "Aquí preparas los presupuestos de los clientes con la misma calculadora de la web y las tarifas que tengas puestas en Web › Tarifas. También llegan aquí, solas, las solicitudes que mandan los clientes desde la calculadora de la web.",
+    },
+    {
+      elemento: "presupuestos-nuevo",
+      titulo: "Nuevo presupuesto",
+      texto: "Pon el nombre del cliente (y, si lo tienes, su teléfono) y se abre con su número, listo para añadir líneas.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "presupuestos-filtros",
+      titulo: "Por estado",
+      texto:
+        "«Solicitudes» son las que han llegado de la web y nadie ha atendido todavía: el número te dice cuántas hay. Después van «Borradores», «Enviados», «Aceptados» y «Rechazados». Un enviado cuya validez ya ha pasado sale como «Caducado».",
+      lado: "bottom",
+    },
+    {
+      elemento: "presupuestos-buscar",
+      titulo: "Buscar",
+      texto: "Escribe el número, el nombre del cliente o su teléfono (con o sin espacios).",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "presupuestos-lista",
+      titulo: "La lista",
+      texto:
+        "Toca uno para abrirlo. En las solicitudes ves lo que escribió el cliente y el precio que le dio la web; con «Convertir en borrador» lo coges para trabajarlo.",
+      opcional: true,
+      lado: "top",
+    },
+    {
+      titulo: "Dentro de un presupuesto",
+      texto:
+        "«Añadir desde calculadora» rellena una línea con las medidas y opciones y su precio; «Línea manual», lo que no sale en la calculadora. Cambia cantidades y precios en la misma línea, ordénalas arrastrando y pon descuento e IVA en los totales. Luego descárgalo en PDF o envíalo por WhatsApp o correo y márcalo como enviado.",
     },
     PASO_FINAL,
   ],

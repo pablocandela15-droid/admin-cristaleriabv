@@ -45,6 +45,14 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
     "modificar, verificar y borrar documentos, clasificar productos, cambiar los ajustes de Facturas y subir (pestaña Cargar). Con solo «Ver» se consulta Compras.",
   facturas_subida:
     "pestaña Cargar: subir facturas, decidir sobre las repetidas y corregir los datos leídos de lo que sube él mismo (no lo de otros). No necesita «Ver» en Facturas: sin él, solo ve Cargar.",
+  web_fotos:
+    "crear, publicar y ordenar los books de fotos de la web, subir y borrar fotos y elegir las de la portada. Con solo «Ver» se consultan.",
+  web_tarifas:
+    "cambiar los precios de la calculadora de la web y sus opciones (añadir u ocultar formas, acabados, campos y categorías). Con solo «Ver» se consultan y se prueban.",
+  web_contenido:
+    "cambiar los textos de la web (datos del negocio, servicios y preguntas frecuentes) y sus imágenes, y subir fotos sueltas para ellas. Con solo «Ver» se consultan.",
+  presupuestos:
+    "crear, modificar, enviar y borrar presupuestos y atender las solicitudes que llegan de la web. Con solo «Ver» se consultan.",
   usuarios:
     "consultar en el admin panel la lista de usuarios y sus permisos. Crear, borrar, bloquear y cambiar permisos es solo del super admin.",
 };
