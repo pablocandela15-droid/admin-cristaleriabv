@@ -13,7 +13,7 @@ Una sección por pestaña, con «Ver» (consulta, la pestaña sale en solo lectu
 | `web_fotos` (Web · Fotos) | Fotos | Crear, publicar, ordenar y borrar books; subir, ordenar, editar y borrar fotos; portada y fotos de inicio |
 | `web_tarifas` (Web · Tarifas) | Tarifas | Precios y opciones de la calculadora |
 | `web_contenido` (Web · Contenido) | Contenido | Textos e imágenes fijas de la web; puede subir fotos **sueltas** (no a un book) para esas imágenes |
-| `presupuestos` (Presupuestos) | *(gestor de presupuestos, aparte)* | Crear, cambiar y enviar presupuestos; atender las solicitudes de la web |
+| `presupuestos` (Presupuestos) | *(página Presupuestos, ver [PRESUPUESTOS.md](PRESUPUESTOS.md))* | Crear, cambiar y enviar presupuestos; atender las solicitudes de la web |
 
 El módulo **Web** (Control del Panel, grupo «Web y clientes») sale en el menú con cualquiera de las tres primeras.
 
@@ -51,7 +51,7 @@ Y los precios sueltos de cada categoría (base, por cm de ancho, suplemento por 
 
 En el editor, por categoría: si sale en la calculadora, nombre y descripción corta, sus precios y, campo a campo, pregunta, ayuda, si se pregunta (los obligatorios siempre) y la tabla de opciones (orden, nombre, ayuda, si se ve y su precio). **Añadir opción** crea el `value` a partir del nombre («Hexagonal» → `hexagonal`), guarda la lista completa y ordenada de opciones del campo en el catálogo y su precio en `config` (multiplicador 1 o 0 € al principio). Las opciones de serie no se borran: se ocultan. **Restaurar valores por defecto** devuelve una categoría a sus precios y textos de serie. **Probar** es la calculadora de la web con lo que hay en pantalla, aunque no se haya guardado; se guarda todo junto con «Guardar tarifas».
 
-La calculadora reutilizable (`src/components/web/CalculadoraCampos.tsx` + `src/hooks/useCalculadora.ts`) pinta cualquier categoría respetando las condiciones (`when`) y calcula con `categoria.quote(valores, precios)`; la usará también el gestor de presupuestos.
+La calculadora reutilizable (`src/components/web/CalculadoraCampos.tsx` + `src/hooks/useCalculadora.ts`) pinta cualquier categoría respetando las condiciones (`when`) y calcula con `categoria.quote(valores, precios)`; la usa también el gestor de presupuestos ([PRESUPUESTOS.md](PRESUPUESTOS.md)).
 
 ## Contenido
 
@@ -86,4 +86,4 @@ Edge Function **pública** `web-solicitud-presupuesto` (`verify_jwt = false`, CO
 - Guarda con el service role, por `web_solicitud_presupuesto_registrar()`, un presupuesto `estado = 'solicitud'`, `origen = 'web'` con una línea (`categoria`, `valores`, «Solicitud web · <nombre de la categoría>», el resumen como detalle, cantidad 1 y el total como precio y como precio calculado) y un aviso `presupuesto_solicitud` en la campana, que solo ve quien tiene Presupuestos. Responde `200 {numero}` (`P-AAAA-NNNN`).
 - En la auditoría sale como «API · service_role · web-solicitud-presupuesto».
 
-Los presupuestos (`presupuestos`, `presupuesto_lineas`) llevan número correlativo por año que pone la base y no se reutiliza (`presupuestos_numeracion`), y la base mantiene `subtotal` (suma de importes) y `total` (con descuento e IVA).
+Los presupuestos (`presupuestos`, `presupuesto_lineas`) llevan número correlativo por año que pone la base y no se reutiliza (`presupuestos_numeracion`), y la base mantiene `subtotal` (suma de importes) y `total` (con descuento e IVA). Se atienden en **Presupuestos** (`/presupuestos?estado=solicitud`; el aviso de la campana abre la solicitud): ver [PRESUPUESTOS.md](PRESUPUESTOS.md).
