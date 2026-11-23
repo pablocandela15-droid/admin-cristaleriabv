@@ -86,11 +86,11 @@ create index if not exists web_fotos_destacadas_idx on public.web_fotos (orden) 
 
 create table if not exists public.web_contenido (
   clave           text primary key check (clave in ('negocio', 'servicios', 'faq', 'imagenes')),
-  valor           jsonb not null default '{}'::jsonb
-                  check (octet_length(valor::text) <= 200000
-                         and jsonb_typeof(valor) = case when clave = 'faq' then 'array' else 'object' end),
+  valor           jsonb not null default '{}'::jsonb check (octet_length(valor::text) <= 200000),
   actualizado_en  timestamptz not null default now(),
-  actualizado_por uuid
+  actualizado_por uuid,
+  -- faq es una lista; los demás, objetos.
+  constraint web_contenido_forma check (jsonb_typeof(valor) = case when clave = 'faq' then 'array' else 'object' end)
 );
 comment on table public.web_contenido is
   'Bloques editables de la web (Web › Contenido del panel). La web mezcla valor sobre lo de su código: negocio '
@@ -211,12 +211,20 @@ begin
 end;
 $$;
 
--- Al borrar la foto de portada, el álbum se queda sin portada (portada_foto_id no tiene FK).
-create or replace function public.web_fotos_quitar_portada()
+-- Al borrar una foto: si era la portada, el álbum se queda sin portada (portada_foto_id no tiene FK), y las imágenes
+-- de la web que la usaban (web_contenido 'imagenes', {ruta, alt} o la ruta sola) vuelven a las del código de la web.
+create or replace function public.web_fotos_limpiar_referencias()
 returns trigger language plpgsql security definer set search_path = public
 as $$
 begin
   update public.web_albumes set portada_foto_id = null where portada_foto_id = old.id;
+  update public.web_contenido c
+     set valor = (select coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb)
+                    from jsonb_each(c.valor) e
+                   where coalesce(e.value->>'ruta', e.value #>> '{}') is distinct from old.ruta)
+   where c.clave = 'imagenes'
+     and jsonb_typeof(c.valor) = 'object'
+     and exists (select 1 from jsonb_each(c.valor) e where coalesce(e.value->>'ruta', e.value #>> '{}') = old.ruta);
   return null;
 end;
 $$;
@@ -396,9 +404,9 @@ create trigger trg_web_albumes_actualizado before update on public.web_albumes
 drop trigger if exists trg_web_fotos_actualizado on public.web_fotos;
 create trigger trg_web_fotos_actualizado before update on public.web_fotos
   for each row execute function public.web_marcar_actualizado();
-drop trigger if exists trg_web_fotos_quitar_portada on public.web_fotos;
-create trigger trg_web_fotos_quitar_portada after delete on public.web_fotos
-  for each row execute function public.web_fotos_quitar_portada();
+drop trigger if exists trg_web_fotos_limpiar_referencias on public.web_fotos;
+create trigger trg_web_fotos_limpiar_referencias after delete on public.web_fotos
+  for each row execute function public.web_fotos_limpiar_referencias();
 drop trigger if exists trg_web_contenido_autor on public.web_contenido;
 create trigger trg_web_contenido_autor before insert or update on public.web_contenido
   for each row execute function public.web_marcar_autor();
@@ -533,13 +541,13 @@ create policy presupuesto_lineas_delete on public.presupuesto_lineas for delete 
 
 -- ─── Permisos: funciones ────────────────────────────────────────────────────
 -- Todo cerrado a anon. La de la Edge Function, solo service role. Las de disparador, para quien escribe.
-revoke all on function public.web_marcar_actualizado(), public.web_marcar_autor(), public.web_fotos_quitar_portada(),
+revoke all on function public.web_marcar_actualizado(), public.web_marcar_autor(), public.web_fotos_limpiar_referencias(),
   public.presupuesto_asignar_numero(), public.presupuesto_calcular_totales(), public.presupuesto_lineas_recalcular(),
   public.web_nombre_categoria(text), public.web_euros(numeric),
   public.web_solicitud_presupuesto_registrar(text, jsonb, integer) from public, anon;
 revoke all on function public.web_solicitud_presupuesto_registrar(text, jsonb, integer) from authenticated;
 grant execute on function public.web_solicitud_presupuesto_registrar(text, jsonb, integer) to service_role;
-grant execute on function public.web_marcar_actualizado(), public.web_marcar_autor(), public.web_fotos_quitar_portada(),
+grant execute on function public.web_marcar_actualizado(), public.web_marcar_autor(), public.web_fotos_limpiar_referencias(),
   public.presupuesto_asignar_numero(), public.presupuesto_calcular_totales(), public.presupuesto_lineas_recalcular(),
   public.web_nombre_categoria(text), public.web_euros(numeric)
 to authenticated, service_role;

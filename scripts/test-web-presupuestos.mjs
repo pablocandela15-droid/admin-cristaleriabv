@@ -176,9 +176,14 @@ igual(await cuenta("with b as (delete from storage.objects where bucket_id = 'we
 await comoWeb();
 igual(await cuenta("select count(*)::int n from public.web_fotos where album_id is null"), 1, "la web ve las sueltas publicadas");
 
+await comoUsuario(CONTENIDO);
+await q(`update public.web_contenido set valor = $1::jsonb where clave = 'imagenes'`,
+  [JSON.stringify({ hero: { ruta: ruta(album, "f1"), alt: "Portada" }, about: ruta(album, "f1"), contact: { ruta: "sueltas/portada.webp" } })]);
 await comoUsuario(FOTOS);
 await q("delete from public.web_fotos where id = $1", [f1]);
 igual((await uno("select portada_foto_id p from public.web_albumes where id = $1", [album])).p, null, "al borrar la portada, el álbum se queda sin portada");
+igual((await uno("select valor from public.web_contenido where clave = 'imagenes'")).valor, { contact: { ruta: "sueltas/portada.webp" } },
+  "y las imágenes de la web que la usaban vuelven a las de la web");
 igual(await cuenta("with b as (delete from storage.objects where bucket_id = 'web-fotos' and name = $1 returning 1) select count(*)::int n from b", [ruta(album, "f1")]), 1,
   "Fotos borra el fichero");
 await q("delete from public.web_albumes where id = $1", [otro]);
@@ -302,7 +307,7 @@ await aplicar();
 await db.exec(adaptar(ROLLBACK));
 igual((await q("select tablename from pg_tables where schemaname = 'public' and tablename = any($1)", [TABLAS])).rows, [], "la vuelta atrás quita todas sus tablas");
 igual(await cuenta(`select count(*)::int n from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'
-  and p.proname in ('web_marcar_actualizado', 'web_marcar_autor', 'web_fotos_quitar_portada', 'presupuesto_asignar_numero', 'presupuesto_calcular_totales',
+  and p.proname in ('web_marcar_actualizado', 'web_marcar_autor', 'web_fotos_limpiar_referencias', 'presupuesto_asignar_numero', 'presupuesto_calcular_totales',
                     'presupuesto_lineas_recalcular', 'web_nombre_categoria', 'web_euros', 'web_solicitud_presupuesto_registrar')`), 0, "y sus funciones");
 igual(await cuenta("select count(*)::int n from pg_policies where schemaname = 'storage' and policyname like 'web_fotos%'"), 0, "y las políticas del bucket");
 igual(await cuenta("select count(*)::int n from storage.buckets where id = 'web-fotos'"), 0, "y el bucket vacío");

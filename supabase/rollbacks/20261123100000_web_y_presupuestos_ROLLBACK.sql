@@ -33,7 +33,7 @@ drop function if exists public.web_euros(numeric) cascade;
 drop function if exists public.presupuesto_lineas_recalcular() cascade;
 drop function if exists public.presupuesto_calcular_totales() cascade;
 drop function if exists public.presupuesto_asignar_numero() cascade;
-drop function if exists public.web_fotos_quitar_portada() cascade;
+drop function if exists public.web_fotos_limpiar_referencias() cascade;
 drop function if exists public.web_marcar_autor() cascade;
 drop function if exists public.web_marcar_actualizado() cascade;
 
