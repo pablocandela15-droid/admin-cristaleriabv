@@ -99,6 +99,15 @@ export function opcionConPrecio(precio: PrecioDeOpciones | null, valor: string):
   return !!precio && (!precio.soloValores || precio.soloValores.includes(valor));
 }
 
+/** Qué significa el número de cada opción (multiplicador o €) y qué es «sin recargo». */
+export function explicacionPrecio(p: PrecioDeOpciones): string {
+  if (p.tipo === "factor") return "Multiplicador sobre el precio por m²: 1 = sin recargo; 1,25 = un 25 % más; 0,9 = un 10 % menos.";
+  if (p.tipo === "eurosM2") return "Precio en € por m² de cristal o de madera.";
+  return p.ceroSeValora
+    ? "Suplemento en € por pieza. 0 € = no suma nada y sale como «se valora en la visita»."
+    : "Suplemento en € por pieza. 0 € = sin recargo.";
+}
+
 /* ------------------------------------------------------------------ */
 /* Precios sueltos de cada categoría                                   */
 /* ------------------------------------------------------------------ */
@@ -331,7 +340,7 @@ export function valorOpcion(etiqueta: string, existentes: Iterable<string>): str
   const base =
     etiqueta
       .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
+      .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")

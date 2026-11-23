@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, Info, MessageSquareWarning, Receipt, TrendingUp } from "lucide-react";
+import { AlertTriangle, Bot, FileText, Info, MessageSquareWarning, Receipt, TrendingUp } from "lucide-react";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 
 /** Adónde lleva un aviso (null = no tiene origen al que ir). Lo comparten la campana y la página «Avisos». */
@@ -66,6 +66,8 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   // Facturas: fin de una tanda de subida (ColaSubidaProvider) y compras más caras que su referencia.
   facturas_subida: Receipt,
   subida_precio: TrendingUp,
+  // Solicitud de presupuesto desde la calculadora de la web (web-solicitud-presupuesto): solo quien ve Presupuestos.
+  presupuesto_solicitud: FileText,
 };
 
 /** Avisos con caducidad ya pasada: no se enseñan. `ahora` inyectable para pruebas. */

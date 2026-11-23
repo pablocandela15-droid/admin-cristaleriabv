@@ -17,7 +17,7 @@
 // ============================================================================
 import type { ComponentType, SVGProps } from "react";
 import { matchPath } from "react-router-dom";
-import { Bell, HelpCircle, LayoutDashboard, MessageSquarePlus, Receipt, Shield, UserRound } from "lucide-react";
+import { Bell, Globe, HelpCircle, LayoutDashboard, MessageSquarePlus, Receipt, Shield, UserRound } from "lucide-react";
 import type { SectionKey } from "@/hooks/useUserRole";
 
 export type IconoModulo = ComponentType<SVGProps<SVGSVGElement>>;
@@ -26,6 +26,7 @@ export type IconoModulo = ComponentType<SVGProps<SVGSVGElement>>;
 export const GRUPOS_MODULOS = [
   { id: "dia", titulo: "Día a día" },
   { id: "compras", titulo: "Compras" },
+  { id: "web", titulo: "Web y clientes" },
   { id: "gestion", titulo: "Equipo" },
   { id: "ayuda", titulo: "Ayuda y cuenta" },
 ] as const;
@@ -89,6 +90,18 @@ export const MODULOS_PANEL: readonly ModuloPanel[] = [
     grupo: "compras",
     // Con solo «Facturas · Subida» también sale (entra en la pestaña Cargar).
     secciones: ["facturas", "facturas_subida"],
+    desactivable: true,
+    enMenu: true,
+  },
+  {
+    clave: "web",
+    nombre: "Web",
+    descripcion: "La web de la cristalería: books de fotos, precios y opciones de la calculadora, textos e imágenes.",
+    rutas: ["/web"],
+    icono: Globe,
+    grupo: "web",
+    // Una pestaña por sección: basta con ver una para entrar.
+    secciones: ["web_fotos", "web_tarifas", "web_contenido"],
     desactivable: true,
     enMenu: true,
   },
