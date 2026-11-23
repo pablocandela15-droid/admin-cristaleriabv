@@ -17,7 +17,7 @@
 // ============================================================================
 import type { ComponentType, SVGProps } from "react";
 import { matchPath } from "react-router-dom";
-import { Bell, Globe, HelpCircle, LayoutDashboard, MessageSquarePlus, Receipt, Shield, UserRound } from "lucide-react";
+import { Bell, FileText, Globe, HelpCircle, LayoutDashboard, MessageSquarePlus, Receipt, Shield, UserRound } from "lucide-react";
 import type { SectionKey } from "@/hooks/useUserRole";
 
 export type IconoModulo = ComponentType<SVGProps<SVGSVGElement>>;
@@ -102,6 +102,17 @@ export const MODULOS_PANEL: readonly ModuloPanel[] = [
     grupo: "web",
     // Una pestaña por sección: basta con ver una para entrar.
     secciones: ["web_fotos", "web_tarifas", "web_contenido"],
+    desactivable: true,
+    enMenu: true,
+  },
+  {
+    clave: "presupuestos",
+    nombre: "Presupuestos",
+    descripcion: "Presupuestos con la calculadora de la web y sus tarifas, en PDF y por WhatsApp o correo, y las solicitudes que llegan de la web.",
+    rutas: ["/presupuestos"],
+    icono: FileText,
+    grupo: "web",
+    secciones: ["presupuestos"],
     desactivable: true,
     enMenu: true,
   },

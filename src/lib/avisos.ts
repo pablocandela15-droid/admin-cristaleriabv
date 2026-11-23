@@ -11,6 +11,10 @@ export function rutaDeAviso(
   if (n.referencia_tipo === "peticion") {
     return n.referencia_id ? `/super-admin/tickets?ticket=${encodeURIComponent(n.referencia_id)}` : "/super-admin/tickets";
   }
+  // Solicitud de presupuesto desde la calculadora de la web: el presupuesto en Presupuestos (o la lista de solicitudes).
+  if (n.referencia_tipo === "presupuesto") {
+    return n.referencia_id ? `/presupuestos?id=${encodeURIComponent(n.referencia_id)}` : "/presupuestos?estado=solicitud";
+  }
   // Aviso con enlace propio del panel (p. ej. uno creado a mano o por un cron nuevo).
   const enlace = n.datos?.enlace;
   if (typeof enlace === "string" && enlace.startsWith("/")) return enlace;

@@ -118,5 +118,5 @@ describe("sin ninguna sección", () => {
 
 it("el super admin ve todo el menú sin permisos guardados", () => {
   h.superAdmin = true;
-  expect(menu()).toEqual(["/dashboard", "/facturas", "/web", "/usuarios", "/peticiones", "/ayuda"]);
+  expect(menu()).toEqual(["/dashboard", "/facturas", "/web", "/presupuestos", "/usuarios", "/peticiones", "/ayuda"]);
 });
