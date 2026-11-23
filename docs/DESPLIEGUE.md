@@ -10,17 +10,18 @@ Guía para montar el panel de Cristalería BV desde cero en un proyecto de Supab
 
 ## 2. Esquema de la base de datos
 
-Dos migraciones, en este orden (cada una con su vuelta atrás en `supabase/rollbacks/`):
+Tres migraciones, en este orden (cada una con su vuelta atrás en `supabase/rollbacks/`):
 
 1. [`20261118120000_nucleo_panel.sql`](../supabase/migrations/20261118120000_nucleo_panel.sql): el núcleo del panel (login, usuarios, permisos, auditoría, avisos, servicios, IA…).
 2. [`20261121100000_facturas.sql`](../supabase/migrations/20261121100000_facturas.sql): el módulo **Facturas** (facturas de proveedores con lectura automática, catálogo de productos, proveedores, avisos de subida de precio, el bucket privado `facturas-originales` y sus tareas programadas). Ver [FACTURAS.md](FACTURAS.md).
+3. [`20261123100000_web_y_presupuestos.sql`](../supabase/migrations/20261123100000_web_y_presupuestos.sql): la **web editable** (books de fotos, textos, tarifas y catálogo de la calculadora, que la web lee con su clave pública, y el bucket **público** `web-fotos`) y los **presupuestos** (con su número correlativo y las solicitudes que llegan de la web). Trae los textos y precios que tiene hoy la web: hasta que alguien los cambie en el panel, la web se ve igual. Ver [WEB.md](WEB.md).
 
 ```bash
 npx supabase link --project-ref <ref>
 npx supabase db push
 ```
 
-(O pega cada fichero en *SQL Editor*, en orden, y ejecútalo entero.) Antes, en local: `npm run test:nucleo:db` (prueba las dos, su vuelta atrás y que se pueden volver a aplicar).
+(O pega cada fichero en *SQL Editor*, en orden, y ejecútalo entero.) Antes, en local: `npm run test:nucleo:db` (prueba las tres, su vuelta atrás y que se pueden volver a aplicar).
 
 ## 3. Primer super admin
 
@@ -55,10 +56,12 @@ Despliega todas las de `supabase/functions/` (la configuración de `verify_jwt` 
 for f in admin-create-user admin-delete-user admin-set-super-admin admin-set-user-access admin-update-user-password \
          analizar-peticion auditoria-revertir avisos-telegram cambiar-mi-contrasena clasificar-productos control-excel \
          ia-modelos-openai leer-metricas list-users ocr-trabajo panel-auth procesar-factura registrar-metrica servicios-uso \
-         sincronizar-costes-openai; do
+         sincronizar-costes-openai web-solicitud-presupuesto; do
   npx supabase functions deploy "$f" --project-ref <ref>
 done
 ```
+
+`web-solicitud-presupuesto` es la única pública (la llama la calculadora de la web, `verify_jwt = false`): no necesita ningún secreto propio. Usa los de Supabase (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, que además es la sal de la huella de IP del límite por hora) y en el bucket `web-fotos` no hay que configurar nada (lo crea la migración).
 
 Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extra (usa los de Supabase). El resto activa cada parte:
 
@@ -95,4 +98,5 @@ Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extr
 - *Super Admin › Auditoría* debe enseñar el acceso que acabas de hacer.
 - Crea un usuario de prueba en *Super Admin › Usuarios*, dale solo «Dashboard» y comprueba que no ve Usuarios.
 - Envía una petición urgente desde *Nueva petición*: el super admin la ve en la campana y en *Tickets*.
+- *Web*: en *Fotos* crea un book, sube un par de fotos y publícalo; en un minuto sale en `/trabajos` de la web. En *Tarifas* cambia un precio y compruébalo en la calculadora de la web (y en «Probar»). Una solicitud enviada desde la calculadora de la web aparece en la campana de quien ve Presupuestos (`curl -X POST https://<ref>.supabase.co/functions/v1/web-solicitud-presupuesto -H 'content-type: application/json' -d '{}'` debe responder 400).
 - *Facturas › Cargar*: sube una factura de prueba (PDF o foto). Debe leerse sola y salir en *Compras › Documentos* con su original al lado; en *Super Admin › Servicios* aparece el coste de la lectura. Un usuario con solo «Facturas · Subida» ve únicamente *Cargar*.
