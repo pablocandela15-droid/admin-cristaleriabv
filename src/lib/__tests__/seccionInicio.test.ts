@@ -15,9 +15,12 @@ import {
 const ver = (...secciones: string[]) => secciones.map((section_key) => ({ section_key, can_view: true, can_edit: false }));
 
 describe("OPCIONES_INICIO", () => {
-  it("son las entradas del menú, en su orden: Dashboard, Usuarios y Ayuda", () => {
+  it("son las entradas del menú, en su orden: Dashboard, Facturas, Web, Presupuestos, Usuarios y Ayuda", () => {
     expect(OPCIONES_INICIO.map((o) => [o.clave, o.ruta])).toEqual([
       ["dashboard", "/dashboard"],
+      ["facturas", "/facturas"],
+      ["web", "/web"],
+      ["presupuestos", "/presupuestos"],
       ["usuarios", "/usuarios"],
       ["ayuda", "/ayuda"],
     ]);
@@ -64,7 +67,7 @@ describe("opcionesInicio", () => {
   });
 
   it("el super admin las ve todas", () => {
-    expect(opcionesInicio([], true).map((o) => o.clave)).toEqual(["dashboard", "usuarios", "ayuda"]);
+    expect(opcionesInicio([], true).map((o) => o.clave)).toEqual(["dashboard", "facturas", "web", "presupuestos", "usuarios", "ayuda"]);
   });
 });
 

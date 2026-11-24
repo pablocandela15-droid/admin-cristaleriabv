@@ -16,7 +16,7 @@
 // Texto: para el dueño y el personal; llano, de tú, sin palabras técnicas.
 // ---------------------------------------------------------------------------
 
-export type SeccionAyuda = "peticiones" | "usuarios";
+export type SeccionAyuda = "facturas" | "peticiones" | "presupuestos" | "usuarios";
 
 export type LadoPaso = "top" | "right" | "bottom" | "left";
 
@@ -54,8 +54,85 @@ const PASO_FINAL: PasoTour = {
 
 const P_NUEVA = "peticiones-pestana-nueva";
 const P_MIAS = "peticiones-pestana-mias";
+const F_COMPRAS = "facturas-pestana-compras";
+const F_CARGAR = "facturas-pestana-cargar";
 
 export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
+  facturas: [
+    {
+      titulo: "Facturas",
+      texto:
+        "Aquí guardas las facturas de los proveedores: vidrio, perfiles, herrajes, siliconas… Les haces una foto o subes el PDF, la aplicación las lee sola y luego puedes buscar qué compraste, a quién y a qué precio. Te lo enseñamos en un momento: el recorrido abre cada pestaña solo.",
+    },
+    {
+      elemento: F_COMPRAS,
+      pestana: F_COMPRAS,
+      titulo: "1. Compras",
+      texto: "En «Compras» está todo lo que se ha leído: las facturas, los productos y los proveedores. Es la pestaña que más vas a usar.",
+      lado: "bottom",
+    },
+    {
+      elemento: "facturas-buscar",
+      pestana: F_COMPRAS,
+      titulo: "Un solo buscador",
+      texto:
+        "Escribe un producto («templado 8»), un proveedor o un número de factura. Busca también dentro de las líneas de cada factura.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "facturas-modos",
+      pestana: F_COMPRAS,
+      titulo: "Documentos, productos y proveedores",
+      texto:
+        "«Documentos» enseña las facturas por meses. «Productos», lo que compras, cuánto gastas por categoría, qué ha subido de precio y cómo ha cambiado cada precio. «Proveedores», de más a menos gasto: toca uno y se despliega con sus datos y sus facturas. El número dice cuántos resultados hay.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "facturas-periodo",
+      pestana: F_COMPRAS,
+      titulo: "Periodo",
+      texto: "Elige este mes, el anterior, el trimestre o el año. Las sumas de la lista y de los proveedores cambian con él.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "facturas-filtros",
+      pestana: F_COMPRAS,
+      titulo: "Filtros",
+      texto: "Toca un filtro para ver solo una parte: los abonos, las que tienen avisos o las que nadie ha revisado todavía.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "facturas-lista",
+      pestana: F_COMPRAS,
+      titulo: "La lista",
+      texto:
+        "Cada fila es una factura: fecha, proveedor, número, avisos e importe con IVA. Toca una para abrirla con su original al lado; el icono de la derecha abre solo el original.",
+      opcional: true,
+      lado: "top",
+    },
+    {
+      elemento: F_CARGAR,
+      pestana: F_CARGAR,
+      titulo: "2. Cargar",
+      texto:
+        "En «Cargar» subes las facturas. La aplicación lee sola el proveedor, la fecha, las líneas, los precios (por m², por metro o por unidad) y el IVA. Tarda unos segundos y puedes seguir trabajando mientras: te avisa al terminar.",
+      lado: "bottom",
+    },
+    {
+      elemento: "facturas-cargar-botones",
+      pestana: F_CARGAR,
+      titulo: "Foto o archivo",
+      texto:
+        "Con «Hacer foto» abres la cámara; con el otro botón eliges PDF o fotos (varias a la vez, también las páginas de una misma factura). Si ya estaba subida, te lo dice y puedes sustituirla o añadirle la página.",
+      opcional: true,
+      lado: "bottom",
+    },
+    PASO_FINAL,
+  ],
   peticiones: [
     {
       titulo: "Peticiones",
@@ -124,6 +201,48 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
         "Cada fila es una persona: su nombre, su tipo de usuario y sus accesos. Con «Permisos» ves sección a sección qué puede ver («Ver») y qué puede cambiar («Editar»).",
       opcional: true,
       lado: "top",
+    },
+    PASO_FINAL,
+  ],
+  presupuestos: [
+    {
+      titulo: "Presupuestos",
+      texto:
+        "Aquí preparas los presupuestos de los clientes con la misma calculadora de la web y las tarifas que tengas puestas en Web › Tarifas. También llegan aquí, solas, las solicitudes que mandan los clientes desde la calculadora de la web.",
+    },
+    {
+      elemento: "presupuestos-nuevo",
+      titulo: "Nuevo presupuesto",
+      texto: "Pon el nombre del cliente (y, si lo tienes, su teléfono) y se abre con su número, listo para añadir líneas.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "presupuestos-filtros",
+      titulo: "Por estado",
+      texto:
+        "«Solicitudes» son las que han llegado de la web y nadie ha atendido todavía: el número te dice cuántas hay. Después van «Borradores», «Enviados», «Aceptados» y «Rechazados». Un enviado cuya validez ya ha pasado sale como «Caducado».",
+      lado: "bottom",
+    },
+    {
+      elemento: "presupuestos-buscar",
+      titulo: "Buscar",
+      texto: "Escribe el número, el nombre del cliente o su teléfono (con o sin espacios).",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "presupuestos-lista",
+      titulo: "La lista",
+      texto:
+        "Toca uno para abrirlo. En las solicitudes ves lo que escribió el cliente y el precio que le dio la web; con «Convertir en borrador» lo coges para trabajarlo.",
+      opcional: true,
+      lado: "top",
+    },
+    {
+      titulo: "Dentro de un presupuesto",
+      texto:
+        "«Añadir desde calculadora» rellena una línea con las medidas y opciones y su precio; «Línea manual», lo que no sale en la calculadora. Cambia cantidades y precios en la misma línea, ordénalas arrastrando y pon descuento e IVA en los totales. Luego descárgalo en PDF o envíalo por WhatsApp o correo y márcalo como enviado.",
     },
     PASO_FINAL,
   ],

@@ -34,6 +34,21 @@ export interface UserRoleData {
 
 export const SECTIONS = [
   { key: "dashboard", label: "Dashboard" },
+  // Facturas de proveedores con lectura automática (migración 20261121100000_facturas): «Ver» consulta
+  // Compras; «Editar» además modifica, verifica, clasifica y sube.
+  { key: "facturas", label: "Facturas" },
+  // Subir facturas (pestaña Cargar) y corregir lo que sube uno mismo. Va por libre: no necesita «Ver»
+  // en Facturas. Un solo interruptor («Puede subir», guardado en can_view). En la BD:
+  // facturas_puede_subir().
+  { key: "facturas_subida", label: "Facturas · Subida" },
+  // Web editable (migración 20261123100000_web_y_presupuestos, página /web): una sección por pestaña. «Ver»
+  // consulta; «Editar» cambia lo que lee la web (books de fotos, tarifas de la calculadora, textos e imágenes).
+  { key: "web_fotos", label: "Web · Fotos" },
+  { key: "web_tarifas", label: "Web · Tarifas" },
+  { key: "web_contenido", label: "Web · Contenido" },
+  // Gestor de presupuestos y solicitudes que llegan de la web (misma migración). «Ver» consulta; «Editar» crea,
+  // cambia y envía.
+  { key: "presupuestos", label: "Presupuestos" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
 // Nota: lo del Super Admin (Control del Panel, Auditoría, Servicios, Gestor Gasto…) no forma parte del

@@ -7,6 +7,9 @@ Panel de administración interno de Cristalería Baix Vinalopó (Cristalería BV
 **Admin Panel** (lo que ve el equipo, según sus permisos):
 
 - **Dashboard**: accesos rápidos a las secciones que puede abrir cada uno y los avisos.
+- **Facturas**: facturas de proveedores que se leen solas con IA (foto o PDF), con Compras por documentos, productos y proveedores, avisos de subida de precio y el original a mano ([docs/FACTURAS.md](docs/FACTURAS.md)).
+- **Web**: la web de la cristalería editable desde el panel: books de fotos de los trabajos, precios y opciones de la calculadora de presupuestos (con «Probar») y textos e imágenes ([docs/WEB.md](docs/WEB.md)). Las solicitudes de presupuesto de la web llegan al panel como presupuestos.
+- **Presupuestos**: presupuestos con la calculadora de la web y sus tarifas (líneas recalculables, descuento e IVA), estados de solicitud a aceptado, PDF con la marca y envío por WhatsApp o correo; aquí se atienden las solicitudes de la web ([docs/PRESUPUESTOS.md](docs/PRESUPUESTOS.md)).
 - **Usuarios**: consulta de usuarios y de sus permisos por sección.
 - **Nueva petición**: reportar errores, pedir mejoras o preguntar dudas, y seguir cómo van.
 - **Ayuda**: guías paso a paso y recorridos guiados sobre la pantalla real.
@@ -40,7 +43,7 @@ Vite + React + TypeScript + Tailwind/shadcn en el frontend; Supabase (Postgres c
 
 ## Puesta en marcha
 
-1. Supabase y Vercel: sigue [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) (migración inicial, secretos, Vault, primer super admin).
+1. Supabase y Vercel: sigue [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) (migraciones, secretos, Vault, primer super admin).
 2. En local:
 
 ```sh

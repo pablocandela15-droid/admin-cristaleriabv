@@ -1,0 +1,457 @@
+// ============================================================================
+//  Extracción de UN documento (camino síncrono de una página)
+// ----------------------------------------------------------------------------
+//  Extracción con esquema estricto + 1 relectura correctiva, verificador del
+//  pie, contador de filas (solo si el total tendría que salir de las líneas),
+//  retirada de importes no citados, deducción del total y normalización.
+//  Sin Deno.env: recibe un ClienteOpenAI. La usan unico.ts y los tests.
+// ============================================================================
+
+import { avisoMagnitudes, resolverMagnitud } from "./magnitudes.ts";
+import { toNumber } from "./normalizacion.ts";
+import {
+  aplicarRecuentoVerificado,
+  comprobarCuadre,
+  compararExpansion,
+  conservarRecuentoFilas,
+  contarCambiosNumericos,
+  deducirImportes,
+  type Descuadre,
+  descuadresComoAlertas,
+  describirProblemas,
+  type DocumentoExtraido,
+  MAX_CAMBIOS_RELECTURA,
+  mensajeCorrectivo,
+  type OrigenImporte,
+  retencionConSigno,
+  retirarImportesNoImpresos,
+  tipoIvaLinea,
+  validarEstructura,
+} from "./esquema.ts";
+import { type BloqueContenido, bloqueContenido, type ClienteOpenAI } from "./openai.ts";
+import { diagnosticoResolucion } from "./imagen.ts";
+import { TEXTO_EXTRACCION, VISION_SYSTEM_PROMPT } from "./prompts.ts";
+import { cifEmpresa, NOMBRES_EMPRESA, normalizarCif } from "./empresa.ts";
+import {
+  avisoClienteAjeno,
+  type AvisoCalidad,
+  cifControlValido,
+  cifLimpio,
+  depurarLineas,
+  limpiarObservaciones,
+  numeroProvisional,
+} from "./calidad.ts";
+import { aplicarReglasLectura, aplicarSignoAbono, avisoFechaFueraDeAnio, documentoNoCompra } from "./reglasCarga.ts";
+
+/** Peso de un conjunto de descuadres, para poder comparar dos intentos.
+ *  Una alerta 'alta' (precio o total inverosímil) pesa más que diez 'media'. */
+export function peso(descuadres: { severidad: string }[]): number {
+  return descuadres.reduce((acc, d) => acc + (d.severidad === "alta" ? 10 : 1), 0);
+}
+
+/** Parsea + valida la forma. Lanza con la RUTA de los campos que fallan. */
+export function validarOLanzar(parsed: unknown, contexto: string): DocumentoExtraido {
+  const v = validarEstructura(parsed);
+  if (!v.ok) {
+    throw new Error(
+      `La extracción no cumple el contrato (${contexto}): ${describirProblemas(v.problemas)}`,
+    );
+  }
+  // Reglas que no necesitan la imagen (líneas con IVA incluido): antes del
+  // cuadre, para no pedir relecturas inútiles.
+  return aplicarReglasLectura(v.datos);
+}
+
+export { normalizarCif };
+
+/** ¿Es el CIF de la propia empresa (el CLIENTE)? Solo si el secreto FACTURAS_CIF_EMPRESA está configurado. */
+export function esCifCliente(cif: string | null | undefined, cifCliente: string = cifEmpresa()): boolean {
+  const n = normalizarCif(cif);
+  return n.length > 0 && cifCliente.length > 0 && n === cifCliente;
+}
+
+/** ¿El «proveedor» que ha devuelto el modelo es en realidad la propia cristalería? */
+export function esNombreCliente(nombre: string | null | undefined): boolean {
+  return !!nombre && NOMBRES_EMPRESA.test(nombre);
+}
+
+/** ¿Existe ese día? (2026-02-31 no). */
+export function fechaReal(a: number, m: number, d: number): boolean {
+  if (!(a >= 1900 && a <= 2200 && m >= 1 && m <= 12 && d >= 1)) return false;
+  const dt = new Date(Date.UTC(a, m - 1, d));
+  return dt.getUTCFullYear() === a && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+/**
+ * Fecha del modelo → «AAAA-MM-DD», o null si no se entiende o no existe.
+ * Admite ISO (también dentro de un texto) y el formato español dd/mm/aaaa.
+ */
+export function fechaIso(valor: unknown): string | null {
+  if (typeof valor !== "string" || !valor.trim()) return null;
+  const s = valor.trim();
+  const iso = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  const es = s.match(/\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b/);
+  const [a, m, d] = iso
+    ? [Number(iso[1]), Number(iso[2]), Number(iso[3])]
+    : es
+    ? [Number(es[3]), Number(es[2]), Number(es[1])]
+    : [NaN, NaN, NaN];
+  if (!fechaReal(a, m, d)) return null;
+  return `${a}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function normalizarDatos(entrada: any, hoy: Date = new Date()) {
+  if (!entrada || typeof entrada !== "object") throw new Error("Los datos extraídos no son un objeto válido");
+  const avisosCalidad: AvisoCalidad[] = [];
+  // Reglas de reglasCarga.ts: avisos de la lectura, signo de los abonos (hay
+  // proveedores que los imprimen en positivo) y qué no es compra.
+  if (Array.isArray(entrada.avisos_reglas)) avisosCalidad.push(...entrada.avisos_reglas);
+  const { data, esAbono } = aplicarSignoAbono(entrada);
+  const noCompra = documentoNoCompra(entrada, (c) => esCifCliente(c), esNombreCliente);
+
+  // fecha → YYYY-MM-DD. Sin fecha legible (o imposible, «2026-02-31») se
+  // guarda con la de hoy, pero AVISANDO.
+  const leida = fechaIso(data.fecha);
+  const fecha: string = leida ?? new Date().toISOString().split("T")[0];
+  if (!leida) {
+    avisosCalidad.push({
+      codigo: "fecha_ausente",
+      severidad: "media",
+      mensaje: data.fecha
+        ? `No se ha entendido la fecha del documento («${String(data.fecha).slice(0, 40)}»): se guarda con la de hoy. Corrígela.`
+        : "El documento no tiene fecha legible: se guarda con la de hoy. Corrígela.",
+      detalle: { fecha_leida: data.fecha ?? null },
+    });
+  }
+
+  // El CIF del cliente NUNCA es el del proveedor: si llega, se descarta (null
+  // antes que un dato falso). Y si el «proveedor» es la propia cristalería,
+  // se deja a null por la misma razón. Red de seguridad del prompt (sección 1b).
+  // Se guarda normalizado («46914230-A» → 46914230A, «F-54650895» →
+  // F54650895). Si no supera el dígito de control se guarda igual (es lo que
+  // pone el papel) y SQL decide: lo corrige contra la ficha del proveedor si
+  // está a ≤ 2 caracteres, y no crea ficha nueva con él (proveedor_resolver).
+  const cif = data.cif && !esCifCliente(data.cif) ? (cifLimpio(data.cif) || null) : null;
+  if (cif && !cifControlValido(cif)) {
+    console.warn(`[calidad] CIF leído ${cif} no supera el dígito de control.`);
+  }
+  const proveedor = data.proveedor && !esNombreCliente(data.proveedor) ? data.proveedor : null;
+
+  // Documento sin número impreso: antes se perdía por «obligatorio». Número
+  // provisional + aviso.
+  let numero = typeof data.numero_documento === "string" ? data.numero_documento.trim() : "";
+  if (!numero) {
+    numero = numeroProvisional(proveedor, data.fecha);
+    avisosCalidad.push({
+      codigo: "numero_ausente",
+      severidad: "media",
+      mensaje: `Sin número en el papel: se guarda con el provisional «${numero}». Cámbialo si el proveedor lo da.`,
+      detalle: { numero_provisional: numero },
+    });
+  }
+  const clienteAjeno = avisoClienteAjeno(data.cliente);
+  if (clienteAjeno) avisosCalidad.push(clienteAjeno);
+
+  const cantidadLeida: (number | null)[] = Array.isArray(data.productos)
+    ? data.productos.map((p: { cantidad?: unknown } | null) => toNumber(p?.cantidad, true))
+    : [];
+  // deno-lint-ignore no-explicit-any
+  const productosLeidos = Array.isArray(data.productos)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? data.productos.map((p: any, i: number) => {
+      const precio_unitario = toNumber(p.precio_unitario, true);
+      const total = toNumber(p.total, true);
+      // Cantidad = la magnitud por la que se multiplica el precio (m² si el
+      // precio es por m²), unidad normalizada, y las unidades/bultos aparte.
+      // Ver magnitudes.ts (4 uds · 3,84 m² · 38,50 → 147,84).
+      const m = resolverMagnitud({
+        cantidad: toNumber(p.cantidad, true),
+        unidad: p.unidad,
+        peso_kg: toNumber(p.peso_kg, true),
+        base_precio: p.base_precio,
+        precio_unitario,
+        total,
+        bonificada: p.bonificada === true,
+      });
+      return {
+        nombre: (p.nombre || "").trim() || `Producto ${i + 1}`,
+        cantidad: m.cantidad || 1,
+        unidad: m.unidad,
+        bultos: m.bultos,
+        precio_unitario,
+        total,
+        // Tipo de IVA impreso en la fila (productos_factura.iva_pct). null si
+        // el documento no lo trae por línea.
+        iva_pct: tipoIvaLinea(toNumber(p.iva_pct, true)),
+        // `base_precio`, `bonificada`, `regla_magnitud` y `sugerencia_magnitud`
+        // NO tienen columna en `productos_factura`.
+        base_precio: p.base_precio ?? "desconocida",
+        bonificada: p.bonificada === true,
+        regla_magnitud: m.regla,
+        sugerencia_magnitud: m.sugerencia,
+        // Varias páginas: posición y procedencia. El camino de una página deja
+        // pagina = 1 y orden = i.
+        pagina: Number.isInteger(p.pagina) ? p.pagina : 1,
+        orden: Number.isInteger(p.orden) ? p.orden : i,
+      };
+    })
+    : [];
+  // Rótulos sin cantidad, mercancía pendiente, medida aparte y precio neto.
+  const depuradas = depurarLineas(productosLeidos, cantidadLeida, data.sin_importes === true);
+  const productos: typeof productosLeidos = depuradas.lineas;
+  avisosCalidad.push(...depuradas.avisos);
+  const avisoAnio = leida ? avisoFechaFueraDeAnio(fecha, hoy) : null;
+  if (avisoAnio) avisosCalidad.push(avisoAnio);
+  const cambiadasAPeso = productos.filter((p: { regla_magnitud: string }) =>
+    p.regla_magnitud === "peso_cuadra" || p.regla_magnitud === "peso_con_descuento"
+  ).length;
+  if (cambiadasAPeso > 0) {
+    console.log(`[magnitudes] ${numero}: ${cambiadasAPeso} línea(s) guardadas por su medida (precio por m², metro o kilo).`);
+  }
+  const avisoMagnitud = avisoMagnitudes(productos.map((p: {
+    nombre: string; cantidad: number; unidad: string; precio_unitario: number | null; total: number | null;
+    sugerencia_magnitud: number | null;
+  }) => ({ ...p, sugerencia: p.sugerencia_magnitud })));
+
+  const subtotal = toNumber(data.subtotal, true);
+  const total = toNumber(data.total, true);
+  const retencion = retencionNormalizada(data.retencion_irpf, data.retencion_irpf_pct, subtotal, total);
+  // Recargo de equivalencia y cargos fuera de base (tasa DGT): no tienen
+  // columna; quedan en observaciones y explican el cuadre (guardado.ts).
+  const recargo = toNumber(data.recargo_equivalencia, true);
+  const fueraBase = toNumber(data.cargos_fuera_base, true);
+  const notasPie = [
+    esAbono ? "Abono (factura rectificativa): importes guardados en negativo" : null,
+    recargo ? `Recargo de equivalencia impreso: ${Math.abs(recargo)} €` : null,
+    fueraBase ? `Cargos fuera de la base (tasas, suplidos): ${Math.abs(fueraBase)} €` : null,
+  ].filter((x): x is string => !!x);
+  const observacionesLimpias = limpiarObservaciones(data.observaciones);
+  const observaciones = notasPie.length > 0
+    ? [observacionesLimpias, ...notasPie].filter(Boolean).join(". ")
+    : observacionesLimpias;
+
+  return {
+    proveedor,
+    cif,
+    numero_documento: numero,
+    /** Paginación impresa («PÁGINA Nº 1/2»); null si el papel no la trae. */
+    pagina: paginaImpresa(data.pagina),
+    fecha,
+    subtotal,
+    iva: toNumber(data.iva, true),
+    total,
+    /** Retención de IRPF (facturas.retencion_irpf) con el signo de la base:
+     *  total = subtotal + iva − retencion_irpf. null = sin retención. */
+    retencion_irpf: retencion.retencion_irpf,
+    /** Porcentaje positivo (facturas.retencion_irpf_pct); null si no se sabe. */
+    retencion_irpf_pct: retencion.retencion_irpf_pct,
+    observaciones,
+    /** Recargo + cargos fuera de base, con el signo de la base (0 si no hay). */
+    extras_total: (recargo ? Math.abs(recargo) : 0) + (fueraBase ? Math.abs(fueraBase) : 0),
+    /** No es una factura de compra (adeudo SEPA, TPV, leasing…): no se guarda (guardado.ts). */
+    no_es_compra: noCompra,
+    productos,
+    /** Avisos de la normalización de cantidades (no van a ninguna columna:
+     *  los llamantes los añaden a alertasPrevias). */
+    avisos: [...(avisoMagnitud ? [avisoMagnitud] : []), ...avisosCalidad],
+  };
+}
+
+/**
+ * Retención de IRPF lista para guardar: importe con el signo de la base (o del
+ * total si no hay base), 0 → null, y porcentaje positivo. Si el porcentaje no
+ * viene (o no es creíble, fuera de 0-50 %) se calcula con la base. Si viene
+ * el porcentaje pero no el importe, NO se inventa el importe: los dos a null.
+ */
+export function retencionNormalizada(
+  importe: unknown,
+  pct: unknown,
+  subtotal: number | null,
+  total: number | null,
+): { retencion_irpf: number | null; retencion_irpf_pct: number | null } {
+  const r = retencionConSigno({ subtotal, total, retencion_irpf: toNumber(importe, true) });
+  if (r === null) return { retencion_irpf: null, retencion_irpf_pct: null };
+  const creible = (n: number | null) => n !== null && Number.isFinite(n) && n > 0 && n <= 50;
+  const leido = toNumber(pct, true);
+  const leidoAbs = leido === null ? null : Math.round(Math.abs(leido) * 100) / 100;
+  if (creible(leidoAbs)) return { retencion_irpf: r, retencion_irpf_pct: leidoAbs };
+  const calculado = subtotal !== null && Number.isFinite(subtotal) && subtotal !== 0
+    ? Math.round((10000 * Math.abs(r)) / Math.abs(subtotal)) / 100
+    : null;
+  return { retencion_irpf: r, retencion_irpf_pct: creible(calculado) ? calculado : null };
+}
+
+/** {actual, total} con enteros positivos; null si no hay ninguno. */
+export function paginaImpresa(v: unknown): { actual: number | null; total: number | null } | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const ent = (x: unknown) => (typeof x === "number" && Number.isInteger(x) && x > 0 && x < 1000 ? x : null);
+  const actual = ent(o.actual), total = ent(o.total);
+  if (actual === null && total === null) return null;
+  return { actual, total: total !== null && actual !== null && total < actual ? null : total };
+}
+
+export type DatosNormalizados = ReturnType<typeof normalizarDatos>;
+
+/**
+ * Extrae el documento y, si los números no cuadran, le pide UNA vez al modelo
+ * que vuelva a mirar. Devuelve la mejor de las dos lecturas y los descuadres
+ * que queden, para dejarlos anotados en `alertas_validacion`.
+ */
+export async function extraerConCuadre(
+  cliente: ClienteOpenAI,
+  contentBlock: BloqueContenido,
+): Promise<{ documento: DocumentoExtraido; descuadres: Descuadre[]; intentos: number }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mensajes: any[] = [
+    { role: "system", content: VISION_SYSTEM_PROMPT },
+    { role: "user", content: [contentBlock, { type: "text", text: TEXTO_EXTRACCION }] },
+  ];
+
+  const primera = validarOLanzar(await cliente.llamarVision(mensajes), "primer intento");
+  const descuadres1 = comprobarCuadre(primera);
+  if (descuadres1.length === 0) return { documento: primera, descuadres: [], intentos: 1 };
+
+  console.warn(
+    `[extraccion] ${primera.numero_documento}: ${descuadres1.length} descuadre(s) ` +
+      `en el primer intento (${descuadres1.map((d) => d.codigo).join(", ")}). Se pide relectura.`,
+  );
+
+  let segunda: DocumentoExtraido;
+  let descuadres2: Descuadre[];
+  try {
+    mensajes.push({ role: "assistant", content: JSON.stringify({ ...primera, avisos_reglas: undefined }) });
+    mensajes.push({ role: "user", content: mensajeCorrectivo(descuadres1) });
+    segunda = validarOLanzar(await cliente.llamarVision(mensajes, undefined, undefined, "relectura"), "reintento");
+    descuadres2 = comprobarCuadre(segunda);
+  } catch (e) {
+    console.error("[extraccion] El reintento falló, se conserva el primer intento:", e);
+    return { documento: primera, descuadres: descuadres1, intentos: 2 };
+  }
+
+  // Ver index.ts v101: una relectura que solo AÑADE filas no es una
+  // recomposición; una que cambia más de MAX_CAMBIOS_RELECTURA números, sí.
+  const expansion = compararExpansion(primera, segunda);
+  if (expansion.esExpansion) {
+    console.log(
+      `[extraccion] Relectura aceptada como EXPANSION: ${expansion.lineasAntes} -> ` +
+        `${expansion.lineasDespues} linea(s). Descuadres ${descuadres1.length} -> ${descuadres2.length}.`,
+    );
+    return { documento: conservarRecuentoFilas(primera, segunda), descuadres: descuadres2, intentos: 2 };
+  }
+
+  const cambios = contarCambiosNumericos(primera, segunda);
+  if (cambios.total > MAX_CAMBIOS_RELECTURA) {
+    console.warn(
+      `[extraccion] Relectura DESCARTADA: cambia ${cambios.total} valores numéricos ` +
+        `(${cambios.campos.slice(0, 8).join(", ")}${cambios.campos.length > 8 ? "..." : ""}). ` +
+        `Se conserva la primera lectura con sus avisos.`,
+    );
+    return { documento: primera, descuadres: descuadres1, intentos: 2 };
+  }
+
+  if (peso(descuadres2) <= peso(descuadres1)) {
+    console.log(
+      `[extraccion] Relectura aceptada: ${descuadres1.length} -> ${descuadres2.length} descuadre(s), ` +
+        `${cambios.total} valor(es) corregido(s): ${cambios.campos.join(", ") || "ninguno"}.`,
+    );
+    return { documento: conservarRecuentoFilas(primera, segunda), descuadres: descuadres2, intentos: 2 };
+  }
+  console.warn("[extraccion] La relectura salió peor que el primer intento; se conserva el primero.");
+  return { documento: primera, descuadres: descuadres1, intentos: 2 };
+}
+
+export interface DocumentoListo {
+  datos: DatosNormalizados;
+  alertasPrevias: Record<string, unknown>[];
+  totalOrigen: OrigenImporte | null;
+  intentos: number;
+}
+
+/**
+ * Pasos 2 → 2b del camino síncrono (index.ts v101 :1297-1385): extracción,
+ * verificador de pie, contador de filas, retirada de importes no citados,
+ * deducción y normalización. Puro respecto a la base de datos.
+ */
+export async function extraerDocumentoUnico(
+  cliente: ClienteOpenAI,
+  contentBlock: BloqueContenido,
+): Promise<DocumentoListo> {
+  const extraccion = await extraerConCuadre(cliente, contentBlock);
+
+  const hayImportes = !extraccion.documento.sin_importes && (
+    extraccion.documento.total !== null ||
+    extraccion.documento.subtotal !== null ||
+    extraccion.documento.iva !== null
+  );
+  const verificacion = hayImportes ? await cliente.verificarPie(contentBlock) : null;
+
+  const { datos: citado, retiradas, discordancias } = retirarImportesNoImpresos(extraccion.documento, verificacion);
+  for (const r of retiradas) {
+    console.warn(
+      `[cita] ${extraccion.documento.numero_documento}: se retira ` +
+        `${r.campo} = ${r.valor}; el modelo no cita los caracteres impresos.`,
+    );
+  }
+
+  const totalSaldriaDeLasLineas = !citado.sin_importes &&
+    citado.subtotal === null && citado.iva === null && citado.total === null &&
+    (citado.productos?.length ?? 0) > 0;
+  const recuento = totalSaldriaDeLasLineas ? await cliente.contarFilas(contentBlock) : null;
+  const { datos: contado, alerta: alertaRecuento } = aplicarRecuentoVerificado(citado, recuento);
+
+  const { datos: documento, deduccion } = deducirImportes(contado);
+  const datos = normalizarDatos(documento);
+  const totalOrigen: OrigenImporte | null = datos.total === null ? null : deduccion ? "deducido" : "leido";
+
+  const alertasPrevias = [
+    ...descuadresComoAlertas(extraccion.descuadres, "pre-guardado"),
+    ...retiradas.map((r) => r.alerta),
+    ...discordancias,
+    ...(alertaRecuento ? [alertaRecuento] : []),
+    ...(deduccion ? [deduccion.alerta] : []),
+    ...datos.avisos,
+  ] as unknown as Record<string, unknown>[];
+
+  console.log(
+    `[extraccion] ${datos.numero_documento}: ${extraccion.intentos} intento(s), ` +
+      `${datos.productos.length} linea(s), ${extraccion.descuadres.length} descuadre(s) sin resolver.`,
+  );
+  return { datos, alertasPrevias, totalOrigen, intentos: extraccion.intentos };
+}
+
+/** Fichero de UN documento tal y como lo lee el camino de una página. */
+export interface FicheroUnico {
+  /** Base64 sin cabecera `data:`. */
+  b64: string;
+  mime: string;
+  /** Nombre del fichero (el del panel). Puede faltar en el camino síncrono. */
+  nombre: string;
+}
+
+/**
+ * Lectura COMPLETA de un documento de una página: diagnóstico de resolución
+ * (solo log), bloque de contenido y extraerDocumentoUnico. Es la ÚNICA puerta
+ * de los dos caminos de una página (05-oct-2026): el síncrono (index.ts →
+ * unico.ts) y el de trabajos en segundo plano (ocr-trabajo, trabajo de una
+ * pieza). Así el payload a OpenAI es el mismo byte a byte.
+ */
+export async function leerDocumentoUnico(cliente: ClienteOpenAI, f: FicheroUnico): Promise<DocumentoListo> {
+  const isPdf = f.mime.includes("pdf");
+  // Diagnóstico de resolución (solo log; ver imagen.ts).
+  if (!isPdf) {
+    try {
+      const cabecera = atob(f.b64.slice(0, 65536));
+      const bytes = new Uint8Array(cabecera.length);
+      for (let i = 0; i < cabecera.length; i++) bytes[i] = cabecera.charCodeAt(i);
+      const diag = diagnosticoResolucion(bytes);
+      if (diag) console.log(diag);
+    } catch {
+      // Medir es informativo.
+    }
+  }
+  const contentBlock = bloqueContenido(f.b64, f.mime, f.nombre || "document.pdf", cliente.config.detalle);
+  // 2) → 2b) Extracción, pie, contador, citas, deducción y normalización.
+  return await extraerDocumentoUnico(cliente, contentBlock);
+}

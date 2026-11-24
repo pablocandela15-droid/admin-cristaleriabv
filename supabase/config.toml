@@ -15,7 +15,7 @@ project_id = "admin-cristaleriabv"
 # Regla aplicada aquí:
 #   · false  SOLO si la función necesita ser alcanzable SIN cabeceras
 #            (enlaces GET dentro de un correo, webhooks de terceros) Y lleva su
-#            propia autenticación real (HMAC, firma svix).  -> 3 funciones.
+#            propia autenticación real (HMAC, firma svix, secreto de pg_net).
 #   · true   en todo lo demás. Todos sus llamadores usan
 #            `supabase.functions.invoke()` con sesión iniciada, o `fetch` con
 #            `apikey` + `Authorization`, así que el filtro no les afecta.
@@ -33,6 +33,30 @@ project_id = "admin-cristaleriabv"
 # sin JWT, con x-ocr-secret) o un SUPER ADMIN con su JWT (lo comprueba ella con
 # exigirSuperAdmin). Ver supabase/functions/ia-modelos-openai/index.ts.
 [functions.ia-modelos-openai]
+verify_jwt = false
+
+# Facturas › lectura en segundo plano (20261121100000_facturas.sql): la llama SOLO
+# Postgres por pg_net (ocr_despachar, el cron reanudar-trabajos-ocr y la limpieza
+# diaria limpiar-pendientes-ocr), sin JWT, con x-ocr-secret == OCR_TRABAJOS_SECRET
+# en tiempo constante y fail-closed. No acepta rutas ni datos: solo ids que lee de
+# la base de datos. Ver supabase/functions/ocr-trabajo/index.ts.
+[functions.ocr-trabajo]
+verify_jwt = false
+
+# Facturas › clasificación del catálogo: el cron «clasificar-productos» (pg_net, sin
+# JWT, x-ocr-secret) o el botón «Clasificar con IA» (JWT de un usuario con «Editar»
+# en Facturas, lo comprueba ella). No acepta datos del cuerpo.
+[functions.clasificar-productos]
+verify_jwt = false
+
+# Web pública › solicitud de presupuesto (20261123100000_web_y_presupuestos.sql): la llama la
+# calculadora de la web (cristaleriabv) desde el navegador de cualquier visitante, sin sesión y con
+# la clave publicable (sb_publishable_…, que no es un JWT: con `true` la pasarela la rechazaría).
+# Pública a propósito, con su propio control de abuso: campo trampa, validación de cada campo y
+# límite por huella de IP (HMAC con sal, 5 por hora) en la RPC web_solicitud_presupuesto_registrar
+# (solo service role). No acepta rutas ni ids: solo crea un presupuesto «solicitud» con su línea.
+# Ver supabase/functions/web-solicitud-presupuesto/solicitud.ts.
+[functions.web-solicitud-presupuesto]
 verify_jwt = false
 
 
@@ -117,4 +141,13 @@ verify_jwt = true
 # panel (CONTROL_EXCEL_CLIENTE, por defecto «Cristalería BV»). Nunca devuelve tokens.
 # Ver supabase/functions/control-excel/control.ts y docs/CONTROL-EXCEL.md.
 [functions.control-excel]
+verify_jwt = true
+
+# Facturas › subir y leer (20261121100000_facturas.sql): JWT de usuario + «Facturas ·
+# Subida» o «Editar» en Facturas (procesar-factura/auth.ts). Crea el trabajo de lectura
+# (las piezas ya están en el bucket facturas-originales), lee por el camino síncrono de
+# una página, o sustituye / añade como página un duplicado (lo suyo, o con «Editar»).
+# Secretos: OPENAI_API_KEY (u OPENAI_API_KEY_OCR), opcionales OCR_MODELO,
+# OCR_MODELO_PIEZAS, OCR_DETALLE y FACTURAS_CIF_EMPRESA.
+[functions.procesar-factura]
 verify_jwt = true

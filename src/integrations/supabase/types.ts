@@ -6,7 +6,8 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Generado a partir de supabase/migrations/20261118120000_nucleo_panel.sql (esquema público del núcleo).
+// Generado a partir de supabase/migrations/20261118120000_nucleo_panel.sql, 20261121100000_facturas.sql y
+// 20261123100000_web_y_presupuestos.sql (esquema público).
 // Para regenerarlo con la CLI: npx supabase gen types typescript --project-id <ref> > src/integrations/supabase/types.ts
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -139,6 +140,51 @@ export type Database = {
         }
         Relationships: []
       }
+      avisos_subida_precio: {
+        Row: {
+          factura_id: number
+          producto_id: number
+          unidad: string
+          precio: number
+          precio_ref: number
+          variacion_pct: number
+          proveedor: string | null
+          proveedor_ref: string | null
+          cambio_proveedor: boolean
+          notificacion_id: string | null
+          revisado_en: string
+          created_at: string
+        }
+        Insert: {
+          factura_id: number
+          producto_id: number
+          unidad: string
+          precio: number
+          precio_ref: number
+          variacion_pct: number
+          proveedor?: string | null
+          proveedor_ref?: string | null
+          cambio_proveedor?: boolean
+          notificacion_id?: string | null
+          revisado_en?: string
+          created_at?: string
+        }
+        Update: {
+          factura_id?: number
+          producto_id?: number
+          unidad?: string
+          precio?: number
+          precio_ref?: number
+          variacion_pct?: number
+          proveedor?: string | null
+          proveedor_ref?: string | null
+          cambio_proveedor?: boolean
+          notificacion_id?: string | null
+          revisado_en?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       avisos_telegram_config: {
         Row: {
           id: boolean
@@ -226,6 +272,69 @@ export type Database = {
         }
         Relationships: []
       }
+      categorias_producto: {
+        Row: {
+          id: number
+          clave: string | null
+          nombre: string
+          descripcion: string | null
+          padre_id: number | null
+          orden: number
+          activa: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          clave?: string | null
+          nombre: string
+          descripcion?: string | null
+          padre_id?: number | null
+          orden?: number
+          activa?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          clave?: string | null
+          nombre?: string
+          descripcion?: string | null
+          padre_id?: number | null
+          orden?: number
+          activa?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      configuracion_facturas: {
+        Row: {
+          id: boolean
+          umbral_subida_precio_pct: number
+          avisos_subida_precio: boolean
+          cif_empresa: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: boolean
+          umbral_subida_precio_pct?: number
+          avisos_subida_precio?: boolean
+          cif_empresa?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: boolean
+          umbral_subida_precio_pct?: number
+          avisos_subida_precio?: boolean
+          cif_empresa?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       costes_fijos: {
         Row: {
           id: string
@@ -268,6 +377,132 @@ export type Database = {
           orden?: number
           creado_en?: string
           actualizado_en?: string
+        }
+        Relationships: []
+      }
+      facturas: {
+        Row: {
+          id: number
+          proveedor: string | null
+          cif: string | null
+          numero_documento: string
+          fecha: string
+          subtotal: number | null
+          iva: number | null
+          total: number | null
+          observaciones: string | null
+          procesado_en: string | null
+          created_at: string | null
+          updated_at: string | null
+          proveedor_normalizado: string | null
+          verificada: boolean | null
+          verificacion_origen: string | null
+          archivo_path: string | null
+          alertas_validacion: Json | null
+          total_origen: string | null
+          paginas: number
+          ocr_trabajo_id: string | null
+          proveedor_id: number | null
+          coste_lectura_usd: number | null
+          lectura_llamadas: number | null
+          lectura_modelo: string | null
+          retencion_irpf: number | null
+          retencion_irpf_pct: number | null
+          subido_por: string | null
+        }
+        Insert: {
+          id?: number
+          proveedor?: string | null
+          cif?: string | null
+          numero_documento: string
+          fecha: string
+          subtotal?: number | null
+          iva?: number | null
+          total?: number | null
+          observaciones?: string | null
+          procesado_en?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          proveedor_normalizado?: string | null
+          verificada?: boolean | null
+          verificacion_origen?: string | null
+          archivo_path?: string | null
+          alertas_validacion?: Json | null
+          total_origen?: string | null
+          paginas?: number
+          ocr_trabajo_id?: string | null
+          proveedor_id?: number | null
+          coste_lectura_usd?: number | null
+          lectura_llamadas?: number | null
+          lectura_modelo?: string | null
+          retencion_irpf?: number | null
+          retencion_irpf_pct?: number | null
+          subido_por?: string | null
+        }
+        Update: {
+          id?: number
+          proveedor?: string | null
+          cif?: string | null
+          numero_documento?: string
+          fecha?: string
+          subtotal?: number | null
+          iva?: number | null
+          total?: number | null
+          observaciones?: string | null
+          procesado_en?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          proveedor_normalizado?: string | null
+          verificada?: boolean | null
+          verificacion_origen?: string | null
+          archivo_path?: string | null
+          alertas_validacion?: Json | null
+          total_origen?: string | null
+          paginas?: number
+          ocr_trabajo_id?: string | null
+          proveedor_id?: number | null
+          coste_lectura_usd?: number | null
+          lectura_llamadas?: number | null
+          lectura_modelo?: string | null
+          retencion_irpf?: number | null
+          retencion_irpf_pct?: number | null
+          subido_por?: string | null
+        }
+        Relationships: []
+      }
+      facturas_sustituciones: {
+        Row: {
+          id: number
+          factura_id: number
+          trabajo_id: string | null
+          sustituida_por: string | null
+          sustituida_at: string
+          factura_antes: Json
+          productos_antes: Json
+          resumen_antes: Json
+          resumen_despues: Json | null
+        }
+        Insert: {
+          id?: number
+          factura_id: number
+          trabajo_id?: string | null
+          sustituida_por?: string | null
+          sustituida_at?: string
+          factura_antes: Json
+          productos_antes: Json
+          resumen_antes: Json
+          resumen_despues?: Json | null
+        }
+        Update: {
+          id?: number
+          factura_id?: number
+          trabajo_id?: string | null
+          sustituida_por?: string | null
+          sustituida_at?: string
+          factura_antes?: Json
+          productos_antes?: Json
+          resumen_antes?: Json
+          resumen_despues?: Json | null
         }
         Relationships: []
       }
@@ -637,6 +872,192 @@ export type Database = {
         }
         Relationships: []
       }
+      ocr_trabajo_paginas: {
+        Row: {
+          id: number
+          trabajo_id: string
+          numero: number
+          pieza: string
+          pagina_doc: number
+          franja: number | null
+          franjas_pagina: number | null
+          storage_path: string
+          mime: string
+          bytes: number
+          estado: string
+          intentos: number
+          relecturas: number
+          motivo_relectura: Json | null
+          no_antes_de: string
+          despachada_at: string | null
+          lease_hasta: string | null
+          resultado: Json | null
+          recuento: Json | null
+          verificacion_pie: Json | null
+          motivos: Json | null
+          filas_extraidas: number | null
+          filas_contadas: number | null
+          duracion_ms: number | null
+          tokens_entrada: number | null
+          tokens_salida: number | null
+          coste_usd: number | null
+          error: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          trabajo_id: string
+          numero: number
+          pieza?: string
+          pagina_doc?: number
+          franja?: number | null
+          franjas_pagina?: number | null
+          storage_path: string
+          mime: string
+          bytes: number
+          estado?: string
+          intentos?: number
+          relecturas?: number
+          motivo_relectura?: Json | null
+          no_antes_de?: string
+          despachada_at?: string | null
+          lease_hasta?: string | null
+          resultado?: Json | null
+          recuento?: Json | null
+          verificacion_pie?: Json | null
+          motivos?: Json | null
+          filas_extraidas?: number | null
+          filas_contadas?: number | null
+          duracion_ms?: number | null
+          tokens_entrada?: number | null
+          tokens_salida?: number | null
+          coste_usd?: number | null
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          trabajo_id?: string
+          numero?: number
+          pieza?: string
+          pagina_doc?: number
+          franja?: number | null
+          franjas_pagina?: number | null
+          storage_path?: string
+          mime?: string
+          bytes?: number
+          estado?: string
+          intentos?: number
+          relecturas?: number
+          motivo_relectura?: Json | null
+          no_antes_de?: string
+          despachada_at?: string | null
+          lease_hasta?: string | null
+          resultado?: Json | null
+          recuento?: Json | null
+          verificacion_pie?: Json | null
+          motivos?: Json | null
+          filas_extraidas?: number | null
+          filas_contadas?: number | null
+          duracion_ms?: number | null
+          tokens_entrada?: number | null
+          tokens_salida?: number | null
+          coste_usd?: number | null
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ocr_trabajos: {
+        Row: {
+          id: string
+          creado_por: string
+          estado: string
+          num_paginas: number
+          paginas_documento: number
+          origen: string
+          nombre_original: string
+          original_path: string | null
+          original_mime: string | null
+          contexto_p1: Json | null
+          modelo: string | null
+          ronda_relectura: number
+          intentos_consolidacion: number
+          lease_hasta: string | null
+          consolidar_despachado_at: string | null
+          resultado: Json | null
+          documento_pendiente: Json | null
+          factura_id: number | null
+          error: string | null
+          coste_usd: number
+          llamadas: number
+          created_at: string
+          updated_at: string
+          terminado_at: string | null
+          limite_at: string
+          limpiado_at: string | null
+        }
+        Insert: {
+          id: string
+          creado_por: string
+          estado?: string
+          num_paginas: number
+          paginas_documento?: number
+          origen: string
+          nombre_original: string
+          original_path?: string | null
+          original_mime?: string | null
+          contexto_p1?: Json | null
+          modelo?: string | null
+          ronda_relectura?: number
+          intentos_consolidacion?: number
+          lease_hasta?: string | null
+          consolidar_despachado_at?: string | null
+          resultado?: Json | null
+          documento_pendiente?: Json | null
+          factura_id?: number | null
+          error?: string | null
+          coste_usd?: number
+          llamadas?: number
+          created_at?: string
+          updated_at?: string
+          terminado_at?: string | null
+          limite_at?: string
+          limpiado_at?: string | null
+        }
+        Update: {
+          id?: string
+          creado_por?: string
+          estado?: string
+          num_paginas?: number
+          paginas_documento?: number
+          origen?: string
+          nombre_original?: string
+          original_path?: string | null
+          original_mime?: string | null
+          contexto_p1?: Json | null
+          modelo?: string | null
+          ronda_relectura?: number
+          intentos_consolidacion?: number
+          lease_hasta?: string | null
+          consolidar_despachado_at?: string | null
+          resultado?: Json | null
+          documento_pendiente?: Json | null
+          factura_id?: number | null
+          error?: string | null
+          coste_usd?: number
+          llamadas?: number
+          created_at?: string
+          updated_at?: string
+          terminado_at?: string | null
+          limite_at?: string
+          limpiado_at?: string | null
+        }
+        Relationships: []
+      }
       oficiososia_borradores: {
         Row: {
           id: string
@@ -898,6 +1319,362 @@ export type Database = {
           linear_url?: string | null
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      presupuesto_lineas: {
+        Row: {
+          id: string
+          presupuesto_id: string
+          orden: number
+          categoria: string | null
+          valores: Json | null
+          descripcion: string
+          detalle: string | null
+          cantidad: number
+          precio_unitario: number
+          importe: number
+          precio_calculado: number | null
+          creado_en: string
+        }
+        Insert: {
+          id?: string
+          presupuesto_id: string
+          orden?: number
+          categoria?: string | null
+          valores?: Json | null
+          descripcion: string
+          detalle?: string | null
+          cantidad?: number
+          precio_unitario?: number
+          importe?: never
+          precio_calculado?: number | null
+          creado_en?: string
+        }
+        Update: {
+          id?: string
+          presupuesto_id?: string
+          orden?: number
+          categoria?: string | null
+          valores?: Json | null
+          descripcion?: string
+          detalle?: string | null
+          cantidad?: number
+          precio_unitario?: number
+          importe?: never
+          precio_calculado?: number | null
+          creado_en?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuesto_lineas_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: false
+            referencedRelation: "presupuestos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      presupuestos: {
+        Row: {
+          id: string
+          numero: string
+          estado: string
+          origen: string
+          cliente_nombre: string
+          cliente_telefono: string | null
+          cliente_email: string | null
+          cliente_direccion: string | null
+          cliente_poblacion: string | null
+          notas_cliente: string | null
+          notas_internas: string | null
+          condiciones: string | null
+          fecha: string
+          validez_dias: number
+          descuento_pct: number
+          iva_pct: number
+          subtotal: number
+          total: number
+          enviado_en: string | null
+          respondido_en: string | null
+          creado_por: string | null
+          creado_en: string
+          actualizado_en: string
+        }
+        Insert: {
+          id?: string
+          numero?: string
+          estado?: string
+          origen?: string
+          cliente_nombre: string
+          cliente_telefono?: string | null
+          cliente_email?: string | null
+          cliente_direccion?: string | null
+          cliente_poblacion?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          condiciones?: string | null
+          fecha?: string
+          validez_dias?: number
+          descuento_pct?: number
+          iva_pct?: number
+          subtotal?: number
+          total?: number
+          enviado_en?: string | null
+          respondido_en?: string | null
+          creado_por?: string | null
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Update: {
+          id?: string
+          numero?: string
+          estado?: string
+          origen?: string
+          cliente_nombre?: string
+          cliente_telefono?: string | null
+          cliente_email?: string | null
+          cliente_direccion?: string | null
+          cliente_poblacion?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          condiciones?: string | null
+          fecha?: string
+          validez_dias?: number
+          descuento_pct?: number
+          iva_pct?: number
+          subtotal?: number
+          total?: number
+          enviado_en?: string | null
+          respondido_en?: string | null
+          creado_por?: string | null
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Relationships: []
+      }
+      presupuestos_numeracion: {
+        Row: {
+          anio: number
+          ultimo: number
+        }
+        Insert: {
+          anio: number
+          ultimo?: number
+        }
+        Update: {
+          anio?: number
+          ultimo?: number
+        }
+        Relationships: []
+      }
+      productos_alias: {
+        Row: {
+          texto_normalizado: string
+          producto_id: number
+          origen: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          texto_normalizado: string
+          producto_id: number
+          origen?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          texto_normalizado?: string
+          producto_id?: number
+          origen?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      productos_catalogo: {
+        Row: {
+          id: number
+          nombre: string
+          nombre_normalizado: string | null
+          categoria_id: number | null
+          unidad_habitual: string | null
+          origen: string
+          creado_por: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          nombre: string
+          nombre_normalizado?: never
+          categoria_id?: number | null
+          unidad_habitual?: string | null
+          origen?: string
+          creado_por?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          nombre?: string
+          nombre_normalizado?: never
+          categoria_id?: number | null
+          unidad_habitual?: string | null
+          origen?: string
+          creado_por?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      productos_factura: {
+        Row: {
+          id: number
+          factura_id: number
+          nombre: string
+          cantidad: number
+          unidad: string | null
+          precio_unitario: number | null
+          total: number | null
+          created_at: string | null
+          nombre_normalizado: string | null
+          pagina: number | null
+          orden: number | null
+          bultos: number | null
+          iva_pct: number | null
+          producto_id: number | null
+          descuento_pct: number | null
+          importe_bruto: number | null
+          importe_bruto_estimado: boolean
+          nombre_busqueda: string | null
+        }
+        Insert: {
+          id?: number
+          factura_id: number
+          nombre: string
+          cantidad?: number
+          unidad?: string | null
+          precio_unitario?: number | null
+          total?: number | null
+          created_at?: string | null
+          nombre_normalizado?: never
+          pagina?: number | null
+          orden?: number | null
+          bultos?: number | null
+          iva_pct?: number | null
+          producto_id?: number | null
+          descuento_pct?: number | null
+          importe_bruto?: number | null
+          importe_bruto_estimado?: boolean
+          nombre_busqueda?: never
+        }
+        Update: {
+          id?: number
+          factura_id?: number
+          nombre?: string
+          cantidad?: number
+          unidad?: string | null
+          precio_unitario?: number | null
+          total?: number | null
+          created_at?: string | null
+          nombre_normalizado?: never
+          pagina?: number | null
+          orden?: number | null
+          bultos?: number | null
+          iva_pct?: number | null
+          producto_id?: number | null
+          descuento_pct?: number | null
+          importe_bruto?: number | null
+          importe_bruto_estimado?: boolean
+          nombre_busqueda?: never
+        }
+        Relationships: []
+      }
+      proveedores: {
+        Row: {
+          id: number
+          nombre: string
+          cif: string | null
+          direccion: string | null
+          telefono: string | null
+          email: string | null
+          categoria: string | null
+          notas: string | null
+          activo: boolean | null
+          created_at: string | null
+          updated_at: string | null
+          nombre_comercial: string | null
+          origen: string | null
+          cif_normalizado: string | null
+          nombre_normalizado: string | null
+          notas_ia: string | null
+        }
+        Insert: {
+          id?: number
+          nombre: string
+          cif?: string | null
+          direccion?: string | null
+          telefono?: string | null
+          email?: string | null
+          categoria?: string | null
+          notas?: string | null
+          activo?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+          nombre_comercial?: string | null
+          origen?: string | null
+          cif_normalizado?: never
+          nombre_normalizado?: never
+          notas_ia?: string | null
+        }
+        Update: {
+          id?: number
+          nombre?: string
+          cif?: string | null
+          direccion?: string | null
+          telefono?: string | null
+          email?: string | null
+          categoria?: string | null
+          notas?: string | null
+          activo?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+          nombre_comercial?: string | null
+          origen?: string | null
+          cif_normalizado?: never
+          nombre_normalizado?: never
+          notas_ia?: string | null
+        }
+        Relationships: []
+      }
+      proveedores_alias: {
+        Row: {
+          id: number
+          proveedor_id: number
+          alias_normalizado: string | null
+          cif_normalizado: string | null
+          texto_original: string | null
+          origen: string
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          proveedor_id: number
+          alias_normalizado?: string | null
+          cif_normalizado?: string | null
+          texto_original?: string | null
+          origen?: string
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          proveedor_id?: number
+          alias_normalizado?: string | null
+          cif_normalizado?: string | null
+          texto_original?: string | null
+          origen?: string
+          created_at?: string
         }
         Relationships: []
       }
@@ -1228,6 +2005,119 @@ export type Database = {
         }
         Relationships: []
       }
+      web_albumes: {
+        Row: {
+          id: string
+          slug: string
+          titulo: string
+          descripcion: string | null
+          servicio: string | null
+          portada_foto_id: string | null
+          orden: number
+          publicado: boolean
+          creado_en: string
+          actualizado_en: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          titulo: string
+          descripcion?: string | null
+          servicio?: string | null
+          portada_foto_id?: string | null
+          orden?: number
+          publicado?: boolean
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          titulo?: string
+          descripcion?: string | null
+          servicio?: string | null
+          portada_foto_id?: string | null
+          orden?: number
+          publicado?: boolean
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Relationships: []
+      }
+      web_contenido: {
+        Row: {
+          clave: string
+          valor: Json
+          actualizado_en: string
+          actualizado_por: string | null
+        }
+        Insert: {
+          clave: string
+          valor?: Json
+          actualizado_en?: string
+          actualizado_por?: string | null
+        }
+        Update: {
+          clave?: string
+          valor?: Json
+          actualizado_en?: string
+          actualizado_por?: string | null
+        }
+        Relationships: []
+      }
+      web_fotos: {
+        Row: {
+          id: string
+          album_id: string | null
+          ruta: string
+          titulo: string | null
+          alt: string
+          ancho: number | null
+          alto: number | null
+          orden: number
+          publicado: boolean
+          destacada: boolean
+          creado_en: string
+          actualizado_en: string
+        }
+        Insert: {
+          id?: string
+          album_id?: string | null
+          ruta: string
+          titulo?: string | null
+          alt?: string
+          ancho?: number | null
+          alto?: number | null
+          orden?: number
+          publicado?: boolean
+          destacada?: boolean
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Update: {
+          id?: string
+          album_id?: string | null
+          ruta?: string
+          titulo?: string | null
+          alt?: string
+          ancho?: number | null
+          alto?: number | null
+          orden?: number
+          publicado?: boolean
+          destacada?: boolean
+          creado_en?: string
+          actualizado_en?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_fotos_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "web_albumes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       web_linear_prueba: {
         Row: {
           id: number
@@ -1289,6 +2179,48 @@ export type Database = {
           linear_equipo_id?: string | null
           linear_proyecto_id?: string | null
           linear_etiquetas?: string[]
+          actualizado_en?: string
+          actualizado_por?: string | null
+        }
+        Relationships: []
+      }
+      web_solicitudes_limite: {
+        Row: {
+          id: number
+          ip_hash: string
+          creado_en: string
+        }
+        Insert: {
+          id?: never
+          ip_hash: string
+          creado_en?: string
+        }
+        Update: {
+          id?: never
+          ip_hash?: string
+          creado_en?: string
+        }
+        Relationships: []
+      }
+      web_tarifas: {
+        Row: {
+          id: number
+          config: Json
+          catalogo: Json
+          actualizado_en: string
+          actualizado_por: string | null
+        }
+        Insert: {
+          id?: number
+          config: Json
+          catalogo?: Json
+          actualizado_en?: string
+          actualizado_por?: string | null
+        }
+        Update: {
+          id?: number
+          config?: Json
+          catalogo?: Json
           actualizado_en?: string
           actualizado_por?: string | null
         }
@@ -1362,6 +2294,12 @@ export type Database = {
         Args: never
         Returns: boolean
       }
+      buscar_documentos_compras: {
+        Args: {
+            p_texto: string
+          }
+        Returns: number[]
+      }
       can_edit_section: {
         Args: {
             _section: string
@@ -1380,6 +2318,35 @@ export type Database = {
           }
         Returns: boolean
       }
+      cif_control_valido: {
+        Args: {
+            p_cif: string
+          }
+        Returns: boolean
+      }
+      cif_distancia: {
+        Args: {
+            a: string
+            b: string
+          }
+        Returns: number
+      }
+      documento_compras: {
+        Args: {
+            p_id: number
+          }
+        Returns: Json
+      }
+      documentos_lista: {
+        Args: never
+        Returns: Json
+      }
+      es_servicio_compras: {
+        Args: {
+            p_normalizado: string
+          }
+        Returns: boolean
+      }
       establecer_superadmin_panel: {
         Args: {
             p_user_id: string
@@ -1387,6 +2354,52 @@ export type Database = {
             p_email: string
           }
         Returns: undefined
+      }
+      estadisticas_lectura: {
+        Args: {
+            p_dias?: number
+          }
+        Returns: {
+            documentos: number
+            total_usd: number
+            media_usd: number
+            mediana_usd: number
+            llamadas_media: number
+            mas_cara_id: number
+            mas_cara_proveedor: string
+            mas_cara_numero: string
+            mas_cara_usd: number
+            por_paginas: Json
+            por_lineas: Json
+          }[]
+      }
+      factura_cumple_autoverificacion: {
+        Args: {
+            p_factura_id: number
+          }
+        Returns: boolean
+      }
+      factura_original_es_mio: {
+        Args: {
+            p_nombre: string
+          }
+        Returns: boolean
+      }
+      factura_subida_por_mi: {
+        Args: {
+            p_factura_id: number
+          }
+        Returns: boolean
+      }
+      facturas_puede_subir: {
+        Args: never
+        Returns: boolean
+      }
+      facturas_puede_subir_usuario: {
+        Args: {
+            _user_id: string
+          }
+        Returns: boolean
       }
       fallo_interno_registrar: {
         Args: {
@@ -1406,6 +2419,12 @@ export type Database = {
             p_limite?: number
           }
         Returns: unknown[]
+      }
+      ficha_proveedor: {
+        Args: {
+            p_proveedor_id: number
+          }
+        Returns: Json
       }
       fijar_tope_ia_mes: {
         Args: {
@@ -1702,6 +2721,25 @@ export type Database = {
           }
         Returns: boolean
       }
+      lineas_precio_producto: {
+        Args: {
+            p_producto_id?: number
+            p_ids?: number[]
+          }
+        Returns: {
+            id: number
+            factura_id: number
+            producto_id: number
+            unidad: string
+            cantidad: number
+            precio: number
+            fecha: string
+            numero: string
+            proveedor: string
+            prov_n: string
+            created_at: string
+          }[]
+      }
       listar_tablas_auditoria_panel: {
         Args: never
         Returns: {
@@ -1714,6 +2752,209 @@ export type Database = {
             p_tipos?: string[]
           }
         Returns: number
+      }
+      meses_compras_incompletos: {
+        Args: never
+        Returns: {
+            mes: string
+            documentos: number
+            referencia: number
+            motivo: string
+          }[]
+      }
+      normalizar_cif: {
+        Args: {
+            p_cif: string
+          }
+        Returns: string
+      }
+      normalizar_nombre_producto: {
+        Args: {
+            p_nombre: string
+          }
+        Returns: string
+      }
+      normalizar_proveedor: {
+        Args: {
+            p_proveedor: string
+          }
+        Returns: string
+      }
+      normalizar_proveedor_base: {
+        Args: {
+            p_proveedor: string
+          }
+        Returns: string
+      }
+      normalizar_texto: {
+        Args: {
+            p_texto: string
+          }
+        Returns: string
+      }
+      normalizar_unidad_factura: {
+        Args: {
+            u: string
+          }
+        Returns: string
+      }
+      ocr_anadir_pagina: {
+        Args: {
+            p_factura_id: number
+            p_trabajo_id: string
+            p_usuario: string
+            p_pagina: number
+            p_paginas_total: number
+            p_cabecera: Json
+            p_lineas: Json
+            p_esperado: Json
+            p_archivo_path: string
+          }
+        Returns: Json
+      }
+      ocr_cerrar_pagina: {
+        Args: {
+            p_pagina_id: number
+            p_resultado: Json
+            p_recuento: Json
+            p_verificacion: Json
+            p_motivos: Json
+            p_filas_extraidas: number
+            p_filas_contadas: number
+            p_relecturas: number
+            p_duracion_ms: number
+            p_tokens_entrada: number
+            p_tokens_salida: number
+            p_coste: number
+            p_contexto: Json
+            p_modelo: string
+          }
+        Returns: boolean
+      }
+      ocr_descartar_trabajo: {
+        Args: {
+            p_trabajo_id: string
+          }
+        Returns: Json
+      }
+      ocr_despachar: {
+        Args: {
+            p_trabajo_id: string
+          }
+        Returns: number
+      }
+      ocr_despachar_cola: {
+        Args: never
+        Returns: number
+      }
+      ocr_despachar_limpieza: {
+        Args: never
+        Returns: number
+      }
+      ocr_factura_existente: {
+        Args: {
+            p_numero: string
+            p_proveedor: string
+            p_cif: string
+            p_fecha: string
+            p_total: number
+          }
+        Returns: Json
+      }
+      ocr_fallo_pagina: {
+        Args: {
+            p_pagina_id: number
+            p_error: string
+          }
+        Returns: string
+      }
+      ocr_marcar_limpiado: {
+        Args: {
+            p_trabajo_id: string
+          }
+        Returns: undefined
+      }
+      ocr_pedir_relectura: {
+        Args: {
+            p_trabajo_id: string
+            p_paginas: Json
+          }
+        Returns: number
+      }
+      ocr_reclamar_consolidacion: {
+        Args: {
+            p_trabajo_id: string
+            p_lease_seg?: number
+          }
+        Returns: unknown[]
+      }
+      ocr_reclamar_pagina: {
+        Args: {
+            p_pagina_id: number
+            p_lease_seg?: number
+          }
+        Returns: unknown[]
+      }
+      ocr_reintentar_trabajo: {
+        Args: {
+            p_trabajo_id: string
+          }
+        Returns: Json
+      }
+      ocr_resumen_factura: {
+        Args: {
+            p_factura_id: number
+          }
+        Returns: Json
+      }
+      ocr_resumen_factura_datos: {
+        Args: {
+            p_factura_id: number
+          }
+        Returns: Json
+      }
+      ocr_sumar_gasto: {
+        Args: {
+            p_trabajo_id: string
+            p_coste: number
+            p_llamadas: number
+          }
+        Returns: undefined
+      }
+      ocr_sustituir_factura: {
+        Args: {
+            p_factura_id: number
+            p_trabajo_id: string
+            p_usuario: string
+            p_cabecera: Json
+            p_lineas: Json
+            p_esperado: Json
+            p_archivo_path: string
+          }
+        Returns: Json
+      }
+      ocr_terminar_trabajo: {
+        Args: {
+            p_trabajo_id: string
+            p_estado: string
+            p_resultado: Json
+            p_factura_id: number
+            p_error: string
+            p_documento_pendiente?: Json
+          }
+        Returns: boolean
+      }
+      ocr_trabajo_es_mio: {
+        Args: {
+            p_trabajo_id: string
+          }
+        Returns: boolean
+      }
+      ocr_trabajos_por_limpiar: {
+        Args: {
+            p_limite?: number
+          }
+        Returns: string[]
       }
       oficiososia_facturacion_eliminar: {
         Args: {
@@ -1770,6 +3011,30 @@ export type Database = {
           }
         Returns: boolean
       }
+      precio_es: {
+        Args: {
+            p: number
+            p_decimales?: number
+          }
+        Returns: string
+      }
+      precio_referencia_producto: {
+        Args: {
+            p_producto_id: number
+            p_unidad: string
+            p_fecha: string
+            p_factura_id: number
+          }
+        Returns: {
+            precio: number
+            compras: number
+            desde: string
+            hasta: string
+            proveedor: string
+            proveedores_n: string[]
+            metodo: string
+          }[]
+      }
       preparar_contexto_auditoria_auth: {
         Args: {
             p_actor_id: string
@@ -1778,6 +3043,194 @@ export type Database = {
             p_email?: string
           }
         Returns: string
+      }
+      productos_aplicar_clasificacion_ia: {
+        Args: {
+            p_items: Json
+          }
+        Returns: Json
+      }
+      productos_asignar_lineas: {
+        Args: {
+            p_linea_ids: number[]
+            p_producto_id?: number
+            p_nombre_nuevo?: string
+            p_categoria_id?: number
+          }
+        Returns: Json
+      }
+      productos_asignar_por_alias: {
+        Args: {
+            p_textos?: string[]
+            p_max_ms?: number
+            p_lote?: number
+          }
+        Returns: Json
+      }
+      productos_avisar_subidas: {
+        Args: {
+            p_ids: number[]
+          }
+        Returns: number
+      }
+      productos_borrar: {
+        Args: {
+            p_producto_id: number
+          }
+        Returns: undefined
+      }
+      productos_con_subida: {
+        Args: never
+        Returns: {
+            producto_id: number
+            nombre: string
+            unidad: string
+            variacion_pct: number
+            fecha: string
+            factura_id: number
+          }[]
+      }
+      productos_despachar_clasificacion: {
+        Args: never
+        Returns: number
+      }
+      productos_fusionar: {
+        Args: {
+            p_origen_ids: number[]
+            p_destino_id: number
+          }
+        Returns: Json
+      }
+      productos_gasto_por_categoria: {
+        Args: {
+            p_desde?: string
+            p_hasta?: string
+          }
+        Returns: {
+            categoria_id: number
+            categoria: string
+            padre_id: number
+            padre: string
+            sin_clasificar: boolean
+            gasto: number
+            lineas: number
+            productos: number
+            lineas_sin_importe: number
+          }[]
+      }
+      productos_puede_editar: {
+        Args: never
+        Returns: boolean
+      }
+      productos_recategorizar: {
+        Args: {
+            p_producto_ids: number[]
+            p_categoria_id: number
+          }
+        Returns: number
+      }
+      productos_renombrar: {
+        Args: {
+            p_producto_id: number
+            p_nombre: string
+          }
+        Returns: Json
+      }
+      productos_resumen: {
+        Args: {
+            p_desde?: string
+            p_hasta?: string
+          }
+        Returns: {
+            producto_id: number
+            nombre: string
+            categoria_id: number
+            origen: string
+            unidad_habitual: string
+            compras: number
+            documentos: number
+            cantidades: Json
+            gasto: number
+            lineas_sin_importe: number
+            ultimo_precio: number
+            ultima_fecha: string
+            proveedores: string[]
+          }[]
+      }
+      proveedor_clave: {
+        Args: {
+            p_nombre: string
+          }
+        Returns: string
+      }
+      proveedor_es_cliente: {
+        Args: {
+            p_base: string
+            p_cif: string
+          }
+        Returns: boolean
+      }
+      proveedor_resolver: {
+        Args: {
+            p_nombre: string
+            p_cif: string
+            p_crear?: boolean
+          }
+        Returns: number
+      }
+      proveedores_editar: {
+        Args: {
+            p_id: number
+            p_nombre: string
+            p_nombre_comercial?: string
+            p_cif?: string
+          }
+        Returns: Json
+      }
+      proveedores_fusionar: {
+        Args: {
+            p_origen_ids: number[]
+            p_destino_id: number
+          }
+        Returns: Json
+      }
+      proveedores_listado: {
+        Args: never
+        Returns: {
+            id: number
+            nombre: string
+            nombre_comercial: string
+            cif: string
+            activo: boolean
+            origen: string
+            documentos: number
+            total: number
+            ultima_fecha: string
+            variantes: string[]
+            alias: string[]
+            cifs_extra: string[]
+          }[]
+      }
+      proveedores_notas_ia_guardar: {
+        Args: {
+            p_id: number
+            p_notas: string
+          }
+        Returns: string
+      }
+      proveedores_puede_editar: {
+        Args: never
+        Returns: boolean
+      }
+      reanudar_trabajos_ocr: {
+        Args: never
+        Returns: number
+      }
+      recalcular_alertas_factura: {
+        Args: {
+            p_factura_id: number
+          }
+        Returns: undefined
       }
       registrar_acceso_panel: {
         Args: {
@@ -1805,6 +3258,14 @@ export type Database = {
         Args: {
             p_tipo: string
           }
+      web_solicitud_presupuesto_registrar: {
+        Args: {
+            p_ip_hash: string
+            p_datos: Json
+            p_max_hora?: number
+          }
+        Returns: Json
+      }
         Returns: string
       }
       servicios_limites_validos: {
@@ -1839,6 +3300,12 @@ export type Database = {
         Args: never
         Returns: unknown[]
       }
+      texto_busqueda_compras: {
+        Args: {
+            p_texto: string
+          }
+        Returns: string
+      }
       tipo_cambio_usd_eur_actual: {
         Args: never
         Returns: {
@@ -1847,11 +3314,32 @@ export type Database = {
             fuente: string
           }[]
       }
+      unidad_comparable: {
+        Args: {
+            p: string
+          }
+        Returns: string
+      }
       url_funcion_edge: {
         Args: {
             p_funcion: string
           }
         Returns: string
+      }
+      validar_cordura_factura: {
+        Args: {
+            p_factura_id: number
+          }
+        Returns: Json
+      }
+      verificar_duplicado_factura: {
+        Args: {
+            p_numero_documento: string
+            p_proveedor: string
+            p_fecha: string
+            p_total: number
+          }
+        Returns: Json
       }
       version_auditoria_panel: {
         Args: never

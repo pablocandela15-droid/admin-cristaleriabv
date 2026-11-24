@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, Info, MessageSquareWarning } from "lucide-react";
+import { AlertTriangle, Bot, FileText, Info, MessageSquareWarning, Receipt, TrendingUp } from "lucide-react";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 
 /** Adónde lleva un aviso (null = no tiene origen al que ir). Lo comparten la campana y la página «Avisos». */
@@ -10,6 +10,10 @@ export function rutaDeAviso(
   // Petición urgente de un usuario: su ticket en Super Admin (solo lo ve el super admin).
   if (n.referencia_tipo === "peticion") {
     return n.referencia_id ? `/super-admin/tickets?ticket=${encodeURIComponent(n.referencia_id)}` : "/super-admin/tickets";
+  }
+  // Solicitud de presupuesto desde la calculadora de la web: el presupuesto en Presupuestos (o la lista de solicitudes).
+  if (n.referencia_tipo === "presupuesto") {
+    return n.referencia_id ? `/presupuestos?id=${encodeURIComponent(n.referencia_id)}` : "/presupuestos?estado=solicitud";
   }
   // Aviso con enlace propio del panel (p. ej. uno creado a mano o por un cron nuevo).
   const enlace = n.datos?.enlace;
@@ -63,6 +67,11 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   // Petición urgente de un usuario del panel: solo super admin.
   peticion_urgente: MessageSquareWarning,
   sistema: Info,
+  // Facturas: fin de una tanda de subida (ColaSubidaProvider) y compras más caras que su referencia.
+  facturas_subida: Receipt,
+  subida_precio: TrendingUp,
+  // Solicitud de presupuesto desde la calculadora de la web (web-solicitud-presupuesto): solo quien ve Presupuestos.
+  presupuesto_solicitud: FileText,
 };
 
 /** Avisos con caducidad ya pasada: no se enseñan. `ahora` inyectable para pruebas. */

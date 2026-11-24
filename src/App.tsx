@@ -14,10 +14,14 @@ import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import { rutaServicios } from "@/components/servicios/pestanas";
 import { PanelLayout, CargandoContenido } from "@/components/PanelLayout";
 import { CARGADORES_SECCION } from "@/lib/precargaSecciones";
+import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
 import Auth from "./pages/Auth";
 const Dashboard = lazy(CARGADORES_SECCION["/dashboard"]);
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Usuarios = lazy(CARGADORES_SECCION["/usuarios"]);
+const Facturas = lazy(CARGADORES_SECCION["/facturas"]);
+const Web = lazy(CARGADORES_SECCION["/web"]);
+const Presupuestos = lazy(CARGADORES_SECCION["/presupuestos"]);
 const Ayuda = lazy(CARGADORES_SECCION["/ayuda"]);
 const Avisos = lazy(CARGADORES_SECCION["/avisos"]);
 const Peticiones = lazy(CARGADORES_SECCION["/peticiones"]);
@@ -122,6 +126,9 @@ const App = () => (
             {/* Los toasts viven fuera de la barrera para seguir funcionando si el router falla. */}
             <Toaster />
             <BrowserRouter>
+              {/* Cola de subida de facturas en segundo plano: por encima de las rutas para que cambiar de
+                  sección no la cancele. */}
+              <ColaSubidaProvider>
               {/* Barrera de nivel app: último recurso para que nunca quede la pantalla en blanco. */}
               <RouteErrorBoundary
                 pantallaCompleta
@@ -134,6 +141,12 @@ const App = () => (
                   <Route element={marcoPanel}>
                     <Route path="/" element={pagina(<Dashboard />)} />
                     <Route path="/dashboard" element={pagina(<Dashboard />)} />
+                    {/* Con solo «Facturas · Subida» se entra a la pestaña Cargar. */}
+                    <Route path="/facturas" element={pagina(<Facturas />, ["facturas", "facturas_subida"])} />
+                    {/* La web: una pestaña por sección (Fotos, Tarifas, Contenido). */}
+                    <Route path="/web" element={pagina(<Web />, ["web_fotos", "web_tarifas", "web_contenido"])} />
+                    {/* Gestor de presupuestos (y solicitudes de la calculadora de la web): «Ver» lee, «Editar» todo. */}
+                    <Route path="/presupuestos" element={pagina(<Presupuestos />, "presupuestos")} />
                     <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                     {/* Historial de avisos (campana): para todos los roles. */}
                     <Route path="/avisos" element={pagina(<Avisos />)} />
@@ -156,6 +169,7 @@ const App = () => (
                   <Route path="*" element={bajoDemanda(<NotFound />)} />
                 </Routes>
               </RouteErrorBoundary>
+              </ColaSubidaProvider>
             </BrowserRouter>
           </TooltipProvider>
         </SuperAdminProvider>

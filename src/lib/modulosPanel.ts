@@ -17,7 +17,7 @@
 // ============================================================================
 import type { ComponentType, SVGProps } from "react";
 import { matchPath } from "react-router-dom";
-import { Bell, HelpCircle, LayoutDashboard, MessageSquarePlus, Shield, UserRound } from "lucide-react";
+import { Bell, FileText, Globe, HelpCircle, LayoutDashboard, MessageSquarePlus, Receipt, Shield, UserRound } from "lucide-react";
 import type { SectionKey } from "@/hooks/useUserRole";
 
 export type IconoModulo = ComponentType<SVGProps<SVGSVGElement>>;
@@ -25,6 +25,8 @@ export type IconoModulo = ComponentType<SVGProps<SVGSVGElement>>;
 /** Grupos de Control del Panel, en el orden del menú lateral. */
 export const GRUPOS_MODULOS = [
   { id: "dia", titulo: "Día a día" },
+  { id: "compras", titulo: "Compras" },
+  { id: "web", titulo: "Web y clientes" },
   { id: "gestion", titulo: "Equipo" },
   { id: "ayuda", titulo: "Ayuda y cuenta" },
 ] as const;
@@ -77,6 +79,41 @@ export const MODULOS_PANEL: readonly ModuloPanel[] = [
     secciones: ["dashboard"],
     desactivable: false,
     motivoSiempreActivo: "Es la portada del panel: ahí se lleva a quien entra en un módulo desactivado.",
+    enMenu: true,
+  },
+  {
+    clave: "facturas",
+    nombre: "Facturas",
+    descripcion: "Facturas de proveedores: se suben, se leen solas (OCR con IA) y se consultan compras, productos y precios.",
+    rutas: ["/facturas"],
+    icono: Receipt,
+    grupo: "compras",
+    // Con solo «Facturas · Subida» también sale (entra en la pestaña Cargar).
+    secciones: ["facturas", "facturas_subida"],
+    desactivable: true,
+    enMenu: true,
+  },
+  {
+    clave: "web",
+    nombre: "Web",
+    descripcion: "La web de la cristalería: books de fotos, precios y opciones de la calculadora, textos e imágenes.",
+    rutas: ["/web"],
+    icono: Globe,
+    grupo: "web",
+    // Una pestaña por sección: basta con ver una para entrar.
+    secciones: ["web_fotos", "web_tarifas", "web_contenido"],
+    desactivable: true,
+    enMenu: true,
+  },
+  {
+    clave: "presupuestos",
+    nombre: "Presupuestos",
+    descripcion: "Presupuestos con la calculadora de la web y sus tarifas, en PDF y por WhatsApp o correo, y las solicitudes que llegan de la web.",
+    rutas: ["/presupuestos"],
+    icono: FileText,
+    grupo: "web",
+    secciones: ["presupuestos"],
+    desactivable: true,
     enMenu: true,
   },
   {

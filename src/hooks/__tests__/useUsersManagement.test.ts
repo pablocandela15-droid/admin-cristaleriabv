@@ -214,11 +214,11 @@ const GUARDADAS: Fila[] = [
   { section_key: "dashboard", can_view: true, can_edit: true },
   { section_key: "usuarios", can_view: true, can_edit: false },
   { section_key: "reservas", can_view: true, can_edit: true },
-  { section_key: "facturas", can_view: true, can_edit: false },
+  { section_key: "cheques", can_view: true, can_edit: false },
   { section_key: "marketing", can_view: false, can_edit: false },
 ];
 // «usuarios» la gestiona el diálogo desde el 06/11/2026 (un solo interruptor, «Puede ver»).
-const NO_GESTIONADAS = ["reservas", "facturas", "marketing"];
+const NO_GESTIONADAS = ["reservas", "cheques", "marketing"];
 /** Fila de OTRO usuario: un guardado de USUARIO no la toca nunca. */
 const DE_OTRO: FilaBd = { user_id: OTRO, section_key: "usuarios", can_view: true, can_edit: false, updated_at: "2026-09-01T10:00:00Z" };
 
@@ -268,7 +268,7 @@ describe("useUsersManagement · setAllPermissions guarda sin dejar al usuario co
     expect(escrituras[0].payload!.map((f) => f.section_key)).toEqual(["dashboard"]);
     expect(escrituras[1].filtros).toEqual([
       ["eq", "user_id", USUARIO],
-      ["in", "section_key", ["usuarios"]],
+      ["in", "section_key", ["facturas", "facturas_subida", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "usuarios"]],
     ]);
     // Resultado: lo marcado está, lo desmarcado ya no, y la edición del Dashboard sigue.
     expect(enBd("dashboard")).toMatchObject({ can_view: true, can_edit: true });
@@ -290,7 +290,10 @@ describe("useUsersManagement · setAllPermissions guarda sin dejar al usuario co
       ),
     );
 
-    expect(doble.escriturasEn("user_permissions").map((o) => o.tipo)).toEqual(["upsert"]);
+    // Se guarda lo marcado; lo desmarcado (Facturas, sin fila) se borra acotado a sus secciones.
+    const escrituras = doble.escriturasEn("user_permissions");
+    expect(escrituras.map((o) => o.tipo)).toEqual(["upsert", "delete"]);
+    expect(escrituras[1].filtros).toContainEqual(["in", "section_key", ["facturas", "facturas_subida", "web_fotos", "web_tarifas", "web_contenido", "presupuestos"]]);
     expect(enBd("usuarios")).toMatchObject({ can_view: true, can_edit: false });
   });
 
@@ -404,7 +407,7 @@ describe("useUsersManagement · setAllPermissions guarda sin dejar al usuario co
     const conAjenas = [
       ...dialogo(),
       { section_key: "reservas", can_view: false, can_edit: false },
-      { section_key: "facturas", can_view: true, can_edit: true },
+      { section_key: "cheques", can_view: true, can_edit: true },
       { section_key: "espacios", can_view: true, can_edit: true },
     ];
 
@@ -528,6 +531,12 @@ describe("useUsersManagement · usuario nuevo (assignRoleToNewUser)", () => {
   it("staff: solo ve el Dashboard, sin edición en ninguna sección", async () => {
     expect(await permisosPorDefecto("staff")).toEqual([
       { user_id: "u-nuevo", section_key: "dashboard", can_view: true, can_edit: false },
+      { user_id: "u-nuevo", section_key: "facturas", can_view: false, can_edit: false },
+      { user_id: "u-nuevo", section_key: "facturas_subida", can_view: false, can_edit: false },
+      { user_id: "u-nuevo", section_key: "web_fotos", can_view: false, can_edit: false },
+      { user_id: "u-nuevo", section_key: "web_tarifas", can_view: false, can_edit: false },
+      { user_id: "u-nuevo", section_key: "web_contenido", can_view: false, can_edit: false },
+      { user_id: "u-nuevo", section_key: "presupuestos", can_view: false, can_edit: false },
       { user_id: "u-nuevo", section_key: "usuarios", can_view: false, can_edit: false },
     ]);
   });
@@ -535,6 +544,12 @@ describe("useUsersManagement · usuario nuevo (assignRoleToNewUser)", () => {
   it("manager: ve todas las secciones, sin edición en ninguna", async () => {
     expect(await permisosPorDefecto("manager")).toEqual([
       { user_id: "u-nuevo", section_key: "dashboard", can_view: true, can_edit: false },
+      { user_id: "u-nuevo", section_key: "facturas", can_view: true, can_edit: false },
+      { user_id: "u-nuevo", section_key: "facturas_subida", can_view: true, can_edit: false },
+      { user_id: "u-nuevo", section_key: "web_fotos", can_view: true, can_edit: false },
+      { user_id: "u-nuevo", section_key: "web_tarifas", can_view: true, can_edit: false },
+      { user_id: "u-nuevo", section_key: "web_contenido", can_view: true, can_edit: false },
+      { user_id: "u-nuevo", section_key: "presupuestos", can_view: true, can_edit: false },
       { user_id: "u-nuevo", section_key: "usuarios", can_view: true, can_edit: false },
     ]);
   });
@@ -542,6 +557,12 @@ describe("useUsersManagement · usuario nuevo (assignRoleToNewUser)", () => {
   it("admin: como staff (solo el Dashboard); el resto lo da un super admin en «Permisos»", async () => {
     expect(await permisosPorDefecto("admin")).toEqual([
       { user_id: "u-nuevo", section_key: "dashboard", can_view: true, can_edit: false },
+      { user_id: "u-nuevo", section_key: "facturas", can_view: false, can_edit: false },
+      { user_id: "u-nuevo", section_key: "facturas_subida", can_view: false, can_edit: false },
+      { user_id: "u-nuevo", section_key: "web_fotos", can_view: false, can_edit: false },
+      { user_id: "u-nuevo", section_key: "web_tarifas", can_view: false, can_edit: false },
+      { user_id: "u-nuevo", section_key: "web_contenido", can_view: false, can_edit: false },
+      { user_id: "u-nuevo", section_key: "presupuestos", can_view: false, can_edit: false },
       { user_id: "u-nuevo", section_key: "usuarios", can_view: false, can_edit: false },
     ]);
   });

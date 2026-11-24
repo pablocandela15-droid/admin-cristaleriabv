@@ -1,6 +1,6 @@
 import { useState, type ComponentType } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronDown, MessageSquarePlus, PlayCircle, Shield } from "lucide-react";
+import { ChevronDown, FileText, MessageSquarePlus, PlayCircle, Receipt, Shield } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -20,13 +20,17 @@ import type { EstadoLanzarTour, SeccionAyuda } from "@/lib/ayuda/tours";
 // ---------------------------------------------------------------------------
 
 const ICONOS: Record<SeccionAyuda, ComponentType<{ className?: string }>> = {
+  facturas: Receipt,
   peticiones: MessageSquarePlus,
+  presupuestos: FileText,
   usuarios: Shield,
 };
 
 /** Secciones de permisos que dan acceso a cada parte del panel (vacía: todo el mundo). */
 const PERMISOS: Record<SeccionAyuda, SectionKey[]> = {
+  facturas: ["facturas", "facturas_subida"],
   peticiones: [],
+  presupuestos: ["presupuestos"],
   usuarios: ["usuarios"],
 };
 

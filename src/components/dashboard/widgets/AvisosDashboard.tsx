@@ -9,6 +9,7 @@ import { ArrowUpRight, Bell, Check, CheckCheck, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNotificacionesDashboard, type NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { etiquetaDia, horaAviso, rutaDeAviso, TIPO_ICON } from "@/lib/avisos";
 import {
   avisosParaDashboard,
@@ -25,7 +26,13 @@ const MAX_FILAS = 15;
 
 function usePermisosAvisos(): PermisosAvisos & { cargando: boolean } {
   const { isSuperAdmin, loading } = useSuperAdmin();
-  return { superAdmin: isSuperAdmin, cargando: loading };
+  const facturas = useCanAccessSection("facturas");
+  const subida = useCanAccessSection("facturas_subida");
+  return {
+    superAdmin: isSuperAdmin,
+    facturas: facturas.canAccess || subida.canAccess,
+    cargando: loading || facturas.loading || subida.loading,
+  };
 }
 
 const cuando = (iso: string) => {
@@ -38,10 +45,10 @@ export function AvisosDashboard() {
   const [filtro, setFiltro] = useState<SeccionAviso | null>(null);
   const permisos = usePermisosAvisos();
   const navigate = useNavigate();
-  const { cargando, superAdmin } = permisos;
+  const { cargando, superAdmin, facturas } = permisos;
   const avisos = useMemo(
-    () => (cargando ? [] : avisosParaDashboard(notificaciones, { superAdmin })),
-    [notificaciones, cargando, superAdmin],
+    () => (cargando ? [] : avisosParaDashboard(notificaciones, { superAdmin, facturas })),
+    [notificaciones, cargando, superAdmin, facturas],
   );
   const porSeccion = useMemo(() => sinLeerPorSeccion(avisos), [avisos]);
   const visibles = useMemo(() => (filtro ? avisos.filter((n) => seccionDeAviso(n) === filtro) : avisos), [avisos, filtro]);

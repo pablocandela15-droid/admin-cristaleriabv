@@ -1,0 +1,137 @@
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
+
+import { aResultado, type ElementoCola, type ResultadoProcesamiento } from "../colaSubida";
+import { claseFichero, formatoTamano, lineaEstado, nivelFila, ordenarPorGravedad } from "../resultadosCarga";
+
+const ok = (extra: Partial<ResultadoProcesamiento> = {}): ResultadoProcesamiento => ({
+  nombre: "x", success: true, alertas: [], archivoGuardado: true, duplicado: false, ...extra,
+});
+
+const el = (id: string, resultado: ResultadoProcesamiento | undefined, extra: Partial<ElementoCola> = {}): ElementoCola => ({
+  id, nombre: `${id}.pdf`, file: null, preview: "", tamano: 1, fase: resultado ? "terminado" : "procesando", progreso: "", tanda: 1, resultado, ...extra,
+});
+
+describe("aResultado", () => {
+  it("guarda el id del documento: el nuevo, el ya existente (duplicado) o el del trabajo", () => {
+    expect(aResultado("a.pdf", { success: true, webhookResponse: { factura_id: 42 } }).facturaId).toBe(42);
+    expect(aResultado("b.pdf", { success: true, duplicado: true, webhookResponse: { factura_existente_id: 7 } }).facturaId).toBe(7);
+    expect(aResultado("c.pdf", { success: true, duplicado: true, sustituible: { existente: { id: 9 } } }).facturaId).toBe(9);
+    expect(aResultado("d.pdf", { success: true }, 3, 15).facturaId).toBe(15);
+    expect(aResultado("e.pdf", { success: true }).facturaId).toBeUndefined();
+  });
+
+  it("el original archivado: «guardado» o «perdido» (archivo_estado del servidor)", () => {
+    expect(aResultado("a.pdf", { success: true, archivo_estado: "guardado" })).toMatchObject({ archivoGuardado: true, archivoEstado: "guardado" });
+    expect(aResultado("b.pdf", { success: true, archivo_guardado: false })).toMatchObject({ archivoGuardado: false, archivoEstado: "perdido" });
+    // En un duplicado no se archiva nada: ni se dice.
+    expect(aResultado("c.pdf", { success: true, duplicado: true, archivo_estado: "guardado" }).archivoEstado).toBeUndefined();
+  });
+});
+
+describe("ordenarPorGravedad: fallido → aviso → duplicado → ok", () => {
+  const fallido = el("fallido", { nombre: "f", success: false, error: "borrosa" });
+  const aviso = el("aviso", ok({ alertas: [{ codigo: "suma", severidad: "media", mensaje: "No cuadra" }] }));
+  const sinOriginal = el("sinoriginal", ok({ archivoGuardado: false }));
+  const duplicado = el("duplicado", ok({ duplicado: true }));
+  const pendiente = el("pendiente", ok({ duplicado: true, sustituible: {} as never }));
+  const guardado = el("guardado", ok());
+  const sustituido = el("sustituido", ok({ sustituida: true }));
+  const enMarcha = el("marcha", undefined);
+
+  it("clasifica cada resultado en su nivel", () => {
+    expect(nivelFila(fallido)).toBe("fallido");
+    expect(nivelFila(aviso)).toBe("aviso");
+    expect(nivelFila(sinOriginal)).toBe("aviso");
+    expect(nivelFila(duplicado)).toBe("duplicado");
+    expect(nivelFila(pendiente)).toBe("duplicado");
+    expect(nivelFila(guardado)).toBe("ok");
+    expect(nivelFila(sustituido)).toBe("ok");
+    expect(nivelFila(enMarcha)).toBe("marcha");
+  });
+
+  it("ordena sea cual sea el orden de llegada; los que siguen en marcha, arriba", () => {
+    const orden = ordenarPorGravedad([guardado, duplicado, aviso, fallido, enMarcha]).map((e) => e.id);
+    expect(orden).toEqual(["marcha", "fallido", "aviso", "duplicado", "guardado"]);
+    const otro = ordenarPorGravedad([fallido, guardado, enMarcha, duplicado, aviso]).map((e) => e.id);
+    expect(otro).toEqual(["marcha", "fallido", "aviso", "duplicado", "guardado"]);
+  });
+
+  it("dentro del mismo nivel, el último enviado primero, y no toca el original", () => {
+    const a = el("a", ok());
+    const b = el("b", ok());
+    const entrada = [a, b];
+    expect(ordenarPorGravedad(entrada).map((e) => e.id)).toEqual(["b", "a"]);
+    expect(entrada.map((e) => e.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("lineaEstado: una sola línea por documento", () => {
+  it("fallido: el error del servidor", () => {
+    expect(lineaEstado(el("f", { nombre: "f", success: false, error: "la foto está borrosa" }))).toEqual({
+      nivel: "fallido", texto: "la foto está borrosa",
+    });
+  });
+
+  it("aviso: cuenta y mensajes en la misma línea", () => {
+    const l = lineaEstado(el("a", ok({ alertas: [
+      { codigo: "a", severidad: "media", mensaje: "No cuadra" },
+      { codigo: "b", severidad: "baja", mensaje: "Falta fecha" },
+    ] })));
+    expect(l.nivel).toBe("aviso");
+    expect(l.texto).toBe("2 avisos: No cuadra · Falta fecha");
+    expect(l.texto).not.toContain("\n");
+  });
+
+  it("sin original archivado: aviso, no «guardado»", () => {
+    const l = lineaEstado(el("s", ok({ archivoGuardado: false })));
+    expect(l.nivel).toBe("aviso");
+    expect(l.texto).toMatch(/no se ha podido archivar/);
+  });
+
+  it("duplicado, sustituido, guardado y en marcha", () => {
+    expect(lineaEstado(el("d", ok({ duplicado: true }))).texto).toMatch(/mismo número y proveedor/);
+    expect(lineaEstado(el("p", ok({ duplicado: true, sustituible: {} as never }))).texto).toMatch(/«Pendientes de decidir»/);
+    expect(lineaEstado(el("x", ok({ sustituida: true }))).texto).toMatch(/sustituida/);
+    expect(lineaEstado(el("g", ok()))).toEqual({ nivel: "ok", texto: "Guardada" });
+    expect(lineaEstado(el("m", undefined, { progreso: "Subiendo…" }))).toEqual({ nivel: "marcha", texto: "Subiendo…" });
+    expect(lineaEstado(el("l", undefined, { progreso: "Leyendo", piezas: 4 })).texto).toMatch(/Documento largo: se lee en 4 trozos/);
+  });
+
+  it("original perdido: «sin original» y cuenta como sin_original", () => {
+    const r = aResultado("p.pdf", { success: true, archivo_estado: "perdido", webhookResponse: { factura_id: 3 } });
+    expect(r.archivoGuardado).toBe(false);
+    expect(lineaEstado(el("p", r)).texto).toMatch(/^Guardada · sin original/);
+  });
+
+  it("sigue en el servidor / parado: aviso (no rojo) con su estado real", () => {
+    const sigue = lineaEstado(el("s", { nombre: "s", success: false, sigueEnServidor: true, error: "Sigue en el servidor: tarda" }));
+    expect(sigue).toEqual({ nivel: "aviso", texto: "Sigue en el servidor: tarda" });
+    const parado = lineaEstado(el("p", { nombre: "p", success: false, parado: true, error: "Parado en el servidor: no avanza" }));
+    expect(parado.nivel).toBe("aviso");
+    expect(parado.texto).toMatch(/^Parado en el servidor/);
+  });
+
+  it("duplicado descartado («Dejar la que hay»): ya no remite a «Pendientes de decidir»", () => {
+    const l = lineaEstado(el("d", ok({ duplicado: true, descartado: true })));
+    expect(l.nivel).toBe("duplicado");
+    expect(l.texto).toMatch(/has decidido dejar la que había/);
+  });
+});
+
+describe("fichero de la cola", () => {
+  it("tamaño legible", () => {
+    expect(formatoTamano(0)).toBe("");
+    expect(formatoTamano(100)).toBe("1 KB");
+    expect(formatoTamano(312 * 1024)).toBe("312 KB");
+    expect(formatoTamano(1.5 * 1024 * 1024)).toBe("1,5 MB");
+  });
+
+  it("icono según el tipo de fichero", () => {
+    expect(claseFichero({ file: new File(["x"], "a.pdf", { type: "application/pdf" }), nombre: "a.pdf" })).toBe("pdf");
+    expect(claseFichero({ file: new File(["x"], "a.png", { type: "image/png" }), nombre: "a.png" })).toBe("imagen");
+    expect(claseFichero({ file: null, nombre: "vinalopo.JPG" })).toBe("imagen");
+    expect(claseFichero({ file: null, nombre: "datos.xml" })).toBe("otro");
+  });
+});

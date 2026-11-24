@@ -102,7 +102,7 @@ const PERMISOS_CAMARERO: Fila[] = [
  */
 const OTRAS_DEL_CAMARERO: Fila[] = [
   { section_key: "reservas", can_view: true, can_edit: false },
-  { section_key: "facturas", can_view: true, can_edit: true },
+  { section_key: "cheques", can_view: true, can_edit: true },
 ];
 
 let doble: ReturnType<typeof crearDoblePermisos>;
@@ -338,7 +338,7 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
     expect(within(dialogo).queryByRole("switch", { name: "Ver Usuarios" })).toBeNull();
     expect(within(dialogo).queryByRole("switch", { name: "Puede editar Usuarios" })).toBeNull();
     // Las secciones retiradas no salen en la tabla.
-    expect(within(dialogo).queryByRole("switch", { name: /Reservas|Facturas/ })).toBeNull();
+    expect(within(dialogo).queryByRole("switch", { name: /Reservas|Cheques/ })).toBeNull();
   });
 
   it("…y sin edición guardada, «Puede editar» sale apagado pero se puede activar", async () => {
@@ -479,7 +479,7 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
       ).toHaveTextContent("No");
       expect(within(dialogo).queryByLabelText(/^Editar Usuarios/)).toBeNull();
       // Las secciones retiradas no salen.
-      expect(within(dialogo).queryByLabelText(/Reservas|Facturas/)).toBeNull();
+      expect(within(dialogo).queryByLabelText(/Reservas|Cheques/)).toBeNull();
       expect(within(dialogo).queryByRole("switch")).toBeNull();
       expect(within(dialogo).queryByRole("combobox")).toBeNull();
       expect(
