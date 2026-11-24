@@ -100,7 +100,7 @@ describe("lista de presupuestos", () => {
     render(<Envoltorio />);
     const solicitud = within(filas()[0]).getByTestId("solicitud-web");
     expect(solicitud).toHaveTextContent("Para el baño pequeño");
-    expect(solicitud).toHaveTextContent("Precio en la web: 560,00 €");
+    expect(solicitud).toHaveTextContent("Precio web (IVA incl.): 560,00 €");
     expect(within(filas()[2]).getByTestId("solicitud-web")).toHaveTextContent("Sin comentarios del cliente.");
     fireEvent.click(within(solicitud).getByRole("button", { name: "Convertir en borrador" }));
     const args = argumentos<ArgsEstado>(h.mut.estado.mutate);
@@ -134,7 +134,7 @@ describe("lista de presupuestos", () => {
     expect(screen.getByTestId("etiqueta-solo-lectura")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Nuevo presupuesto/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Convertir en borrador" })).toBeNull();
-    expect(within(filas()[0]).getByTestId("solicitud-web")).toHaveTextContent("Precio en la web: 560,00 €");
+    expect(within(filas()[0]).getByTestId("solicitud-web")).toHaveTextContent("Precio web (IVA incl.): 560,00 €");
   });
 
   it("en el móvil, tarjetas", () => {

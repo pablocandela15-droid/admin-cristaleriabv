@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { ipCliente } from "./ip-cliente.ts";
+import { enSegundoPlano, mensajeDeRespuesta, registrarErrorServidor } from "./logs-web/servidor.ts";
 
 type Actor = { id: string; email?: string | null };
 type Contexto = { fuente: string; peticionId: string; actor: Actor | null; userAgent: string; deviceId: string; ip: string };
@@ -54,7 +55,7 @@ export function clienteConAuditoria<T extends Fabrica>(fabrica: T, fuente: strin
 
 const SIN_EVENTO_PROPIO = new Set([
   "admin-create-user", "admin-delete-user", "admin-set-super-admin", "admin-update-user-password", "admin-set-user-access",
-  "auditoria-revertir", "list-users", "leer-metricas", "registrar-metrica",
+  "auditoria-revertir", "list-users", "leer-metricas", "registrar-metrica", "sync-trafico-web",
   // Solo LEE consumo (Super Admin › Servicios): cada visita no es una acción; los fallos sí se registran.
   "servicios-uso",
   // Registra su propio intento (iniciar/finalizar_cambio_contrasena) y el cambio lo audita el trigger de auth.users.
@@ -75,6 +76,12 @@ export const ADMITE_INTEGRACION: ReadonlySet<string> = new Set([
   // Facturas: la lectura en segundo plano (pg_net desde Postgres, solo x-ocr-secret) y la clasificación del
   // catálogo (pg_cron con x-ocr-secret o un usuario con «Editar» en Facturas).
   "ocr-trabajo", "clasificar-productos",
+  // Tráfico web: la sincronización nocturna con Vercel (pg_cron con x-ocr-secret).
+  "sync-trafico-web",
+  // Super Admin › Logs: la ingesta la llama cualquier visitante de la web (origen
+  // permitido + tope de tamaño + límite por IP con HMAC + cupo diario en la RPC);
+  // el proceso, pg_cron con x-ocr-secret o un super admin.
+  "registrar-actividad-web", "procesar-logs-web",
 ]);
 
 /** La autenticación y autorización de negocio siguen en cada handler. */
@@ -138,10 +145,14 @@ export function conAuditoriaDePeticion(
           status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
       }
-      // Los 5xx y las excepciones quedan en el log de la función (console.error arriba). En el panel
-      // original iban además a Super Admin › Logs (error_servidor), que aquí no existe.
-      if (response.status >= 500 && !excepcion) console.error(`[${fuente}] ${response.status} en ${req.method} (${Date.now() - inicio} ms)`);
-      void pila;
+      // Super Admin › Logs: los 5xx y las excepciones quedan además como error_servidor (sin cuerpo ni datos del
+      // usuario). Nunca rompe ni retrasa la respuesta (_shared/logs-web/servidor.ts).
+      if (response.status >= 500) {
+        if (!excepcion) console.error(`[${fuente}] ${response.status} en ${req.method} (${Date.now() - inicio} ms)`);
+        const subruta = new URL(req.url).pathname.split(fuente).slice(1).join(fuente);
+        const mensaje = excepcion ?? await mensajeDeRespuesta(response);
+        await enSegundoPlano(registrarErrorServidor({ fuente, subruta, status: response.status, mensaje, duracionMs: Date.now() - inicio, metodo: req.method, pila, excepcion: excepcion !== null }));
+      }
       // Efectos externos (envíos, sincronizaciones, OCR, publicación...) también
       // tienen un evento propio. Las mutaciones SQL se registran atómicamente
       // por trigger. No se guarda el cuerpo de la petición ni de la respuesta.

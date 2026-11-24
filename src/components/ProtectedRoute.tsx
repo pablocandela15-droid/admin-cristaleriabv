@@ -25,6 +25,7 @@ const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   // Una pestaña por sección (Fotos, Tarifas, Contenido): con ver una se entra.
   "/web": ["web_fotos", "web_tarifas", "web_contenido"],
   "/presupuestos": "presupuestos",
+  "/trafico-web": "trafico_web",
   "/usuarios": "usuarios",
 };
 // Las páginas de /super-admin/* no tienen ruta aquí: las protege SuperAdminRoute.

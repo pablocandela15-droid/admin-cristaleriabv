@@ -112,6 +112,7 @@ describe("InvitarUsuario · «Puede editar» al crear", () => {
       { section_key: "web_tarifas", can_view: false, can_edit: false },
       { section_key: "web_contenido", can_view: false, can_edit: false },
       { section_key: "presupuestos", can_view: false, can_edit: false },
+      { section_key: "trafico_web", can_view: false, can_edit: false },
       { section_key: "usuarios", can_view: false, can_edit: false },
     ]);
     expect(rolEnviado()).toBe("staff");

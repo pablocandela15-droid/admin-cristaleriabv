@@ -1322,6 +1322,30 @@ export type Database = {
         }
         Relationships: []
       }
+      peso_paginas: {
+        Row: {
+          actualizado_en: string
+          bytes_por_visita: number
+          nota: string | null
+          proyecto: string
+          ruta: string
+        }
+        Insert: {
+          actualizado_en?: string
+          bytes_por_visita: number
+          nota?: string | null
+          proyecto: string
+          ruta?: string
+        }
+        Update: {
+          actualizado_en?: string
+          bytes_por_visita?: number
+          nota?: string | null
+          proyecto?: string
+          ruta?: string
+        }
+        Relationships: []
+      }
       presupuesto_lineas: {
         Row: {
           id: string
@@ -1900,6 +1924,93 @@ export type Database = {
           eur_por_usd?: number
           fuente?: string
           actualizado_en?: string
+        }
+        Relationships: []
+      }
+      trafico_web_desglose: {
+        Row: {
+          dimension: string
+          fecha: string
+          proyecto: string
+          sincronizado_en: string
+          valor: string
+          visitantes: number | null
+          visitas: number
+        }
+        Insert: {
+          dimension: string
+          fecha: string
+          proyecto: string
+          sincronizado_en?: string
+          valor: string
+          visitantes?: number | null
+          visitas: number
+        }
+        Update: {
+          dimension?: string
+          fecha?: string
+          proyecto?: string
+          sincronizado_en?: string
+          valor?: string
+          visitantes?: number | null
+          visitas?: number
+        }
+        Relationships: []
+      }
+      trafico_web_diario: {
+        Row: {
+          fecha: string
+          proyecto: string
+          ruta: string
+          sincronizado_en: string
+          visitantes: number | null
+          visitas: number
+        }
+        Insert: {
+          fecha: string
+          proyecto: string
+          ruta?: string
+          sincronizado_en?: string
+          visitantes?: number | null
+          visitas: number
+        }
+        Update: {
+          fecha?: string
+          proyecto?: string
+          ruta?: string
+          sincronizado_en?: string
+          visitantes?: number | null
+          visitas?: number
+        }
+        Relationships: []
+      }
+      trafico_web_sync_estado: {
+        Row: {
+          datos_desde: string | null
+          dias_ultimo_sync: number | null
+          fallos_consecutivos: number
+          proyecto: string
+          ultimo_error: string | null
+          ultimo_intento_en: string | null
+          ultimo_ok_en: string | null
+        }
+        Insert: {
+          datos_desde?: string | null
+          dias_ultimo_sync?: number | null
+          fallos_consecutivos?: number
+          proyecto: string
+          ultimo_error?: string | null
+          ultimo_intento_en?: string | null
+          ultimo_ok_en?: string | null
+        }
+        Update: {
+          datos_desde?: string | null
+          dias_ultimo_sync?: number | null
+          fallos_consecutivos?: number
+          proyecto?: string
+          ultimo_error?: string | null
+          ultimo_intento_en?: string | null
+          ultimo_ok_en?: string | null
         }
         Relationships: []
       }
@@ -3313,6 +3424,85 @@ export type Database = {
             fecha: string
             fuente: string
           }[]
+      }
+      trafico_web_desglose_resumen: {
+        Args: {
+          p_desde?: string
+          p_dimension?: string
+          p_hasta?: string
+          p_limite?: number
+          p_proyecto?: string | null
+        }
+        Returns: {
+          pct: number | null
+          valor: string
+          visitantes: number | null
+          visitas: number
+        }[]
+      }
+      trafico_web_fdt_mes: {
+        Args: { p_mes?: string | null }
+        Returns: {
+          alerta_80: boolean
+          bytes_acumulados: number | null
+          bytes_medios_por_visita: number | null
+          bytes_proy_lineal: number | null
+          bytes_proy_regresion: number | null
+          dias_con_dato: number
+          dias_mes: number
+          dias_restantes: number
+          limite_bytes: number
+          pct_limite: number | null
+          pct_proyectado: number | null
+          proyecto: string
+          visitas_mes: number | null
+        }[]
+      }
+      trafico_web_serie: {
+        Args: { p_desde?: string; p_hasta?: string; p_proyecto?: string | null }
+        Returns: {
+          desv_30: number | null
+          desv_dow: number | null
+          desviacion_pct: number | null
+          es_anomalia: boolean | null
+          fecha: string
+          media_30: number | null
+          media_7: number | null
+          media_dow: number | null
+          n_dow: number
+          visitantes: number | null
+          visitas: number | null
+          z_dow: number | null
+        }[]
+      }
+      trafico_web_tendencia: {
+        Args: { p_dias?: number; p_proyecto?: string | null }
+        Returns: {
+          fiable: boolean | null
+          intercepto: number | null
+          n: number
+          pendiente: number | null
+          proyeccion: Json | null
+          r2: number | null
+          total_30d: number | null
+        }[]
+      }
+      trafico_web_top_paginas: {
+        Args: {
+          p_desde?: string
+          p_hasta?: string
+          p_limite?: number
+          p_orden?: string
+          p_proyecto?: string | null
+        }
+        Returns: {
+          bytes_estimados: number | null
+          pct_bytes: number | null
+          pct_visitas: number | null
+          proyecto: string
+          ruta: string
+          visitas: number
+        }[]
       }
       unidad_comparable: {
         Args: {

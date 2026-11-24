@@ -20,6 +20,9 @@ const AUTENTICACION_PROPIA: Record<string, { mecanismo: string; patrones: RegExp
   "avisos-telegram": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (pg_cron o SQL con el secreto de Vault) o JWT de super admin", patrones: [/x-ocr-secret/, /compararTiempoConstante/, /exigirSuperAdmin/] },
   "ocr-trabajo": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (solo pg_net desde Postgres)", patrones: [/verificarSecreto/] },
   "clasificar-productos": { mecanismo: "x-ocr-secret en tiempo constante (pg_cron) o JWT con «Editar» en Facturas", patrones: [/verificarSecreto/, /autenticar\(req, cfgAuth, "edit"\)/] },
+  "sync-trafico-web": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (solo pg_cron)", patrones: [/x-ocr-secret/, /compararTiempoConstante/] },
+  "procesar-logs-web": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (pg_cron) o JWT de super admin", patrones: [/x-ocr-secret/, /compararTiempoConstante/, /exigirSuperAdmin/] },
+  "registrar-actividad-web": { mecanismo: "pública: origen permitido, tope de tamaño, límite por IP con HMAC y cupo diario en la RPC", patrones: [/entornoDeOrigen/, /MAX_BYTES_LOTE/, /hmacHex/] },
 };
 
 /** Funciones del panel que actúan en nombre de un usuario: nunca pueden estar en la lista. */
@@ -40,8 +43,11 @@ function fuentes(dir: string): string {
 }
 
 describe("ADMITE_INTEGRACION", () => {
-  it("son solo los procesos programados (costes de OpenAI, modelos de IA, avisos por Telegram y lectura de facturas)", () => {
-    expect([...ADMITE_INTEGRACION].sort()).toEqual(["avisos-telegram", "clasificar-productos", "ia-modelos-openai", "ocr-trabajo", "sincronizar-costes-openai"]);
+  it("son los procesos programados (costes de OpenAI, modelos de IA, avisos por Telegram, lectura de facturas, Tráfico web y Logs) y la ingesta de la web", () => {
+    expect([...ADMITE_INTEGRACION].sort()).toEqual([
+      "avisos-telegram", "clasificar-productos", "ia-modelos-openai", "ocr-trabajo", "procesar-logs-web", "registrar-actividad-web",
+      "sincronizar-costes-openai", "sync-trafico-web",
+    ]);
   });
 
   it.each(DE_USUARIO)("no incluye %s (actúa en nombre de un usuario)", (fn) => {

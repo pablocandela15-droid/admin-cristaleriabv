@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalculadoraCampos, ResultadoCalculo } from "@/components/web/CalculadoraCampos";
 import { useCalculadora } from "@/hooks/useCalculadora";
 import { cn } from "@/lib/utils";
-import { cambiosAlRecalcular, lineaDesdeCalculadora } from "@/lib/presupuestos/lineas";
-import { eurosCentimos, redondear2 } from "@/lib/presupuestos/totales";
+import { cambiosAlRecalcular, lineaDesdeCalculadora, precioConIva } from "@/lib/presupuestos/lineas";
+import { eurosCentimos, formatoPorcentaje, redondear2 } from "@/lib/presupuestos/totales";
 import type { CambiosLinea, LineaNueva, LineaPresupuesto } from "@/lib/presupuestos/tipos";
 import type { PricingConfig } from "@/lib/web/pricing/config";
 import type { CategoriaAplicada } from "@/lib/web/pricing/tarifas";
@@ -20,6 +20,8 @@ interface DialogoCalculadoraProps {
   linea?: LineaPresupuesto | null;
   categorias: Record<IdCategoria, CategoriaAplicada>;
   precios: PricingConfig;
+  /** IVA del presupuesto (el de pantalla): el precio de la calculadora lo lleva incluido y la línea se guarda sin él. */
+  ivaPct: number;
   /** Aviso si no se han podido leer las tarifas (se calcula con las de serie). */
   avisoTarifas?: string | null;
   guardando?: boolean;
@@ -30,8 +32,9 @@ interface DialogoCalculadoraProps {
 
 /**
  * «Añadir desde calculadora»: la calculadora de la web (cualquier categoría, también las ocultas en la web) con las
- * tarifas de hoy. Añade una línea con el nombre de la categoría, lo elegido y el desglose, cantidad 1 y el total como
- * precio. Con `linea`, «Recalcular»: abre lo que se guardó y avisa si con las tarifas de hoy sale otro precio.
+ * tarifas de hoy. Añade una línea con el nombre de la categoría, lo elegido y el desglose, cantidad 1 y, como el
+ * precio de la web lleva el IVA incluido, ese total sin el IVA del presupuesto como precio (el total con IVA es el
+ * precio web). Con `linea`, «Recalcular»: abre lo que se guardó y avisa si con las tarifas de hoy sale otro precio.
  */
 export function DialogoCalculadora(props: DialogoCalculadoraProps) {
   const { abierto, linea, onCerrar } = props;
@@ -47,7 +50,7 @@ export function DialogoCalculadora(props: DialogoCalculadoraProps) {
 
 const esIdCategoria = (v: unknown): v is IdCategoria => (IDS_CATEGORIAS as string[]).includes(String(v));
 
-function Contenido({ linea, categorias, precios, avisoTarifas, guardando, onAnadir, onActualizar, onCerrar }: DialogoCalculadoraProps) {
+function Contenido({ linea, categorias, precios, ivaPct, avisoTarifas, guardando, onAnadir, onActualizar, onCerrar }: DialogoCalculadoraProps) {
   const inicial: IdCategoria = esIdCategoria(linea?.categoria) ? linea.categoria : (IDS_CATEGORIAS.find((id) => categorias[id].activo) ?? IDS_CATEGORIAS[0]);
   const [cat, setCat] = useState<IdCategoria>(inicial);
   // Estable: useCalculadora los pone una vez, en la categoría de la línea.
@@ -55,13 +58,17 @@ function Contenido({ linea, categorias, precios, avisoTarifas, guardando, onAnad
   const calc = useCalculadora(categorias, precios, cat, valoresPartida);
   const recalculando = !!linea;
   const listo = calc.presupuesto.ready;
-  const nueva = useMemo(() => lineaDesdeCalculadora(calc.categoria, calc.valores, calc.presupuesto), [calc.categoria, calc.valores, calc.presupuesto]);
+  const nueva = useMemo(
+    () => lineaDesdeCalculadora(calc.categoria, calc.valores, calc.presupuesto, ivaPct),
+    [calc.categoria, calc.valores, calc.presupuesto, ivaPct],
+  );
+  const cambios = linea ? cambiosAlRecalcular(linea, calc.categoria, calc.valores, calc.presupuesto, categorias, ivaPct) : null;
   const diferencia =
     recalculando && linea.precio_calculado != null && listo && cat === linea.categoria ? redondear2(calc.presupuesto.total - linea.precio_calculado) : 0;
 
   const guardar = () => {
     if (!listo) return;
-    if (linea) onActualizar(linea, cambiosAlRecalcular(linea, calc.categoria, calc.valores, calc.presupuesto, categorias));
+    if (linea && cambios) onActualizar(linea, cambios);
     else onAnadir(nueva);
   };
 
@@ -74,8 +81,8 @@ function Contenido({ linea, categorias, precios, avisoTarifas, guardando, onAnad
         </DialogTitle>
         <DialogDescription>
           {recalculando
-            ? "Lo que se rellenó al añadirla, calculado con las tarifas de hoy. Cambia lo que haga falta y actualiza la línea."
-            : "La calculadora de la web con las tarifas de hoy. Rellena las medidas y las opciones: la línea se añade con su detalle y el total como precio."}
+            ? `Lo que se rellenó al añadirla, calculado con las tarifas de hoy. Cambia lo que haga falta y actualiza la línea: su precio será el de la calculadora sin el IVA (${formatoPorcentaje(ivaPct)}).`
+            : `La calculadora de la web con las tarifas de hoy. Sus precios llevan el IVA incluido: la línea se añade con su detalle y ese precio sin el IVA del presupuesto (${formatoPorcentaje(ivaPct)}), así el total con IVA es el de la calculadora.`}
         </DialogDescription>
       </DialogHeader>
 
@@ -121,17 +128,17 @@ function Contenido({ linea, categorias, precios, avisoTarifas, guardando, onAnad
           {recalculando && (
             <dl className="space-y-1 rounded-md border p-3 text-sm" data-testid="comparar-tarifas">
               <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">Precio en la línea</dt>
+                <dt className="text-muted-foreground">Precio en la línea (sin IVA)</dt>
                 <dd className="tabular-nums">{eurosCentimos(linea.precio_unitario)}</dd>
               </div>
               {linea.precio_calculado != null && (
                 <div className="flex justify-between gap-3">
-                  <dt className="text-muted-foreground">Calculado al añadirla</dt>
+                  <dt className="text-muted-foreground">Precio web al añadirla (IVA incl.)</dt>
                   <dd className="tabular-nums">{eurosCentimos(linea.precio_calculado)}</dd>
                 </div>
               )}
               <div className="flex justify-between gap-3 font-medium">
-                <dt>Con las tarifas de hoy</dt>
+                <dt>Con las tarifas de hoy (IVA incl.)</dt>
                 <dd className="tabular-nums">{listo ? eurosCentimos(calc.presupuesto.total) : "—"}</dd>
               </div>
               {diferencia !== 0 && (
@@ -145,8 +152,10 @@ function Contenido({ linea, categorias, precios, avisoTarifas, guardando, onAnad
           {listo && (
             <div className="rounded-md bg-muted/60 p-3 text-xs" data-testid="vista-linea">
               <p className="font-medium text-foreground">{recalculando ? "La línea quedará así" : "Se añadirá"}:</p>
-              <p className="mt-1 font-semibold text-foreground">{recalculando && !cambiosAlRecalcular(linea, calc.categoria, calc.valores, calc.presupuesto, categorias).descripcion ? linea.descripcion : nueva.descripcion}</p>
-              <p className="text-muted-foreground">1 × {eurosCentimos(nueva.precio_unitario)}</p>
+              <p className="mt-1 font-semibold text-foreground">{recalculando && !cambios?.descripcion ? linea.descripcion : nueva.descripcion}</p>
+              <p className="text-muted-foreground" data-testid="vista-linea-precio">
+                1 × {eurosCentimos(nueva.precio_unitario)} sin IVA · {eurosCentimos(precioConIva(nueva.precio_unitario, ivaPct))} con IVA ({formatoPorcentaje(ivaPct)})
+              </p>
             </div>
           )}
         </div>

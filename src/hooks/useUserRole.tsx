@@ -49,6 +49,9 @@ export const SECTIONS = [
   // Gestor de presupuestos y solicitudes que llegan de la web (misma migración). «Ver» consulta; «Editar» crea,
   // cambia y envía.
   { key: "presupuestos", label: "Presupuestos" },
+  // Visitas de la web (Vercel Web Analytics) y comportamiento de los visitantes (migraciones 20261124110000_trafico_web
+  // y 20261124120000_logs_web, página /trafico-web). «Ver» consulta; «Editar» además cambia los pesos por página.
+  { key: "trafico_web", label: "Tráfico web" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
 // Nota: lo del Super Admin (Control del Panel, Auditoría, Servicios, Gestor Gasto…) no forma parte del

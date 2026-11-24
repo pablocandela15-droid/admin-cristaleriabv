@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-cristaleriabv. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración empieza en 1.0.0.
 
+## [1.3.0] - 2026-11-24
+
+Objetivo: Tráfico web, Super Admin › Logs y precio de la calculadora de la web con IVA incluido
+
+### Añadido
+- Tráfico web, Super Admin › Logs y precio de la web con IVA incluido ([#7](https://github.com/oficiososia/admin-cristaleriabv/pull/7))
+
 ## [1.2.1] - 2026-11-24
 
 Objetivo: Arreglar el despliegue automático de Supabase (CLI 3.x) para subir las migraciones y funciones de la v1.2.0
