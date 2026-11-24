@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-cristaleriabv. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración empieza en 1.0.0.
 
+## [1.2.1] - 2026-11-24
+
+Objetivo: Arreglar el despliegue automático de Supabase (CLI 3.x) para subir las migraciones y funciones de la v1.2.0
+
+### Cambiado
+- Ci: despliegue de Supabase con la CLI 3.x ([#5](https://github.com/oficiososia/admin-cristaleriabv/pull/5))
+
 ## [1.2.0] - 2026-11-23
 
 Objetivo: Facturas con OCR, web editable desde el panel (fotos, tarifas y contenido) y gestor de presupuestos
