@@ -14,7 +14,7 @@ import { AVISO_PUBLICACION_WEB } from "@/lib/web/fotos";
 
 // ---------------------------------------------------------------------------
 // Web (/web): lo que se edita de la web de la cristalería. Una pestaña por
-// sección de permisos: «Fotos» (books de trabajos), «Tarifas» (precios y
+// sección de permisos: «Fotos» (por tipo de trabajo), «Tarifas» (precios y
 // opciones de la calculadora) y «Contenido» (textos e imágenes). Con solo
 // «Ver» la pestaña sale en solo lectura. La web lee los cambios cada minuto.
 // ---------------------------------------------------------------------------
