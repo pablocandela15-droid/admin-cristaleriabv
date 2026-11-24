@@ -60,6 +60,9 @@ const SIN_EVENTO_PROPIO = new Set([
   "servicios-uso",
   // Registra su propio intento (iniciar/finalizar_cambio_contrasena) y el cambio lo audita el trigger de auth.users.
   "cambiar-mi-contrasena",
+  // Newsletter: el panel pide el estado de la configuración al abrir la página (cada visita no es una acción); las
+  // sincronizaciones quedan en newsletter_sincronizaciones_resend con quién las lanzó. Los fallos sí se registran.
+  "newsletter-sync-resend",
 ]);
 
 // Funciones que pueden ejecutarse SIN usuario ni service role porque tienen
@@ -82,6 +85,10 @@ export const ADMITE_INTEGRACION: ReadonlySet<string> = new Set([
   // permitido + tope de tamaño + límite por IP con HMAC + cupo diario en la RPC);
   // el proceso, pg_cron con x-ocr-secret o un super admin.
   "registrar-actividad-web", "procesar-logs-web",
+  // Newsletter: el alta de la web (origen permitido + campo trampa + consentimiento + límite por IP con HMAC en la
+  // RPC), la baja (token aleatorio por suscriptor; también el botón one-click, sin cabeceras), los eventos de Resend
+  // (firma svix) y la lista de envío (pg_cron con x-ocr-secret o un usuario con la sección).
+  "newsletter-alta", "newsletter-baja", "resend-webhook", "newsletter-sync-resend",
 ]);
 
 /** La autenticación y autorización de negocio siguen en cada handler. */
