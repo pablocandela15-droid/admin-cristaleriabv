@@ -2,6 +2,14 @@
 
 Publicaciones en producción de admin-cristaleriabv. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración empieza en 1.0.0.
 
+## [1.2.0] - 2026-11-23
+
+Objetivo: Facturas con OCR, web editable desde el panel (fotos, tarifas y contenido) y gestor de presupuestos
+
+### Añadido
+- Facturas: módulo Facturas con OCR + despliegue automático de Supabase ([#2](https://github.com/oficiososia/admin-cristaleriabv/pull/2))
+- Web: web editable desde el panel (Fotos, Tarifas, Contenido) y gestor de Presupuestos ([#3](https://github.com/oficiososia/admin-cristaleriabv/pull/3))
+
 ## [1.0.0] - 2026-11-18
 
 Objetivo: Primera versión del panel de administración de Cristalería Baix Vinalopó
