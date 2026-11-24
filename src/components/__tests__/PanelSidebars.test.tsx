@@ -312,7 +312,7 @@ describe("menú del panel normal · cabecera con el negocio", () => {
       </MemoryRouter>,
     );
     expect(screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"))).toEqual([
-      "Dashboard", "Facturas", "Web", "Presupuestos", "Usuarios", "Nueva petición", "Ayuda",
+      "Dashboard", "Facturas", "Web", "Presupuestos", "Tráfico web", "Usuarios", "Nueva petición", "Ayuda",
     ]);
   });
 });

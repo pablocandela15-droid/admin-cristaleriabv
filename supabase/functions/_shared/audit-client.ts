@@ -54,7 +54,7 @@ export function clienteConAuditoria<T extends Fabrica>(fabrica: T, fuente: strin
 
 const SIN_EVENTO_PROPIO = new Set([
   "admin-create-user", "admin-delete-user", "admin-set-super-admin", "admin-update-user-password", "admin-set-user-access",
-  "auditoria-revertir", "list-users", "leer-metricas", "registrar-metrica",
+  "auditoria-revertir", "list-users", "leer-metricas", "registrar-metrica", "sync-trafico-web",
   // Solo LEE consumo (Super Admin › Servicios): cada visita no es una acción; los fallos sí se registran.
   "servicios-uso",
   // Registra su propio intento (iniciar/finalizar_cambio_contrasena) y el cambio lo audita el trigger de auth.users.
@@ -75,6 +75,8 @@ export const ADMITE_INTEGRACION: ReadonlySet<string> = new Set([
   // Facturas: la lectura en segundo plano (pg_net desde Postgres, solo x-ocr-secret) y la clasificación del
   // catálogo (pg_cron con x-ocr-secret o un usuario con «Editar» en Facturas).
   "ocr-trabajo", "clasificar-productos",
+  // Tráfico web: la sincronización nocturna con Vercel (pg_cron con x-ocr-secret).
+  "sync-trafico-web",
 ]);
 
 /** La autenticación y autorización de negocio siguen en cada handler. */

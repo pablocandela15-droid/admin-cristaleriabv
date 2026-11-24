@@ -1,6 +1,6 @@
 import { useState, type ComponentType } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronDown, FileText, MessageSquarePlus, PlayCircle, Receipt, Shield } from "lucide-react";
+import { Activity, ChevronDown, FileText, MessageSquarePlus, PlayCircle, Receipt, Shield } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ const ICONOS: Record<SeccionAyuda, ComponentType<{ className?: string }>> = {
   facturas: Receipt,
   peticiones: MessageSquarePlus,
   presupuestos: FileText,
+  trafico_web: Activity,
   usuarios: Shield,
 };
 
@@ -31,6 +32,7 @@ const PERMISOS: Record<SeccionAyuda, SectionKey[]> = {
   facturas: ["facturas", "facturas_subida"],
   peticiones: [],
   presupuestos: ["presupuestos"],
+  trafico_web: ["trafico_web"],
   usuarios: ["usuarios"],
 };
 

@@ -221,6 +221,64 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       },
     ],
   },
+  {
+    seccion: "trafico_web",
+    titulo: "Tráfico web",
+    ruta: "/trafico-web",
+    queEs:
+      "Aquí ves cuánta gente entra en la web de la cristalería y qué hace en ella: las visitas de cada día, las páginas más vistas, de dónde llegan y cuántos usan la calculadora, piden presupuesto, pulsan WhatsApp o llaman. Las cifras se ponen al día solas cada noche.",
+    grupos: [
+      {
+        titulo: "Las visitas",
+        pasos: [
+          "Arriba elige el periodo (30, 90, 180 o 365 días). Todo lo de la página cambia a ese periodo.",
+          "Las cifras de arriba son las visitas y los visitantes del periodo, comparados con el periodo anterior, y la tendencia (si suben o bajan). Si aún hay pocos días, la página lo avisa.",
+          "La gráfica enseña las visitas día a día y marca los días raros: muchas más o muchas menos visitas de lo normal para ese día de la semana. Debajo están las páginas más vistas y de dónde llegan (Google, Instagram, un enlace…), qué dispositivos usan y de qué país son.",
+        ],
+      },
+      {
+        titulo: "Qué hacen los visitantes",
+        pasos: [
+          "En «Comportamiento de los visitantes» ves cuántos han usado la calculadora, cuántos han pedido presupuesto desde la web, cuántos han pulsado WhatsApp o el teléfono y cuántos han enviado el formulario de contacto.",
+          "Los recorridos («embudos») dicen cuántos empiezan a pedir un presupuesto y cuántos lo terminan; así sabes si algo de la web les frena.",
+          "También ves qué servicios y qué trabajos miran más. Las solicitudes que llegan aparecen además en Presupuestos › Solicitudes.",
+        ],
+      },
+      {
+        titulo: "La transferencia",
+        pasos: [
+          "La web está en el plan gratuito de Vercel, que tiene un límite de transferencia al mes. «Transferencia del mes» estima cuánto lleva gastado y cuánto gastará a final de mes; si se acerca al límite, avisa.",
+          "«Pesos por página» es lo que pesa de media cada página al abrirla. Solo cambia si sabes lo que haces: si no, déjalo como está.",
+        ],
+      },
+    ],
+    preguntas: [
+      {
+        pregunta: "Hoy no sale nada de hoy, ¿por qué?",
+        respuesta:
+          "Las visitas se copian cada noche (a las 03:30 UTC) con los días ya cerrados: lo de hoy aparece mañana. El comportamiento de los visitantes, en cambio, se pone al día cada pocos minutos.",
+      },
+      {
+        pregunta: "¿Por qué no coinciden del todo las visitas con lo que hacen los visitantes?",
+        respuesta:
+          "Son dos cuentas distintas: las visitas las cuenta Vercel y el comportamiento lo cuenta la propia web. Además, quien tiene puesto en su navegador «No rastrear» no se cuenta en el comportamiento. Las cifras se parecen, pero no son exactamente iguales.",
+      },
+      {
+        pregunta: "¿La web usa cookies para esto?",
+        respuesta:
+          "No. Ni las visitas ni el comportamiento usan cookies ni guardan nada en el móvil o el ordenador del visitante, y no se sabe quién es cada uno: solo se cuenta lo que pasa.",
+      },
+      {
+        pregunta: "Pone «Aún no hay datos», ¿qué hago?",
+        respuesta:
+          "Si la web acaba de ponerse en marcha, espera a mañana. Si sigue igual, la página te dice qué falta configurar: díselo a quien lleva la parte técnica del panel.",
+      },
+      {
+        pregunta: "No puedo cambiar los pesos por página, ¿por qué?",
+        respuesta: "Tienes permiso para ver el tráfico pero no para cambiarlo. Pídeselo al encargado si lo necesitas.",
+      },
+    ],
+  },
 ];
 
 /** ¿Es un archivo de vídeo (se enseña con <video>) y no un enlace de inserción (<iframe>)? */

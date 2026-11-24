@@ -60,6 +60,14 @@ verify_jwt = false
 verify_jwt = false
 
 
+# Tráfico web (20261124110000_trafico_web.sql): la llama SOLO pg_cron a las 03:30 UTC (trafico_web_disparar,
+# pg_net sin JWT) con x-ocr-secret == OCR_TRABAJOS_SECRET en tiempo constante y fail-closed. No acepta datos del
+# cuerpo: con VERCEL_ANALYTICS_TOKEN trae de Vercel Web Analytics las visitas de la web (proyecto cristaleriabv).
+# Ver supabase/functions/sync-trafico-web/ y docs/TRAFICO-WEB.md.
+[functions.sync-trafico-web]
+verify_jwt = false
+
+
 # ----------------------------------------------------------------------------
 # verify_jwt = true — autenticación propia REAL + filtro barato encima
 # ----------------------------------------------------------------------------
@@ -151,3 +159,4 @@ verify_jwt = true
 # OCR_MODELO_PIEZAS, OCR_DETALLE y FACTURAS_CIF_EMPRESA.
 [functions.procesar-factura]
 verify_jwt = true
+

@@ -47,6 +47,7 @@ describe("SECCIONES_CONFIGURABLES", () => {
       ["web_tarifas", "Web · Tarifas"],
       ["web_contenido", "Web · Contenido"],
       ["presupuestos", "Presupuestos"],
+      ["trafico_web", "Tráfico web"],
       ["usuarios", "Usuarios"],
     ]);
   });
@@ -91,6 +92,7 @@ describe("permisosParaEditar", () => {
       permiso("web_tarifas", false, false),
       permiso("web_contenido", false, false),
       permiso("presupuestos", false, false),
+      permiso("trafico_web", false, false),
       permiso("usuarios", false, false),
     ]);
   });
@@ -107,7 +109,7 @@ describe("permisosParaEditar", () => {
       permiso("trabajadores", true, true),
     ]);
     expect(permisos.map((p) => p.section_key)).toEqual([
-      "dashboard", "facturas", "facturas_subida", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "usuarios",
+      "dashboard", "facturas", "facturas_subida", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "trafico_web", "usuarios",
     ]);
     expect(permisos.every((p) => !p.can_view && !p.can_edit)).toBe(true);
   });
@@ -123,8 +125,8 @@ describe("«Usuarios» y «Facturas · Subida»: un solo interruptor (en can_vie
   });
 
   it("Facturas: «Puede editar» cuenta para el rol; «Facturas · Subida» no", () => {
-    // Admin si edita en todas las que cuentan (Facturas, las tres de Web y Presupuestos); en alguna, manager.
-    expect(rolSegunPermisos(["facturas", "web_fotos", "web_tarifas", "web_contenido", "presupuestos"].map((k) => permiso(k, true, true)))).toBe("admin");
+    // Admin si edita en todas las que cuentan (Facturas, las tres de Web, Presupuestos y Tráfico web); en alguna, manager.
+    expect(rolSegunPermisos(["facturas", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "trafico_web"].map((k) => permiso(k, true, true)))).toBe("admin");
     expect(rolSegunPermisos([permiso("facturas", true, true)])).toBe("manager");
     expect(rolSegunPermisos([permiso("facturas", true, false), permiso("facturas_subida", true, false)])).toBe("staff");
     expect(AYUDA_EDICION.facturas_subida).toMatch(/Cargar/);
@@ -266,5 +268,15 @@ describe("Web y Presupuestos (migración 20261123100000_web_y_presupuestos)", ()
     }
     expect(rolSegunPermisos([permiso("web_tarifas", true, true)])).toBe("manager");
     expect(rolSegunPermisos([permiso("web_fotos", true, false), permiso("presupuestos", true, false)])).toBe("staff");
+  });
+});
+
+describe("Tráfico web (migración 20261124110000_trafico_web)", () => {
+  it("«Ver» lee las visitas y el comportamiento; «Puede editar» cambia los pesos por página", () => {
+    expect(interruptorUnico("trafico_web")).toBeNull();
+    expect(AYUDA_EDICION.trafico_web).toMatch(/Con solo «Ver»/);
+    expect(AYUDA_EDICION.trafico_web).toMatch(/pesos por página/i);
+    expect(rolSegunPermisos([permiso("trafico_web", true, true)])).toBe("manager");
+    expect(rolSegunPermisos([permiso("trafico_web", true, false)])).toBe("staff");
   });
 });
