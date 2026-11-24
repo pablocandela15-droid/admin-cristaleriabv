@@ -216,7 +216,7 @@ function Solicitud({ p, onConvertir, convirtiendo }: { p: PresupuestoLista; onCo
       )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-muted-foreground">
-          Precio en la web: <span className="font-semibold text-foreground tabular-nums">{p.precioWeb == null ? "—" : eurosCentimos(p.precioWeb)}</span>
+          Precio web (IVA incl.): <span className="font-semibold text-foreground tabular-nums">{p.precioWeb == null ? "—" : eurosCentimos(p.precioWeb)}</span>
         </span>
         {onConvertir && (
           <Button

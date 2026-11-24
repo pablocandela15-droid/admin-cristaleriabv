@@ -10,18 +10,19 @@ Guía para montar el panel de Cristalería BV desde cero en un proyecto de Supab
 
 ## 2. Esquema de la base de datos
 
-Tres migraciones, en este orden (cada una con su vuelta atrás en `supabase/rollbacks/`):
+Migraciones, en este orden (cada una con su vuelta atrás en `supabase/rollbacks/`):
 
 1. [`20261118120000_nucleo_panel.sql`](../supabase/migrations/20261118120000_nucleo_panel.sql): el núcleo del panel (login, usuarios, permisos, auditoría, avisos, servicios, IA…).
 2. [`20261121100000_facturas.sql`](../supabase/migrations/20261121100000_facturas.sql): el módulo **Facturas** (facturas de proveedores con lectura automática, catálogo de productos, proveedores, avisos de subida de precio, el bucket privado `facturas-originales` y sus tareas programadas). Ver [FACTURAS.md](FACTURAS.md).
 3. [`20261123100000_web_y_presupuestos.sql`](../supabase/migrations/20261123100000_web_y_presupuestos.sql): la **web editable** (books de fotos, textos, tarifas y catálogo de la calculadora, que la web lee con su clave pública, y el bucket **público** `web-fotos`) y los **presupuestos** (con su número correlativo y las solicitudes que llegan de la web). Trae los textos y precios que tiene hoy la web: hasta que alguien los cambie en el panel, la web se ve igual. Ver [WEB.md](WEB.md).
+4. [`20261124100000_presupuestos_iva_incluido.sql`](../supabase/migrations/20261124100000_presupuestos_iva_incluido.sql): el precio de la calculadora de la web **lleva IVA**: las solicitudes de la web guardan la línea sin IVA y el precio web como precio calculado (y se ajustan las solicitudes sin atender). Ver [PRESUPUESTOS.md](PRESUPUESTOS.md#iva-el-precio-de-la-web-lleva-iva).
 
 ```bash
 npx supabase link --project-ref <ref>
 npx supabase db push
 ```
 
-(O pega cada fichero en *SQL Editor*, en orden, y ejecútalo entero.) Antes, en local: `npm run test:nucleo:db` (prueba las tres, su vuelta atrás y que se pueden volver a aplicar).
+(O pega cada fichero en *SQL Editor*, en orden, y ejecútalo entero.) Antes, en local: `npm run test:nucleo:db` (prueba todas, su vuelta atrás y que se pueden volver a aplicar).
 
 ## 3. Primer super admin
 

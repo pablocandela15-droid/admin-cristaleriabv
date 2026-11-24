@@ -34,6 +34,7 @@ export interface DatosSolicitud {
   notas: string | null;
   categoria: string;
   valores: Record<string, unknown>;
+  /** Precio de la calculadora de la web, IVA incluido (la base guarda la línea sin IVA: 20261124100000). */
   total: number;
   resumen: string;
 }

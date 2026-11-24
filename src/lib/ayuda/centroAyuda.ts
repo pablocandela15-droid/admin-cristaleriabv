@@ -177,7 +177,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
         titulo: "Hacer un presupuesto",
         pasos: [
           "Pulsa «Nuevo presupuesto», escribe el nombre del cliente (y su teléfono si lo tienes) y pulsa «Crear y abrir». El número (P-2026-0001…) lo pone el panel.",
-          "«Añadir desde calculadora»: elige qué es (mampara, espejo, cerramiento…), rellena las medidas y las opciones y pulsa «Añadir al presupuesto». La línea sale con el detalle de lo elegido y el precio de tus tarifas de hoy.",
+          "«Añadir desde calculadora»: elige qué es (mampara, espejo, cerramiento…), rellena las medidas y las opciones y pulsa «Añadir al presupuesto». La línea sale con el detalle de lo elegido y el precio de tus tarifas de hoy. Los precios de la calculadora llevan el IVA incluido: la línea lo guarda sin IVA para que el total con IVA sea el precio de la calculadora.",
           "Lo que no está en la calculadora (desplazamiento, retirar un cristal…) va con «Línea manual».",
           "En cada línea puedes cambiar la descripción, el detalle, la cantidad y el precio; se guarda al salir del campo. Ordénalas arrastrando o con las flechas.",
           "En «Totales» pon el descuento y el IVA (21 % de serie). Revisa las condiciones y la validez y pulsa «Guardar cambios».",
@@ -207,9 +207,9 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
           "No: cada línea guarda su precio. Si con las tarifas de hoy sale otro, la línea lo avisa («Tarifa de hoy») y con «Recalcular» la pones al día si quieres.",
       },
       {
-        pregunta: "¿Por qué el total es más alto que el precio que vio el cliente en la web?",
+        pregunta: "¿El precio de la web lleva IVA?",
         respuesta:
-          "El precio de la web va como precio de la línea y el presupuesto le suma el IVA. Si ese precio ya llevaba el IVA, cambia el precio de la línea o pon el IVA que corresponda.",
+          "Sí: el precio de la calculadora de la web lleva el IVA incluido. La línea lo guarda sin IVA (sale «Precio web (IVA incl.)» al lado) y el presupuesto le suma el IVA, así el total es el precio que vio el cliente. Si cambias el IVA del presupuesto, las líneas no cambian solas: usa «Recalcular» en las que quieras ajustar.",
       },
       {
         pregunta: "¿Qué significa «Caducado»?",

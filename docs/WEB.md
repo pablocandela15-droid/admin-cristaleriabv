@@ -32,6 +32,8 @@ Lo que hace la web:
 
 ## Tarifas (calculadora)
 
+**Todos los precios de la calculadora llevan el IVA incluido** (lo que paga el cliente; decisión del dueño del 24/11/2026). En Presupuestos la línea se guarda sin IVA para que el total con IVA sea el de la calculadora.
+
 Una sola fila en `web_tarifas` (id 1) con dos JSON:
 
 - `config`: los precios, con la forma de `DEFAULT_PRICING`. Se guarda entero; lo que falte lo pone el código (`mergePricing`).
@@ -83,7 +85,7 @@ Edge Function **pública** `web-solicitud-presupuesto` (`verify_jwt = false`, CO
 - `website` es un campo trampa: si llega relleno responde `200 {numero: null}` sin guardar nada.
 - Valida nombre (2–120), teléfono (6–30, con al menos 6 cifras), email (≤ 200), notas (≤ 1500), resumen (≤ 4000), total (0–1 000 000), `valores` (objeto ≤ 20 KB), categoría (una de las 8) y consentimiento. Si algo falla: `400 {error}` con el motivo para el cliente.
 - Límite: 5 solicitudes por hora por **huella** de IP (HMAC-SHA256 con la clave de servicio como sal; la IP no se guarda nunca), en la tabla `web_solicitudes_limite` (sin políticas, se purga sola al día). Pasado: `429 {error}`.
-- Guarda con el service role, por `web_solicitud_presupuesto_registrar()`, un presupuesto `estado = 'solicitud'`, `origen = 'web'` con una línea (`categoria`, `valores`, «Solicitud web · <nombre de la categoría>», el resumen como detalle, cantidad 1 y el total como precio y como precio calculado) y un aviso `presupuesto_solicitud` en la campana, que solo ve quien tiene Presupuestos. Responde `200 {numero}` (`P-AAAA-NNNN`).
+- Guarda con el service role, por `web_solicitud_presupuesto_registrar()`, un presupuesto `estado = 'solicitud'`, `origen = 'web'` con una línea (`categoria`, `valores`, «Solicitud web · <nombre de la categoría>», el resumen como detalle, cantidad 1, el total **con IVA** como precio calculado y ese total sin el IVA del presupuesto como precio: el total del presupuesto es el precio web; ver [PRESUPUESTOS.md](PRESUPUESTOS.md#iva-el-precio-de-la-web-lleva-iva)) y un aviso `presupuesto_solicitud` en la campana, que solo ve quien tiene Presupuestos. Responde `200 {numero}` (`P-AAAA-NNNN`).
 - En la auditoría sale como «API · service_role · web-solicitud-presupuesto».
 
 Los presupuestos (`presupuestos`, `presupuesto_lineas`) llevan número correlativo por año que pone la base y no se reutiliza (`presupuestos_numeracion`), y la base mantiene `subtotal` (suma de importes) y `total` (con descuento e IVA). Se atienden en **Presupuestos** (`/presupuestos?estado=solicitud`; el aviso de la campana abre la solicitud): ver [PRESUPUESTOS.md](PRESUPUESTOS.md).

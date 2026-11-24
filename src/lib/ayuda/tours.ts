@@ -242,7 +242,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     {
       titulo: "Dentro de un presupuesto",
       texto:
-        "«Añadir desde calculadora» rellena una línea con las medidas y opciones y su precio; «Línea manual», lo que no sale en la calculadora. Cambia cantidades y precios en la misma línea, ordénalas arrastrando y pon descuento e IVA en los totales. Luego descárgalo en PDF o envíalo por WhatsApp o correo y márcalo como enviado.",
+        "«Añadir desde calculadora» rellena una línea con las medidas y opciones y su precio (el de la calculadora lleva el IVA incluido; la línea va sin IVA); «Línea manual», lo que no sale en la calculadora. Cambia cantidades y precios en la misma línea, ordénalas arrastrando y pon descuento e IVA en los totales. Luego descárgalo en PDF o envíalo por WhatsApp o correo y márcalo como enviado.",
     },
     PASO_FINAL,
   ],

@@ -55,7 +55,7 @@ afterEach(() => {
 });
 
 describe("líneas", { timeout: 20_000 }, () => {
-  it("añadir desde la calculadora: mampara de 100 cm → línea con su detalle, cantidad 1 y el total como precio", () => {
+  it("añadir desde la calculadora: mampara de 100 cm → línea con su detalle, cantidad 1 y el total (IVA incluido) sin IVA como precio", () => {
     montar(conLineas());
     expect(screen.getByTestId("sin-lineas")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Añadir desde calculadora/ }));
@@ -64,12 +64,14 @@ describe("líneas", { timeout: 20_000 }, () => {
     fireEvent.change(within(dialogo).getByLabelText(/^Ancho/), { target: { value: "100" } });
     expect(within(dialogo).getByTestId("total-calculo")).toHaveTextContent("500 €");
     expect(within(dialogo).getByTestId("vista-linea")).toHaveTextContent("Mampara a medida");
+    // 500 € de la calculadora llevan el IVA: la línea va a 413,22 € y con el 21 % vuelve a dar 500 €.
+    expect(within(dialogo).getByTestId("vista-linea-precio")).toHaveTextContent("1 × 413,22 € sin IVA · 500,00 € con IVA (21 %)");
     fireEvent.click(within(dialogo).getByRole("button", { name: "Añadir al presupuesto" }));
 
     expect(h.mut.anadir.mutate).toHaveBeenCalledTimes(1);
     const args = argumentos<ArgsAnadir>(h.mut.anadir.mutate);
     expect(args).toMatchObject({ presupuestoId: "p1", orden: 0, pasarABorrador: false });
-    expect(args.linea).toMatchObject({ categoria: "mamparas", descripcion: "Mampara a medida", cantidad: 1, precio_unitario: 500, precio_calculado: 500 });
+    expect(args.linea).toMatchObject({ categoria: "mamparas", descripcion: "Mampara a medida", cantidad: 1, precio_unitario: 413.22, precio_calculado: 500 });
     expect(args.linea.valores?.ancho).toBe(100);
     expect(args.linea.detalle).toMatch(/Ancho: 100 cm/);
     // Se cierra al guardarse.
@@ -79,17 +81,33 @@ describe("líneas", { timeout: 20_000 }, () => {
   it("recalcular: avisa de que con las tarifas de hoy sale otro precio y actualiza la línea", () => {
     h.tarifas = { config: mergePricing({ mamparas: { ...DEFAULT_PRICING.mamparas, base: 250 } }), catalogo: {} };
     const valores = { ...categories.mamparas.defaults, ancho: 100 };
-    montar(conLineas({ lineas: [lineaDePrueba({ categoria: "mamparas", valores, descripcion: "Mampara a medida", precio_unitario: 500, importe: 500, precio_calculado: 500 })] }));
+    montar(conLineas({ lineas: [lineaDePrueba({ categoria: "mamparas", valores, descripcion: "Mampara a medida", precio_unitario: 413.22, importe: 413.22, precio_calculado: 500 })] }));
     expect(screen.getByTestId("tarifa-distinta")).toHaveTextContent("Tarifa de hoy: 550,00 €");
+    expect(screen.getByTestId("precio-web-linea")).toHaveTextContent("Precio web (IVA incl.): 500,00 €");
     fireEvent.click(screen.getByRole("button", { name: "Recalcular Mampara a medida" }));
     const comparar = screen.getByTestId("comparar-tarifas");
-    expect(comparar).toHaveTextContent("Calculado al añadirla500,00 €");
-    expect(comparar).toHaveTextContent("Con las tarifas de hoy550,00 €");
+    expect(comparar).toHaveTextContent("Precio en la línea (sin IVA)413,22 €");
+    expect(comparar).toHaveTextContent("Precio web al añadirla (IVA incl.)500,00 €");
+    expect(comparar).toHaveTextContent("Con las tarifas de hoy (IVA incl.)550,00 €");
     expect(comparar).toHaveTextContent("más caro: +50,00 €");
     fireEvent.click(screen.getByRole("button", { name: "Actualizar línea" }));
     const args = argumentos<ArgsCambiarLinea>(h.mut.cambiarLinea.mutate);
     expect(args).toMatchObject({ presupuestoId: "p1", id: "l1", aviso: "Línea recalculada" });
-    expect(args.cambios).toMatchObject({ precio_unitario: 550, precio_calculado: 550, descripcion: "Mampara a medida", categoria: "mamparas" });
+    expect(args.cambios).toMatchObject({ precio_unitario: 454.55, precio_calculado: 550, descripcion: "Mampara a medida", categoria: "mamparas" });
+  });
+
+  it("cambiar el IVA no reescribe las líneas: lo avisa y «Recalcular» usa el IVA nuevo", () => {
+    const valores = { ...categories.mamparas.defaults, ancho: 100 };
+    montar(conLineas({ lineas: [lineaDePrueba({ categoria: "mamparas", valores, descripcion: "Mampara a medida", precio_unitario: 413.22, importe: 413.22, precio_calculado: 500 })] }));
+    expect(screen.queryByTestId("aviso-iva-lineas")).toBeNull();
+    fireEvent.change(screen.getByLabelText("IVA (%)"), { target: { value: "10" } });
+    expect(screen.getByTestId("aviso-iva-lineas")).toHaveTextContent("Una línea de la calculadora no da su precio web con el IVA nuevo (10 %)");
+    expect(screen.getByTestId("precio-web-linea")).toHaveTextContent("con este precio e IVA: 454,54 €");
+    expect(h.mut.cambiarLinea.mutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Recalcular Mampara a medida" }));
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar línea" }));
+    // 500 / 1,10 = 454,55
+    expect(argumentos<ArgsCambiarLinea>(h.mut.cambiarLinea.mutate).cambios).toMatchObject({ precio_unitario: 454.55, precio_calculado: 500 });
   });
 
   it("cambiar cantidad y precio se guarda al salir del campo; quitar una línea", () => {
@@ -184,12 +202,13 @@ describe("estado", () => {
         origen: "web",
         condiciones: null,
         notas_cliente: "Es para el baño de arriba, ¿podéis venir el jueves?",
-        lineas: [lineaDePrueba({ categoria: "mamparas", valores: { ancho: 120 }, descripcion: "Solicitud web · Mampara a medida", precio_unitario: 560, importe: 560, precio_calculado: 560 })],
+        lineas: [lineaDePrueba({ categoria: "mamparas", valores: { ancho: 120 }, descripcion: "Solicitud web · Mampara a medida", precio_unitario: 462.81, importe: 462.81, precio_calculado: 560 })],
       }),
     );
     const bloque = screen.getByTestId("bloque-solicitud");
     expect(bloque).toHaveTextContent("¿podéis venir el jueves?");
-    expect(bloque).toHaveTextContent("Precio que vio en la web: 560,00 €");
+    expect(bloque).toHaveTextContent("Precio que vio en la web (IVA incl.): 560,00 €. La línea lo lleva sin el IVA (21 %)");
+    expect(screen.queryByTestId("aviso-iva-lineas")).toBeNull();
     expect(screen.getByTestId("origen-web")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Convertir en borrador" }));
     const args = argumentos<ArgsEstado>(h.mut.estado.mutate);
