@@ -1,0 +1,105 @@
+import { ExternalLink, HardDrive } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { TiraCifras } from "@/components/panel/TiraCifras";
+import { NOMBRE_PROYECTO, type FilaFdtMes, type ProyectoTrafico } from "@/hooks/useTraficoWeb";
+import { esNulo, fmtBytes, fmtNumero, fmtPct, URL_USO_VERCEL } from "./formato";
+
+const proyeccionMax = (f: FilaFdtMes): number | null => {
+  const a = f.bytes_proy_lineal;
+  const b = f.bytes_proy_regresion;
+  if (esNulo(a) && esNulo(b)) return null;
+  return Math.max(a ?? -Infinity, b ?? -Infinity);
+};
+
+interface FdtMesProps {
+  filas: FilaFdtMes[];
+  /** Resalta la fila de la web filtrada; con "ambos" solo se destaca el total. */
+  proyectoSeleccionado: ProyectoTrafico | null;
+}
+
+export function FdtMes({ filas, proyectoSeleccionado }: FdtMesProps) {
+  const total = filas.find((f) => f.proyecto === "*");
+  const porProyecto = filas.filter((f) => f.proyecto !== "*");
+  const proyTotal = total ? proyeccionMax(total) : null;
+  const mes = format(new Date(), "MMMM yyyy", { locale: es });
+
+  return (
+    <Card variante="plana">
+      <CardHeader className="px-0 pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium sm:text-base">
+            <HardDrive className="h-4 w-4 text-muted-foreground" aria-hidden />
+            Fast Data Transfer · {mes}
+          </CardTitle>
+          <Badge variant="outline" className="border-amber-500/50 px-2 py-0 text-[10px] font-semibold tracking-wider text-amber-700 pointer-coarse:text-xs dark:text-amber-400">
+            ESTIMACIÓN
+          </Badge>
+        </div>
+        <CardDescription className="text-xs">
+          Visitas × peso por visita de cada página. El plan Hobby de Vercel incluye 100 GB al mes de datos servidos (Fast
+          Data Transfer); en otro plan se pagan por uso. La cifra real solo la da Vercel:{" "}
+          <a
+            href={URL_USO_VERCEL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="touch-hit inline-flex items-center gap-0.5 font-medium text-primary underline-offset-2 hover:underline"
+          >
+            ver uso en Vercel <ExternalLink className="h-3 w-3" aria-hidden />
+          </a>
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 px-0">
+        <div className="space-y-2">
+          <TiraCifras
+            cifras={[
+              { etiqueta: "Servido este mes (estimado)", valor: fmtBytes(total?.bytes_acumulados) },
+              { etiqueta: "Proyección fin de mes", valor: fmtBytes(proyTotal) },
+              { etiqueta: "Del cupo Hobby (100 GB)", valor: fmtPct(total?.pct_proyectado) },
+            ]}
+          />
+          {total?.alerta_80 && (
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-400" role="status">
+              La proyección pasa del 80 % del cupo del plan Hobby: revisa el uso en Vercel.
+            </p>
+          )}
+          {total && (
+            <p className="text-xs text-muted-foreground">
+              {total.dias_con_dato} de {total.dias_mes} días con datos · quedan {total.dias_restantes}. Proyección lineal{" "}
+              {fmtBytes(total.bytes_proy_lineal)} · por regresión {fmtBytes(total.bytes_proy_regresion)}.
+            </p>
+          )}
+        </div>
+
+        {porProyecto.length > 0 && (
+          <div className="grid gap-x-6 gap-y-3 pb-1 sm:grid-cols-2">
+            {porProyecto.map((f) => {
+              const destacado = proyectoSeleccionado === f.proyecto;
+              const nombre = NOMBRE_PROYECTO[f.proyecto as ProyectoTrafico] ?? f.proyecto;
+              return (
+                <div
+                  key={f.proyecto}
+                  className={`border-l-2 pl-3 text-xs ${destacado ? "border-foreground" : "border-border"}`}
+                >
+                  <p className="mb-1 text-sm font-medium">{nombre}</p>
+                  <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-muted-foreground">
+                    <dt>Visitas del mes</dt>
+                    <dd className="text-right tabular-nums text-foreground">{fmtNumero(f.visitas_mes)}</dd>
+                    <dt>Consumido</dt>
+                    <dd className="text-right tabular-nums text-foreground">{fmtBytes(f.bytes_acumulados)}</dd>
+                    <dt>Peso medio/visita</dt>
+                    <dd className="text-right tabular-nums text-foreground">{fmtBytes(f.bytes_medios_por_visita)}</dd>
+                    <dt>Proyección fin de mes</dt>
+                    <dd className="text-right tabular-nums text-foreground">{fmtBytes(proyeccionMax(f))}</dd>
+                  </dl>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

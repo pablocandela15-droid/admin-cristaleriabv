@@ -221,7 +221,7 @@ export function ResultadoCalculo({ presupuesto, nota, className }: { presupuesto
         <p className="text-xs text-muted-foreground">Se valora en la visita: {presupuesto.pending.join(", ")}.</p>
       )}
       <div className="flex items-baseline justify-between border-t pt-2 font-semibold">
-        <span>Total orientativo</span>
+        <span>Total orientativo (IVA incl.)</span>
         <span className="tabular-nums" data-testid="total-calculo">
           {euros(presupuesto.total)}
         </span>

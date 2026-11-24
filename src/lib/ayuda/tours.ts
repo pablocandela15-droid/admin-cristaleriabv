@@ -16,7 +16,7 @@
 // Texto: para el dueño y el personal; llano, de tú, sin palabras técnicas.
 // ---------------------------------------------------------------------------
 
-export type SeccionAyuda = "facturas" | "peticiones" | "presupuestos" | "usuarios";
+export type SeccionAyuda = "facturas" | "peticiones" | "presupuestos" | "trafico_web" | "usuarios";
 
 export type LadoPaso = "top" | "right" | "bottom" | "left";
 
@@ -242,7 +242,53 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     {
       titulo: "Dentro de un presupuesto",
       texto:
-        "«Añadir desde calculadora» rellena una línea con las medidas y opciones y su precio; «Línea manual», lo que no sale en la calculadora. Cambia cantidades y precios en la misma línea, ordénalas arrastrando y pon descuento e IVA en los totales. Luego descárgalo en PDF o envíalo por WhatsApp o correo y márcalo como enviado.",
+        "«Añadir desde calculadora» rellena una línea con las medidas y opciones y su precio (el de la calculadora lleva el IVA incluido; la línea va sin IVA); «Línea manual», lo que no sale en la calculadora. Cambia cantidades y precios en la misma línea, ordénalas arrastrando y pon descuento e IVA en los totales. Luego descárgalo en PDF o envíalo por WhatsApp o correo y márcalo como enviado.",
+    },
+    PASO_FINAL,
+  ],
+  trafico_web: [
+    {
+      titulo: "Tráfico web",
+      texto:
+        "Aquí ves cuánta gente entra en la web de la cristalería y qué hace: cuántas visitas hay cada día, qué páginas miran, de dónde vienen y cuántos usan la calculadora, piden presupuesto o te escriben por WhatsApp. Las cifras se ponen al día cada noche.",
+    },
+    {
+      elemento: "trafico-filtros",
+      titulo: "El periodo",
+      texto: "Elige si quieres ver los últimos 30, 90, 180 o 365 días. Todo lo de la página (cifras, gráfica, páginas y comportamiento) cambia a ese periodo.",
+      lado: "bottom",
+    },
+    {
+      elemento: "trafico-kpis",
+      titulo: "Las cifras",
+      texto:
+        "Las visitas y los visitantes del periodo, comparados con el periodo anterior, y hacia dónde va la tendencia. Si todavía hay pocos días, lo avisa: con más datos las cifras son más fiables.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "trafico-grafica",
+      titulo: "Día a día",
+      texto:
+        "La gráfica enseña las visitas de cada día y marca los días raros (muchas más o muchas menos visitas de lo normal para ese día de la semana). Debajo tienes las páginas más vistas y de dónde llegan los visitantes.",
+      opcional: true,
+      lado: "top",
+    },
+    {
+      elemento: "trafico-comportamiento",
+      titulo: "Qué hacen los visitantes",
+      texto:
+        "Cuántos han usado la calculadora, cuántos han pedido presupuesto, cuántos han pulsado WhatsApp o el teléfono y qué trabajos y servicios miran más. La web no usa cookies ni guarda quién eres: solo cuenta lo que pasa.",
+      opcional: true,
+      lado: "top",
+    },
+    {
+      elemento: "trafico-pesos",
+      titulo: "Pesos por página",
+      texto:
+        "Sirve para estimar cuánta transferencia gasta la web al mes (el plan gratuito de Vercel tiene un límite). Si no sabes qué poner, déjalo como está.",
+      opcional: true,
+      lado: "bottom",
     },
     PASO_FINAL,
   ],

@@ -21,7 +21,7 @@ Se puede elegir como sección de inicio al entrar (Usuarios › Permisos › «A
 - **Estado**: Solicitud, Borrador, Enviado, Aceptado, Rechazado. **Caducado** no es un estado guardado: sale en un presupuesto **enviado** cuya validez (`fecha + validez_dias`) ya ha pasado.
 - **Web**: llegó desde la calculadora de la web.
 - Filtro por estado (el de **Solicitudes** lleva cuántas hay sin atender) y búsqueda por número, cliente (sin mirar acentos), correo, población o teléfono (solo cuentan las cifras). Filtro y búsqueda van en la dirección: `/presupuestos?estado=solicitud&q=juan`.
-- Las **solicitudes** enseñan lo que escribió el cliente y el precio que le dio la web, con **Convertir en borrador** (pasa a borrador, le pone las condiciones de siempre si no tiene y lo abre).
+- Las **solicitudes** enseñan lo que escribió el cliente y el precio que le dio la web («Precio web (IVA incl.)»), con **Convertir en borrador** (pasa a borrador, le pone las condiciones de siempre si no tiene y lo abre).
 - **Nuevo presupuesto**: basta con el nombre del cliente (y, si se tiene, teléfono, correo y población). Se crea en borrador, con validez de 30 días y las condiciones de siempre, y se abre.
 
 ## Un presupuesto
@@ -30,8 +30,9 @@ Se puede elegir como sección de inicio al entrar (Usuarios › Permisos › «A
 
 - **Cliente**: nombre (obligatorio), teléfono, correo, dirección y población.
 - **Líneas**: se ordenan arrastrando o con las flechas; descripción, detalle, cantidad y precio se cambian en la propia línea y se guardan al salir del campo (los números se escriben a la española, «1.234,5»). Quitar una línea se puede **deshacer** desde el aviso.
-  - **Añadir desde calculadora**: cualquier categoría (también las ocultas en la web, marcadas «oculta en la web»), con los campos y las condiciones de la calculadora (`CalculadoraCampos`) y el cálculo al momento con las tarifas de hoy (`ResultadoCalculo`). Añade `{categoria, valores, descripcion: nombre de la categoría (+ « · » nombre de la pieza), detalle: lo elegido + desglose, cantidad 1, precio_unitario = precio_calculado = total}`.
-  - **Recalcular** (líneas de la calculadora): abre la calculadora con lo que se guardó y compara el precio de la línea, el calculado al añadirla y el de las tarifas de hoy. Al actualizar se cambian valores, detalle y precios; la descripción solo si era la automática (o la de una solicitud de la web). Si con las tarifas de hoy sale otro precio, la línea lo avisa sin abrir nada («Tarifa de hoy: …»).
+  - **Añadir desde calculadora**: cualquier categoría (también las ocultas en la web, marcadas «oculta en la web»), con los campos y las condiciones de la calculadora (`CalculadoraCampos`) y el cálculo al momento con las tarifas de hoy (`ResultadoCalculo`, «Total orientativo (IVA incl.)»). Añade `{categoria, valores, descripcion: nombre de la categoría (+ « · » nombre de la pieza), detalle: lo elegido + desglose, cantidad 1, precio_unitario = round(total / (1 + IVA/100), 2), precio_calculado = total}`: **los precios de la calculadora llevan el IVA incluido** (ver [IVA](#iva-el-precio-de-la-web-lleva-iva)).
+  - **Recalcular** (líneas de la calculadora): abre la calculadora con lo que se guardó y compara el precio de la línea (sin IVA), el precio web al añadirla y el de las tarifas de hoy (los dos con IVA). Al actualizar se cambian valores, detalle y precios (con el IVA que haya en pantalla); la descripción solo si era la automática (o la de una solicitud de la web). Si con las tarifas de hoy sale otro precio, la línea lo avisa sin abrir nada («Tarifa de hoy: …»).
+  - Cada línea de la calculadora enseña su **«Precio web (IVA incl.)»**; si con su precio y el IVA del presupuesto ya no da ese precio, lo dice en ámbar («con este precio e IVA: …»).
   - **Línea manual**: concepto, detalle, cantidad y precio (desplazamiento, retirada de un cristal…).
 - **Totales**: subtotal, descuento (%), base imponible, IVA (%, 21 de serie) y total, calculados al momento como la base (`round(cantidad × precio, 2)` por línea; `total = round(subtotal × (1 − descuento/100) × (1 + IVA/100), 2)`); el IVA es `total − base`, así base + IVA = total. Lo guardado lo pone la base.
 - **Condiciones y notas**: fecha, validez (días; enseña «válido hasta»), condiciones (salen en el PDF; «Poner las de siempre» = «Presupuesto válido durante N días desde su fecha.» + la nota de precios de Web › Tarifas; cambiar los días cambia esa frase) y notas internas (no salen en el PDF ni en los envíos).
@@ -67,6 +68,18 @@ Cualquier cambio en una solicitud (cabecera o líneas) la pasa sola a borrador. 
 
 Pruebas: `src/lib/presupuestos/__tests__/` (lógica y PDF), `src/components/presupuestos/__tests__/` (lista y editor), `src/hooks/__tests__/usePresupuestos.test.tsx` (datos) y `src/pages/__tests__/Presupuestos.permisos.test.tsx` (permisos).
 
-## A decidir con el dueño
+## IVA: el precio de la web lleva IVA
 
-- **IVA y precio de la web.** El precio de la calculadora de la web se guarda como precio de la línea y el presupuesto le **suma** el IVA (21 %): una solicitud de 560 € sale con un total de 677,60 €. Si los precios de la web ya llevan IVA, hay que bajar el precio de la línea (o el IVA) al prepararlo. El editor lo explica en el bloque de la solicitud y en la ayuda.
+Decisión del dueño (24/11/2026): **los precios de la calculadora de la web incluyen el IVA**. Una línea que viene de la calculadora (panel «Añadir desde calculadora», «Recalcular» y solicitudes de la web) guarda:
+
+| Campo | Valor | Qué es |
+|---|---|---|
+| `precio_calculado` | total de la calculadora | El **precio web**, IVA incluido: lo que vio el cliente |
+| `precio_unitario` | `round(total / (1 + iva_pct/100), 2)` | El precio de la línea, **sin IVA**, con el IVA del presupuesto (21 de serie) |
+
+Así el total del presupuesto (que suma el IVA) es el precio web: una solicitud de 560 € lleva la línea a 462,81 € y el total es 560,00 € (antes salía 677,60 €). Con precios a céntimos el total puede salir **un céntimo** arriba o abajo (100 € → 82,64 € → 99,99 €).
+
+- Las solicitudes de la web las guarda así `web_solicitud_presupuesto_registrar()` desde la migración [`20261124100000_presupuestos_iva_incluido.sql`](../supabase/migrations/20261124100000_presupuestos_iva_incluido.sql). Esa migración ajusta también las solicitudes **sin atender** que ya estaban guardadas con el precio web como precio de la línea; las que ya se están trabajando no se tocan. Su vuelta atrás (`supabase/rollbacks/`) restaura la función anterior y deshace ese ajuste.
+- **Cambiar el IVA** de un presupuesto **no reescribe** sus líneas (ni en la base ni en el panel): el editor avisa («… no da su precio web con el IVA nuevo») y «Recalcular» ajusta cada línea al IVA de pantalla.
+- Las líneas manuales no cambian: su precio es sin IVA, como siempre.
+- Web › Tarifas lo dice arriba («Todos los precios llevan el IVA incluido») y «Probar» enseña «Total orientativo (IVA incl.)».

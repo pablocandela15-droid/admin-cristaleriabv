@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   Calculator,
   Copy,
@@ -65,7 +66,7 @@ import {
   validezValida,
   type FormularioCabecera,
 } from "@/lib/presupuestos/formulario";
-import { copiarLineas, mover, ordenesNuevos, precioWeb, siguienteOrdenLinea } from "@/lib/presupuestos/lineas";
+import { copiarLineas, mover, ordenesNuevos, precioFueraDelPrecioWeb, precioWeb, siguienteOrdenLinea } from "@/lib/presupuestos/lineas";
 import { nombrePdfPresupuesto } from "@/lib/presupuestos/pdf";
 import { calcularTotales, eurosCentimos, formatoPorcentaje } from "@/lib/presupuestos/totales";
 import type { CambiosLinea, LineaNueva, LineaPresupuesto, PresupuestoConLineas } from "@/lib/presupuestos/tipos";
@@ -305,6 +306,9 @@ function Editor({ p, puedeEditar, cargandoPermisos, volver, onVolver, onAbrir }:
   const web = p.origen === "web";
   const precioEnLaWeb = web ? precioWeb(p.lineas) : null;
   const soloLectura = !puedeEditar;
+  // Cambiar el IVA no reescribe las líneas de la calculadora (su precio se guardó sin el IVA de entonces): se avisa.
+  const ivaCambiado = Number(enPantalla.iva_pct) !== Number(p.iva_pct);
+  const lineasFueraDeIva = p.lineas.filter((l) => precioFueraDelPrecioWeb(l, enPantalla.iva_pct)).length;
 
   return (
     <div className="space-y-4 pb-4">
@@ -376,8 +380,9 @@ function Editor({ p, puedeEditar, cargandoPermisos, volver, onVolver, onAbrir }:
               <p className="text-sm text-muted-foreground">El cliente no escribió comentarios.</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Precio que vio en la web: <span className="font-semibold text-foreground tabular-nums">{precioEnLaWeb == null ? "—" : eurosCentimos(precioEnLaWeb)}</span>. Va
-              como precio de la línea; el total del presupuesto le suma el IVA ({formatoPorcentaje(enPantalla.iva_pct)}).
+              Precio que vio en la web (IVA incl.):{" "}
+              <span className="font-semibold text-foreground tabular-nums">{precioEnLaWeb == null ? "—" : eurosCentimos(precioEnLaWeb)}</span>. La línea lo lleva
+              sin el IVA ({formatoPorcentaje(enPantalla.iva_pct)}), así el total del presupuesto es ese precio.
             </p>
           </div>
         </section>
@@ -425,8 +430,21 @@ function Editor({ p, puedeEditar, cargandoPermisos, volver, onVolver, onAbrir }:
               )
             }
           >
+            {lineasFueraDeIva > 0 && (ivaCambiado || web) && (
+              <p
+                className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                role="status"
+                data-testid="aviso-iva-lineas"
+              >
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {lineasFueraDeIva === 1 ? "Una línea de la calculadora no da" : `${lineasFueraDeIva} líneas de la calculadora no dan`} su precio web con el IVA
+                {ivaCambiado ? " nuevo" : ""} ({formatoPorcentaje(enPantalla.iva_pct)}). Cambiar el IVA no cambia el precio de las líneas: si quieres que el
+                total con IVA vuelva a ser el precio web, usa «Recalcular» en cada una.
+              </p>
+            )}
             <LineasPresupuesto
               lineas={p.lineas}
+              ivaPct={enPantalla.iva_pct}
               puedeEditar={puedeEditar}
               categorias={tarifas.categorias}
               precios={tarifas.precios}
@@ -549,6 +567,7 @@ function Editor({ p, puedeEditar, cargandoPermisos, volver, onVolver, onAbrir }:
         linea={calculadora?.linea}
         categorias={tarifas.categorias}
         precios={tarifas.precios}
+        ivaPct={enPantalla.iva_pct}
         avisoTarifas={tarifas.error ? "No se han podido leer las tarifas de Web › Tarifas: se calcula con los precios de serie de la web." : null}
         guardando={anadirLinea.isPending || cambiarLinea.isPending}
         onAnadir={(linea) => anadir(linea, () => setCalculadora(null))}

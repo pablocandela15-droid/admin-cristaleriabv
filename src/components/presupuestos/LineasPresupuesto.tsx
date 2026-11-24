@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ListaOrdenable } from "@/components/ui/lista-ordenable";
 import { cn } from "@/lib/utils";
-import { precioConTarifasDeHoy } from "@/lib/presupuestos/lineas";
+import { precioConIva, precioConTarifasDeHoy, precioFueraDelPrecioWeb } from "@/lib/presupuestos/lineas";
 import { eurosCentimos, formatoCantidad, importeLinea, leerNumero, numeroEditable, redondear2 } from "@/lib/presupuestos/totales";
 import type { CambiosLinea, LineaPresupuesto } from "@/lib/presupuestos/tipos";
 import type { CategoryDef } from "@/lib/web/pricing/categories";
@@ -13,6 +13,8 @@ import type { PricingConfig } from "@/lib/web/pricing/config";
 
 interface LineasPresupuestoProps {
   lineas: LineaPresupuesto[];
+  /** IVA del presupuesto (el de pantalla), para comparar el precio de cada línea con su precio web (IVA incluido). */
+  ivaPct: number;
   puedeEditar: boolean;
   categorias: Partial<Record<string, CategoryDef>>;
   precios: PricingConfig;
@@ -24,10 +26,10 @@ interface LineasPresupuestoProps {
 
 /**
  * Líneas del presupuesto: se ordenan arrastrando (o con las flechas), y descripción, detalle, cantidad y precio se
- * cambian ahí mismo (se guardan al salir del campo). Las de la calculadora se pueden recalcular y avisan si con las
- * tarifas de hoy sale otro precio.
+ * cambian ahí mismo (se guardan al salir del campo); el precio va sin IVA. Las de la calculadora enseñan su precio web
+ * (IVA incluido), se pueden recalcular y avisan si con las tarifas de hoy sale otro precio.
  */
-export function LineasPresupuesto({ lineas, puedeEditar, categorias, precios, onCambiar, onBorrar, onMover, onRecalcular }: LineasPresupuestoProps) {
+export function LineasPresupuesto({ lineas, ivaPct, puedeEditar, categorias, precios, onCambiar, onBorrar, onMover, onRecalcular }: LineasPresupuestoProps) {
   if (!lineas.length) {
     return (
       <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground" data-testid="sin-lineas">
@@ -50,6 +52,7 @@ export function LineasPresupuesto({ lineas, puedeEditar, categorias, precios, on
           total={lineas.length}
           asa={puedeEditar ? asa : null}
           puedeEditar={puedeEditar}
+          ivaPct={ivaPct}
           precioHoy={precioConTarifasDeHoy(lineas[i], categorias, precios)}
           onCambiar={onCambiar}
           onBorrar={onBorrar}
@@ -67,6 +70,7 @@ interface FilaLineaProps {
   total: number;
   asa: ReactNode;
   puedeEditar: boolean;
+  ivaPct: number;
   precioHoy: number | null;
   onCambiar: LineasPresupuestoProps["onCambiar"];
   onBorrar: LineasPresupuestoProps["onBorrar"];
@@ -76,7 +80,7 @@ interface FilaLineaProps {
 
 const filasTexto = (t: string) => Math.min(10, Math.max(2, t.split("\n").length));
 
-function FilaLinea({ linea, indice, total, asa, puedeEditar, precioHoy, onCambiar, onBorrar, onMover, onRecalcular }: FilaLineaProps) {
+function FilaLinea({ linea, indice, total, asa, puedeEditar, ivaPct, precioHoy, onCambiar, onBorrar, onMover, onRecalcular }: FilaLineaProps) {
   const [descripcion, setDescripcion] = useState(linea.descripcion);
   const [detalle, setDetalle] = useState(linea.detalle ?? "");
   const [cantidad, setCantidad] = useState(numeroEditable(linea.cantidad));
@@ -93,6 +97,7 @@ function FilaLinea({ linea, indice, total, asa, puedeEditar, precioHoy, onCambia
   const precioMal = precioNum == null;
   const importe = importeLinea({ cantidad: cantidadMal ? linea.cantidad : (cantidadNum as number), precio_unitario: precioMal ? linea.precio_unitario : (precioNum as number) });
   const tarifaDistinta = precioHoy != null && linea.precio_calculado != null && Math.abs(redondear2(precioHoy - linea.precio_calculado)) >= 0.01;
+  const fueraDelPrecioWeb = precioFueraDelPrecioWeb(linea, ivaPct);
   const nombre = linea.descripcion || `línea ${indice + 1}`;
 
   const guardarTexto = () => {
@@ -137,11 +142,25 @@ function FilaLinea({ linea, indice, total, asa, puedeEditar, precioHoy, onCambia
                   onClick={() => onRecalcular(linea)}
                   disabled={!puedeEditar}
                   className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-medium text-amber-900 enabled:hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
-                  title={`Al añadirla salía ${eurosCentimos(linea.precio_calculado)}; con las tarifas de hoy, ${eurosCentimos(precioHoy)}.`}
+                  title={`Al añadirla salía ${eurosCentimos(linea.precio_calculado)} (IVA incl.); con las tarifas de hoy, ${eurosCentimos(precioHoy)}.`}
                   data-testid="tarifa-distinta"
                 >
                   Tarifa de hoy: {eurosCentimos(precioHoy)}
                 </button>
+              )}
+              {linea.precio_calculado != null && (
+                <span
+                  className={cn("tabular-nums", fueraDelPrecioWeb && "text-amber-700 dark:text-amber-300")}
+                  title={
+                    fueraDelPrecioWeb
+                      ? `Con este precio y el IVA del presupuesto la línea sale a ${eurosCentimos(precioConIva(linea.precio_unitario, ivaPct))}. «Recalcular» la ajusta al precio web.`
+                      : "Lo que da la calculadora de la web, con el IVA incluido. La línea lo lleva sin IVA."
+                  }
+                  data-testid="precio-web-linea"
+                >
+                  · Precio web (IVA incl.): {eurosCentimos(linea.precio_calculado)}
+                  {fueraDelPrecioWeb && <> · con este precio e IVA: {eurosCentimos(precioConIva(linea.precio_unitario, ivaPct))}</>}
+                </span>
               )}
             </div>
             {puedeEditar ? (
@@ -190,7 +209,7 @@ function FilaLinea({ linea, indice, total, asa, puedeEditar, precioHoy, onCambia
                     />
                   </label>
                   <label className="space-y-1 text-xs text-muted-foreground">
-                    <span className="block">Precio (€)</span>
+                    <span className="block">Precio sin IVA (€)</span>
                     <Input
                       value={precio}
                       onChange={(e) => setPrecio(e.target.value)}

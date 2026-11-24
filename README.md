@@ -10,6 +10,7 @@ Panel de administración interno de Cristalería Baix Vinalopó (Cristalería BV
 - **Facturas**: facturas de proveedores que se leen solas con IA (foto o PDF), con Compras por documentos, productos y proveedores, avisos de subida de precio y el original a mano ([docs/FACTURAS.md](docs/FACTURAS.md)).
 - **Web**: la web de la cristalería editable desde el panel: books de fotos de los trabajos, precios y opciones de la calculadora de presupuestos (con «Probar») y textos e imágenes ([docs/WEB.md](docs/WEB.md)). Las solicitudes de presupuesto de la web llegan al panel como presupuestos.
 - **Presupuestos**: presupuestos con la calculadora de la web y sus tarifas (líneas recalculables, descuento e IVA), estados de solicitud a aceptado, PDF con la marca y envío por WhatsApp o correo; aquí se atienden las solicitudes de la web ([docs/PRESUPUESTOS.md](docs/PRESUPUESTOS.md)).
+- **Tráfico web**: visitas de la web (Vercel Web Analytics, copiadas cada noche), tendencia, días raros, páginas más vistas, procedencia, estimación de transferencia y lo que hacen los visitantes: calculadora, solicitudes de presupuesto, WhatsApp, teléfono y formulario de contacto ([docs/TRAFICO-WEB.md](docs/TRAFICO-WEB.md)).
 - **Usuarios**: consulta de usuarios y de sus permisos por sección.
 - **Nueva petición**: reportar errores, pedir mejoras o preguntar dudas, y seguir cómo van.
 - **Ayuda**: guías paso a paso y recorridos guiados sobre la pantalla real.
@@ -24,6 +25,7 @@ Panel de administración interno de Cristalería Baix Vinalopó (Cristalería BV
 - **Tickets**: las peticiones del equipo, analizadas por la IA (y envío a Linear).
 - **Gestor Gasto**: recibos de OficiosOsIA, tarifas y Excel de control.
 - **Servicios**: servicios contratados, su consumo y sus costes (incluido el gasto de IA), modelos de IA y avisos por Telegram.
+- **Logs**: la actividad de la web (recorridos de las visitas, sin cookies), sus errores agrupados en incidencias con ticket en Linear (o en el destino de pruebas) y las estadísticas de comportamiento ([docs/LOGS-WEB.md](docs/LOGS-WEB.md)).
 
 ## Marca
 
