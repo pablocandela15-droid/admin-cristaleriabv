@@ -10,25 +10,30 @@ Una sección por pestaña, con «Ver» (consulta, la pestaña sale en solo lectu
 
 | Sección | Pestaña | Con «Editar» |
 |---|---|---|
-| `web_fotos` (Web · Fotos) | Fotos | Crear, publicar, ordenar y borrar books; subir, ordenar, editar y borrar fotos; portada y fotos de inicio |
+| `web_fotos` (Web · Fotos) | Fotos | Subir, ordenar, editar, ocultar y borrar las fotos de cada tipo de trabajo y marcar las del inicio (★); crear, publicar, ordenar y borrar otros books |
 | `web_tarifas` (Web · Tarifas) | Tarifas | Precios y opciones de la calculadora |
 | `web_contenido` (Web · Contenido) | Contenido | Textos e imágenes fijas de la web; puede subir fotos **sueltas** (no a un book) para esas imágenes |
 | `presupuestos` (Presupuestos) | *(página Presupuestos, ver [PRESUPUESTOS.md](PRESUPUESTOS.md))* | Crear, cambiar y enviar presupuestos; atender las solicitudes de la web |
 
 El módulo **Web** (Control del Panel, grupo «Web y clientes») sale en el menú con cualquiera de las tres primeras.
 
-## Fotos (books)
+## Fotos (por tipo de trabajo)
 
-- **Books** (`web_albumes`): título, dirección (`slug`, sale sola del título y se puede cambiar), descripción, servicio de la web (uno de los 8 o ninguno), publicado y orden. La portada es una de sus fotos (o la primera).
-- **Fotos** (`web_fotos`): en el bucket **público** `web-fotos`, en `albumes/<album_id>/<uuid>.webp`. El panel las reduce en el navegador a **2400 px** por el lado mayor y las guarda en **WebP al 85 %**, con su ancho y alto. Cada foto: título, descripción (`alt`), orden, publicada y «en la portada de la web» (`destacada`). Borrar una foto borra su fichero; borrar un book, todas sus fotos y ficheros.
-- **Fotos sueltas** (`album_id` nulo, `sueltas/<uuid>.webp`): las imágenes fijas que se suben desde Contenido. Se ven y se gestionan en Fotos › Fotos sueltas.
+La pestaña **Fotos** va por tipo de trabajo: un apartado plegable por cada servicio de la web (Mamparas, Espejos, Cerramientos, Aluminio, Barandillas, Armarios, Dominó y Otros trabajos, en ese orden). Cada uno dice cuántas fotos tiene y, al abrirlo, tiene su zona para subir fotos directamente a ese tipo y sus fotos con las acciones: mover antes o después, ★ (sale en el inicio de la web), mostrar u ocultar en la web, título y descripción, y borrar. Lógica sin React en `src/lib/web/fotosPorTipo.ts` (pruebas en `src/lib/web/__tests__/fotosPorTipo.test.ts`).
 
-Lo que hace la web:
+- **Book de cada tipo** (sin cambiar el esquema): un `web_albumes` con slug `trabajos-<servicio>`, título = nombre del tipo, `servicio` = el tipo y publicado. Lo crea el panel al subir la primera foto a ese tipo (`asegurarAlbumTipo` en `src/hooks/useWebFotos.ts`: lo busca por su slug; si otra persona lo crea a la vez, 23505, lo vuelve a leer; si existía sin publicar o con otro servicio, lo arregla).
+- El apartado de un tipo enseña las fotos de **todos** los books con ese `servicio` (también los creados antes a mano), ordenadas por el `orden` de cada foto (a igualdad, por el orden del book y la fecha de subida). Es el mismo orden que usa la web, así que mover una foto aquí la mueve en la web.
+- **Otros books** (plegado, debajo de los tipos): los books hechos a mano (los que no son `trabajos-<servicio>`), con o sin tipo, y las **fotos sueltas**. Se crean, publican, ordenan, editan y borran como antes; al abrir uno se suben y gestionan sus fotos igual que en un tipo.
+- **Books** (`web_albumes`): título, dirección (`slug`), descripción, tipo de trabajo (`servicio`, uno de los 8 o ninguno), publicado y orden. La portada (`portada_foto_id`) ya no se elige: la web no la usa (en la lista de «Otros books» sale la elegida antes o la primera foto).
+- **Fotos** (`web_fotos`): en el bucket **público** `web-fotos`, en `albumes/<album_id>/<uuid>.webp`. El panel las reduce en el navegador a **2400 px** por el lado mayor y las guarda en **WebP al 85 %**, con su ancho y alto. Cada foto: título, descripción (`alt`), orden, publicada y ★ «en el inicio» (`destacada`). Al subir, el título sale del nombre del fichero salvo los que pone el móvil o la cámara («IMG_2034», «WhatsApp Image…»): sin título, la web pone el del book (en un tipo, su nombre). Borrar una foto borra su fichero; borrar un book, todas sus fotos y ficheros.
+- **Fotos sueltas** (`album_id` nulo, `sueltas/<uuid>.webp`): las imágenes fijas que se suben desde Contenido. Se ven y se gestionan en Fotos › Otros books › Fotos sueltas.
 
-- `/trabajos`: si hay al menos un book publicado con fotos, enseña los books (en su orden); si no, su galería de siempre.
-- Página de cada servicio: las fotos de los books de ese servicio (si no hay, las de siempre).
-- Portada: las fotos marcadas «en la portada de la web» (si no hay, las de siempre).
-- Solo ve lo publicado: un book sin publicar no sale, ni sus fotos aunque estén publicadas.
+Lo que hace la web (`cristaleriabv`, `src/lib/web/mezclar.ts`):
+
+- `/trabajos` («Ver todos los trabajos»): siempre la galería con el filtro por tipo. Cada tipo, en el orden de los servicios, con sus fotos del panel o, si no tiene ninguna visible, sus fotos de ejemplo; al final, las de los books sin tipo (solo en «Todos»).
+- Página de cada servicio: las mismas fotos de su tipo (si no hay, las de ejemplo).
+- Inicio, «Espacios que se llenan de luz»: las fotos ★ (hasta 8). Si no hay ninguna, la primera foto de cada tipo que tenga fotos, completando hasta 4 con las de ejemplo de los tipos que falten; sin ninguna foto del panel, las de ejemplo de siempre.
+- Solo ve lo publicado: una foto oculta no sale, ni las fotos de un book sin publicar.
 
 ## Tarifas (calculadora)
 
