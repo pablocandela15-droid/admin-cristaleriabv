@@ -58,16 +58,21 @@ jobs:
           fi
           [ -n "$SUPABASE_DB_PASSWORD" ] || echo "::warning::Sin SUPABASE_DB_PASSWORD: no se aplican migraciones, solo funciones."
 
+      # Versión fija: la 3.x cambió las opciones (db push necesita --remote y functions deploy ya no
+      # admite --project-ref). Al subirla, comprobar `supabase db push --help` y `functions deploy --help`.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.3.0
+
+      - name: Enlazar el proyecto
+        run: supabase link --project-ref "$PROYECTO_REF"
 
       - name: Migraciones pendientes
         if: env.SUPABASE_DB_PASSWORD != ''
+        # --skip-vault: los secretos de Vault se gestionan a mano en Supabase (ver docs/DESPLIEGUE.md).
         run: |
-          supabase link --project-ref "$PROYECTO_REF" --password "$SUPABASE_DB_PASSWORD"
-          supabase db push --dry-run --password "$SUPABASE_DB_PASSWORD"
-          supabase db push --password "$SUPABASE_DB_PASSWORD"
+          supabase db push --remote --password "$SUPABASE_DB_PASSWORD" --skip-vault --dry-run --yes
+          supabase db push --remote --password "$SUPABASE_DB_PASSWORD" --skip-vault --yes
 
       - name: Desplegar funciones
-        run: supabase functions deploy --project-ref "$PROYECTO_REF" --use-api
+        run: supabase functions deploy --use-api --yes
