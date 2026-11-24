@@ -474,6 +474,11 @@ export const TABLA_LABEL: Record<string, string> = {
   fallos_internos: "Fallos internos",
   // Tráfico web (Admin Panel): lo único editable son los pesos por página; lo demás lo escribe la sincronización.
   peso_paginas: "Pesos por página (Tráfico web)",
+  // Newsletter: suscriptores (las altas, confirmaciones y bajas las escriben las funciones), envíos, plantillas y ajustes.
+  newsletter_suscriptores: "Suscriptores de la newsletter",
+  newsletter_envios: "Envíos de la newsletter",
+  newsletter_plantillas: "Plantillas de la newsletter",
+  newsletter_config: "Ajustes de la newsletter",
   // Servicios, costes e IA.
   costes_fijos: "Costes fijos",
   servicios_contratados: "Servicios contratados",

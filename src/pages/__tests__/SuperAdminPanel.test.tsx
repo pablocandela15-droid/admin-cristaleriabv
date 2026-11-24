@@ -46,13 +46,14 @@ describe("Control del Panel", () => {
     render(<SuperAdminPanel />);
     expect(screen.getByRole("heading", { level: 1, name: "Control del Panel" })).toBeInTheDocument();
     expect(tarjetas()).toEqual(MODULOS_PANEL.map((m) => m.clave));
-    expect(tarjetas()).toEqual(["dashboard", "facturas", "web", "presupuestos", "trafico_web", "usuarios", "peticiones", "ayuda", "avisos", "mi_cuenta"]);
+    expect(tarjetas()).toEqual(["dashboard", "facturas", "web", "presupuestos", "trafico_web", "newsletter", "usuarios", "peticiones", "ayuda", "avisos", "mi_cuenta"]);
     expect(screen.queryByTestId("funcionalidad-reservas")).toBeNull();
     // Grupos con su título; cada lista se llama como su grupo.
     const grupos = {
       "Día a día": ["dashboard"],
       Compras: ["facturas"],
       "Web y clientes": ["web", "presupuestos", "trafico_web"],
+      Marketing: ["newsletter"],
       Equipo: ["usuarios"],
       "Ayuda y cuenta": ["peticiones", "ayuda", "avisos", "mi_cuenta"],
     };
@@ -65,8 +66,8 @@ describe("Control del Panel", () => {
   it("resumen: activados de los que se pueden apagar, desactivados y último cambio", () => {
     render(<SuperAdminPanel />);
     const resumen = screen.getByTestId("resumen-control");
-    // 6 se pueden apagar (Facturas, Web, Presupuestos, Tráfico web, Usuarios y Nueva petición); Usuarios apagado. Las filas viejas (Tienda, Reservas) no cuentan.
-    expect(within(resumen).getByText("Activados").nextSibling).toHaveTextContent("5de 6");
+    // 7 se pueden apagar (Facturas, Web, Presupuestos, Tráfico web, Newsletter, Usuarios y Nueva petición); Usuarios apagado. Las filas viejas (Tienda, Reservas) no cuentan.
+    expect(within(resumen).getByText("Activados").nextSibling).toHaveTextContent("6de 7");
     expect(within(resumen).getByText("Desactivados").nextSibling).toHaveTextContent("1");
     expect(within(resumen).getByText("Último cambio")).toBeInTheDocument();
   });
@@ -98,7 +99,7 @@ describe("Control del Panel", () => {
       expect(within(tarjeta).getByText("Siempre activo")).toBeInTheDocument();
     }
     expect(within(screen.getByTestId("funcionalidad-dashboard")).getByText(/portada del panel/)).toBeInTheDocument();
-    expect(screen.getAllByRole("switch")).toHaveLength(6);
+    expect(screen.getAllByRole("switch")).toHaveLength(7);
   });
 
   it("el interruptor y el nombre cambian el módulo (la fila se crea al primer cambio)", async () => {
@@ -131,7 +132,7 @@ describe("Control del Panel", () => {
     h.toggles = [];
     rerender(<SuperAdminPanel />);
     // Sin ninguna fila (BD vacía): todos activados.
-    expect(within(screen.getByTestId("resumen-control")).getByText("Activados").nextSibling).toHaveTextContent("6de 6");
+    expect(within(screen.getByTestId("resumen-control")).getByText("Activados").nextSibling).toHaveTextContent("7de 7");
     expect(screen.getAllByRole("switch").every((s) => s.getAttribute("aria-checked") === "true")).toBe(true);
   });
 });
