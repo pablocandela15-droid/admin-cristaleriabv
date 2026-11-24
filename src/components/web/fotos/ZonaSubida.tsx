@@ -26,9 +26,16 @@ const TEXTO: Record<FaseSubida, string> = {
 
 interface ZonaSubidaProps {
   /** Book al que van las fotos; null = fotos sueltas. */
-  albumId: string | null;
+  albumId?: string | null;
+  /**
+   * Si el book aún puede no existir (el de un tipo de trabajo): devuelve su id, creándolo si hace falta. Se llama una
+   * vez por tanda, antes de subir; en vez de `albumId`.
+   */
+  resolverAlbum?: () => Promise<string>;
   /** `orden` de las fotos que ya hay (las nuevas van detrás, en el orden en que se eligen). */
   ordenes: number[];
+  /** Adónde van, para el lector de pantalla y el texto de la zona: «Mamparas». */
+  destino?: string;
   className?: string;
 }
 
@@ -37,7 +44,7 @@ interface ZonaSubidaProps {
  * WebP en el navegador, se sube al bucket web-fotos y se guarda con sus medidas. Cada fichero lleva su barra y, si
  * falla, el motivo; las demás siguen.
  */
-export function ZonaSubida({ albumId, ordenes, className }: ZonaSubidaProps) {
+export function ZonaSubida({ albumId = null, resolverAlbum, ordenes, destino, className }: ZonaSubidaProps) {
   const input = useRef<HTMLInputElement>(null);
   const [encima, setEncima] = useState(false);
   const [subidas, setSubidas] = useState<Subida[]>([]);
@@ -54,12 +61,24 @@ export function ZonaSubida({ albumId, ordenes, className }: ZonaSubidaProps) {
     if (!validas.length) return;
     const lote = validas.map((f, i) => ({ archivo: f, clave: `${Date.now()}-${i}-${f.name}` }));
     setSubidas((lista) => [...lista.filter((s) => s.fase !== "hecha"), ...lote.map((l) => ({ clave: l.clave, nombre: l.archivo.name, fase: "preparando" as FaseSubida }))]);
+    let album = albumId;
+    if (resolverAlbum) {
+      try {
+        album = await resolverAlbum();
+      } catch (e) {
+        const error = mensajeErrorWeb(e, "Web · Fotos");
+        const claves = new Set(lote.map((l) => l.clave));
+        setSubidas((lista) => lista.map((s) => (claves.has(s.clave) ? { ...s, fase: "error" as const, error } : s)));
+        await refrescar();
+        return;
+      }
+    }
     let orden = siguienteOrden(ordenes);
     let bien = 0;
     // De una en una: el móvil no se queda sin memoria con fotos de 12-48 Mpx.
     for (const { archivo, clave } of lote) {
       try {
-        await subirFotoWeb(archivo, { albumId, orden: orden++, alFase: (fase) => cambiar(clave, { fase }) });
+        await subirFotoWeb(archivo, { albumId: album, orden: orden++, alFase: (fase) => cambiar(clave, { fase }) });
         bien++;
       } catch (e) {
         cambiar(clave, { fase: "error", error: mensajeErrorWeb(e, "Web · Fotos") });
@@ -74,7 +93,7 @@ export function ZonaSubida({ albumId, ordenes, className }: ZonaSubidaProps) {
       <div
         role="button"
         tabIndex={0}
-        aria-label="Subir fotos: arrástralas aquí o pulsa para elegirlas"
+        aria-label={destino ? `Subir fotos a ${destino}: arrástralas aquí o pulsa para elegirlas` : "Subir fotos: arrástralas aquí o pulsa para elegirlas"}
         onClick={() => input.current?.click()}
         onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), input.current?.click())}
         onDragOver={(e) => {
@@ -94,7 +113,7 @@ export function ZonaSubida({ albumId, ordenes, className }: ZonaSubidaProps) {
         data-testid="zona-subida"
       >
         <ImagePlus className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
-        <p className="text-sm font-medium">Arrastra aquí las fotos o pulsa para elegirlas</p>
+        <p className="text-sm font-medium">{destino ? `Arrastra aquí las fotos de ${destino} o pulsa para elegirlas` : "Arrastra aquí las fotos o pulsa para elegirlas"}</p>
         <p className="text-xs text-muted-foreground">Varias a la vez. Se reducen solas a 2400 px y se guardan en WebP (pesan mucho menos).</p>
         <Button type="button" size="sm" variant="secondary" disabled={ocupada} onClick={(e) => (e.stopPropagation(), input.current?.click())}>
           Elegir fotos

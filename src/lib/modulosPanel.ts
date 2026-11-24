@@ -96,7 +96,7 @@ export const MODULOS_PANEL: readonly ModuloPanel[] = [
   {
     clave: "web",
     nombre: "Web",
-    descripcion: "La web de la cristalería: books de fotos, precios y opciones de la calculadora, textos e imágenes.",
+    descripcion: "La web de la cristalería: fotos de cada tipo de trabajo, precios y opciones de la calculadora, textos e imágenes.",
     rutas: ["/web"],
     icono: Globe,
     grupo: "web",

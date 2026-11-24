@@ -22,7 +22,7 @@ interface AlbumDialogProps {
   onGuardado?: (id: string) => void;
 }
 
-/** Crear o editar un book: título, dirección (slug, sale sola del título), descripción, servicio y si se publica. */
+/** Crear o editar un book: título, dirección (slug, sale sola del título), descripción, tipo de trabajo y si se publica. */
 export function AlbumDialog({ abierto, onCerrar, album, ordenes, onGuardado }: AlbumDialogProps) {
   const guardar = useGuardarAlbum();
   const [titulo, setTitulo] = useState("");
@@ -70,8 +70,8 @@ export function AlbumDialog({ abierto, onCerrar, album, ordenes, onGuardado }: A
           <DialogHeader>
             <DialogTitle>{album ? "Editar book" : "Nuevo book de fotos"}</DialogTitle>
             <DialogDescription>
-              Un book agrupa las fotos de un trabajo o de un tipo de trabajo. En la web sale en «Trabajos» y, si eliges un
-              servicio, también en la galería de ese servicio.
+              Un book agrupa las fotos de un trabajo concreto. Para las fotos de un tipo de trabajo no hace falta: súbelas en su
+              apartado. Si eliges un tipo, sus fotos salen también con las de ese tipo; si no, en «Trabajos» › «Todos».
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
@@ -101,13 +101,13 @@ export function AlbumDialog({ abierto, onCerrar, album, ordenes, onGuardado }: A
             <Textarea id="album-descripcion" value={descripcion} maxLength={2000} rows={3} onChange={(e) => setDescripcion(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="album-servicio">Servicio</Label>
+            <Label htmlFor="album-servicio">Tipo de trabajo</Label>
             <Select value={servicio} onValueChange={setServicio}>
               <SelectTrigger id="album-servicio">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={SIN_SERVICIO}>Ninguno (solo en «Trabajos»)</SelectItem>
+                <SelectItem value={SIN_SERVICIO}>Ninguno (solo en «Trabajos» › «Todos»)</SelectItem>
                 {SERVICIOS_WEB.map((s) => (
                   <SelectItem key={s.slug} value={s.slug}>
                     {s.nombre}

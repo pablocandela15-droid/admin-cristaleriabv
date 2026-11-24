@@ -46,7 +46,7 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   facturas_subida:
     "pestaña Cargar: subir facturas, decidir sobre las repetidas y corregir los datos leídos de lo que sube él mismo (no lo de otros). No necesita «Ver» en Facturas: sin él, solo ve Cargar.",
   web_fotos:
-    "crear, publicar y ordenar los books de fotos de la web, subir y borrar fotos y elegir las de la portada. Con solo «Ver» se consultan.",
+    "subir, ordenar, ocultar y borrar las fotos de cada tipo de trabajo de la web, elegir las del inicio (★) y gestionar los otros books. Con solo «Ver» se consultan.",
   web_tarifas:
     "cambiar los precios de la calculadora de la web y sus opciones (añadir u ocultar formas, acabados, campos y categorías). Con solo «Ver» se consultan y se prueban.",
   web_contenido:
