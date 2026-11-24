@@ -178,5 +178,8 @@ describe("TraficoWeb", () => {
     expect(screen.getAllByText(/sin datos/).length).toBeGreaterThan(0);
     // Badge del KPI de tendencia (el texto se parte en varios nodos: "poco fiable (", "5", " días)")
     expect(screen.getAllByText(/poco fiable/).length).toBeGreaterThanOrEqual(2);
+    // Debajo, el comportamiento de los visitantes (sin enlace a Logs si no es super admin).
+    expect(await screen.findByTestId("seccion-comportamiento")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /ver recorridos y errores en logs/i })).toBeNull();
   });
 });

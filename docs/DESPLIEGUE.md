@@ -16,6 +16,8 @@ Migraciones, en este orden (cada una con su vuelta atrás en `supabase/rollbacks
 2. [`20261121100000_facturas.sql`](../supabase/migrations/20261121100000_facturas.sql): el módulo **Facturas** (facturas de proveedores con lectura automática, catálogo de productos, proveedores, avisos de subida de precio, el bucket privado `facturas-originales` y sus tareas programadas). Ver [FACTURAS.md](FACTURAS.md).
 3. [`20261123100000_web_y_presupuestos.sql`](../supabase/migrations/20261123100000_web_y_presupuestos.sql): la **web editable** (books de fotos, textos, tarifas y catálogo de la calculadora, que la web lee con su clave pública, y el bucket **público** `web-fotos`) y los **presupuestos** (con su número correlativo y las solicitudes que llegan de la web). Trae los textos y precios que tiene hoy la web: hasta que alguien los cambie en el panel, la web se ve igual. Ver [WEB.md](WEB.md).
 4. [`20261124100000_presupuestos_iva_incluido.sql`](../supabase/migrations/20261124100000_presupuestos_iva_incluido.sql): el precio de la calculadora de la web **lleva IVA**: las solicitudes de la web guardan la línea sin IVA y el precio web como precio calculado (y se ajustan las solicitudes sin atender). Ver [PRESUPUESTOS.md](PRESUPUESTOS.md#iva-el-precio-de-la-web-lleva-iva).
+5. [`20261124110000_trafico_web.sql`](../supabase/migrations/20261124110000_trafico_web.sql): **Tráfico web** (sección `trafico_web` del Admin Panel): las visitas que copia cada noche `sync-trafico-web` desde Vercel Web Analytics, los pesos por página y la tarea `sync-trafico-web`. Ver [TRAFICO-WEB.md](TRAFICO-WEB.md).
+6. [`20261124120000_logs_web.sql`](../supabase/migrations/20261124120000_logs_web.sql): **Super Admin › Logs** (actividad de la web, errores, incidencias con Linear o el destino de pruebas, estadísticas de comportamiento), el trigger que apunta las solicitudes de presupuesto de la web y la tarea `procesar-logs-web`. Ver [LOGS-WEB.md](LOGS-WEB.md).
 
 ```bash
 npx supabase link --project-ref <ref>
@@ -38,7 +40,7 @@ Desde ahí, el resto de usuarios y permisos se gestionan en **Super Admin › Us
 
 ## 4. Vault (tareas programadas)
 
-Las tareas de pg_cron (avisos por Telegram, vigilante de fallos, centro de modelos de IA, costes reales de OpenAI y, de Facturas, la lectura de documentos en segundo plano, la clasificación de productos y la limpieza diaria) llaman a las Edge Functions con un secreto. En *SQL Editor*:
+Las tareas de pg_cron (avisos por Telegram, vigilante de fallos, centro de modelos de IA, costes reales de OpenAI; de Facturas, la lectura de documentos en segundo plano, la clasificación de productos y la limpieza diaria; y de la web, `sync-trafico-web` y `procesar-logs-web`) llaman a las Edge Functions con un secreto. En *SQL Editor*:
 
 ```sql
 select vault.create_secret('https://<ref>.supabase.co', 'project_url');
@@ -49,6 +51,8 @@ El mismo valor de `ocr_trabajos_secret` va en el secreto `OCR_TRABAJOS_SECRET` d
 
 Tareas de Facturas (las instala su migración si hay pg_cron): `reanudar-trabajos-ocr` (cada minuto: rescata lecturas paradas; sin trabajos activos no hace nada), `clasificar-productos` (cada 5 minutos: asigna las líneas nuevas a su producto, primero por lo ya conocido y, si quedan, con IA) y `limpiar-pendientes-ocr` (3:40 cada día: borra del bucket las piezas de lecturas terminadas hace más de 7 días).
 
+Tareas de la web (las instalan sus migraciones si hay pg_cron): `sync-trafico-web` (3:30 UTC cada día: copia las visitas del día anterior desde Vercel) y `procesar-logs-web` (cada 5 minutos: agrupa los errores de la web, abre o actualiza tickets y purga lo antiguo). Para lanzarlas a mano: `select public.trafico_web_disparar();` y `select public.logs_web_disparar();` (devuelven `llamada` o `sin_vault`).
+
 ## 5. Edge Functions
 
 Despliega todas las de `supabase/functions/` (la configuración de `verify_jwt` está en `supabase/config.toml`):
@@ -56,13 +60,14 @@ Despliega todas las de `supabase/functions/` (la configuración de `verify_jwt` 
 ```bash
 for f in admin-create-user admin-delete-user admin-set-super-admin admin-set-user-access admin-update-user-password \
          analizar-peticion auditoria-revertir avisos-telegram cambiar-mi-contrasena clasificar-productos control-excel \
-         ia-modelos-openai leer-metricas list-users ocr-trabajo panel-auth procesar-factura registrar-metrica servicios-uso \
-         sincronizar-costes-openai web-solicitud-presupuesto; do
+         ia-modelos-openai leer-metricas list-users ocr-trabajo panel-auth procesar-factura procesar-logs-web \
+         registrar-actividad-web registrar-metrica resumen-logs-web servicios-uso sincronizar-costes-openai \
+         sync-trafico-web web-solicitud-presupuesto; do
   npx supabase functions deploy "$f" --project-ref <ref>
 done
 ```
 
-`web-solicitud-presupuesto` es la única pública (la llama la calculadora de la web, `verify_jwt = false`): no necesita ningún secreto propio. Usa los de Supabase (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, que además es la sal de la huella de IP del límite por hora) y en el bucket `web-fotos` no hay que configurar nada (lo crea la migración).
+`web-solicitud-presupuesto` y `registrar-actividad-web` son las públicas (las llama la web, `verify_jwt = false`): no necesitan ningún secreto propio. Usan los de Supabase (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, que además es la sal de la huella de IP de los límites) y en el bucket `web-fotos` no hay que configurar nada (lo crea la migración). `registrar-actividad-web` solo acepta la web publicada (producción), sus previews de Vercel (demo) y `localhost` (local); otro dominio, con `LOGS_WEB_ORIGENES_EXTRA`. `sync-trafico-web` y `procesar-logs-web` también llevan `verify_jwt = false`: las protege `OCR_TRABAJOS_SECRET` (y, en «Procesar ahora», la sesión de super admin).
 
 Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extra (usa los de Supabase). El resto activa cada parte:
 
@@ -71,14 +76,20 @@ Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extr
 | `OCR_TRABAJOS_SECRET` | Que pg_cron pueda llamar a las funciones (mismo valor que en Vault) | Las tareas programadas no funcionan |
 | `SUPABASE_REF_PRODUCCION`, `SUPABASE_REF_DEMO` | Saber en qué entorno corre cada función | Todo se trata como «local» |
 | `PANEL_URL` (y `PANEL_URL_DEMO`) | Enlaces al panel en Telegram y en los tickets enviados a Linear | Sin enlaces |
-| `OPENAI_API_KEY` | Análisis de los tickets con IA (y, si no hay `OPENAI_API_KEY_OCR`, la lectura de facturas) | El análisis no se hace |
+| `OPENAI_API_KEY` | Análisis de los tickets con IA, explicaciones y resúmenes de Logs y Tráfico web (y, si no hay `OPENAI_API_KEY_OCR`, la lectura de facturas) | El análisis no se hace |
 | `OPENAI_API_KEY_OCR` | Facturas: leer los documentos y clasificar productos (proceso «ocr»; si falta, usa `OPENAI_API_KEY`) | Facturas no lee nada: la subida falla con «falta la clave» |
 | `OCR_MODELO`, `OCR_MODELO_PIEZAS`, `OCR_DETALLE` | Facturas: modelo de lectura (todo / solo las piezas de documentos largos) y `detail` de las imágenes (`high` o el de por defecto). Opcionales: manda el modelo elegido en *Super Admin › Servicios › Modelos* | `gpt-5.6-luna` con `detail` «original» |
 | `CLASIFICAR_PRODUCTOS_MODELO` | Facturas: modelo de la clasificación de productos. Opcional (igual que arriba) | `gpt-5.6-luna` |
 | `FACTURAS_CIF_EMPRESA` | Facturas: el CIF de Cristalería BV, que en las facturas es el del CLIENTE y nunca se toma por el del proveedor. Conviene ponerlo también en la base (`update configuracion_facturas set cif_empresa = '…'`) | Solo se reconoce a la empresa por su nombre |
 | `OPENAI_ADMIN_KEY` | Costes reales de OpenAI y centro de modelos | Solo el estimado de `ia_uso` |
 | `TELEGRAM_BOT_TOKEN` | Avisos por Telegram (el chat se configura en Super Admin › Servicios) | «Telegram sin configurar» |
-| `LINEAR_API_KEY` | «Enviar a Linear» desde Tickets (modo en `web_logs_config.linear_modo`: `prueba` por defecto) | Solo modo prueba |
+| `LINEAR_API_KEY` | «Enviar a Linear» desde Tickets y los tickets de *Super Admin › Logs* (modo en `web_logs_config.linear_modo`: `prueba` por defecto). Se crea en Linear › *Settings › Security & access › Personal API keys* | Solo el destino de pruebas (`web_linear_prueba`) |
+| `VERCEL_ANALYTICS_TOKEN` | Tráfico web: leer las visitas de Vercel Web Analytics (`sync-trafico-web`). Token personal de Vercel (*Account Settings › Tokens*) con acceso al equipo de la web. Ver [TRAFICO-WEB.md](TRAFICO-WEB.md#puesta-en-marcha) | Tráfico web sin datos (la página dice qué falta) |
+| `VERCEL_ANALYTICS_PROJECT`, `VERCEL_ANALYTICS_TEAM` | Opcionales: id (`prj_…`) o nombre del proyecto de la web en Vercel, e id (`team_…`) o slug del equipo | Proyecto `cristaleriabv`; equipo `SERVICIOS_VERCEL_TEAM_ID` o `pablo1505` |
+| `LOGS_WEB_VERCEL_TOKEN` | Opcional: Logs vigila los despliegues de la web en ERROR | Usa `VERCEL_ANALYTICS_TOKEN` o `SERVICIOS_VERCEL_TOKEN`; sin ninguno, no los vigila |
+| `LOGS_WEB_ORIGENES_EXTRA` | Opcional: otros dominios de la web que pueden mandar actividad (`https://dominio=produccion,https://otro=demo`) | Solo los conocidos (ver arriba) |
+| `LOGS_WEB_URL_PANEL` | Opcional: dirección del panel para el enlace al detalle en los tickets de Logs | `PANEL_URL` / `PANEL_URL_DEMO` |
+| `LOGS_WEB_ERRORES_SERVIDOR` | Opcional: `off` para que las funciones no registren sus 5xx en Logs | Se registran |
 | `SUPER_ADMIN_EMAILS` | Cuentas protegidas: no se pueden borrar ni quitar de super admin | Sin protección extra |
 | `METRICS_SUPABASE_URL` y `METRICS_SUPABASE_SERVICE_ROLE_KEY` | Registrar los inicios de sesión en la base de métricas de OficiosOsIA (URL del proyecto de métricas y su clave de servicio) | No se registran |
 | `SERVICIOS_VERCEL_TOKEN` + `SERVICIOS_VERCEL_TEAM_ID` | Consumo de Vercel en Servicios | La tarjeta pide el secreto |
@@ -93,6 +104,8 @@ Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extr
 2. Variables de entorno: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y `VITE_SUPABASE_PUBLISHABLE_KEY` (las de *Settings › API*), en *Preview* con el proyecto de la demo y en *Production* con el de producción.
 3. Crea la rama `staging` desde `main`: cada subida a `staging` publica la demo.
 
+**En el proyecto de la web** (`cristaleriabv`, otro repositorio): *Analytics › Enable* (Web Analytics, para Tráfico web) y las variables de Supabase que ya usa la calculadora, del mismo proyecto que el panel (`NEXT_PUBLIC_SUPABASE_URL` y la clave pública). La actividad para Logs solo necesita `NEXT_PUBLIC_SUPABASE_URL`: sin ella la web no manda nada.
+
 ## 7. Comprobar
 
 - Entra en `/auth` con el super admin: debe abrir el Dashboard; el engranaje «Super Admin» del pie del menú lleva a `/super-admin/login`.
@@ -100,4 +113,6 @@ Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extr
 - Crea un usuario de prueba en *Super Admin › Usuarios*, dale solo «Dashboard» y comprueba que no ve Usuarios.
 - Envía una petición urgente desde *Nueva petición*: el super admin la ve en la campana y en *Tickets*.
 - *Web*: en *Fotos* crea un book, sube un par de fotos y publícalo; en un minuto sale en `/trabajos` de la web. En *Tarifas* cambia un precio y compruébalo en la calculadora de la web (y en «Probar»). Una solicitud enviada desde la calculadora de la web aparece en la campana de quien ve Presupuestos y en *Presupuestos › Solicitudes* (`curl -X POST https://<ref>.supabase.co/functions/v1/web-solicitud-presupuesto -H 'content-type: application/json' -d '{}'` debe responder 400).
+- *Tráfico web*: al día siguiente de activar Web Analytics y poner `VERCEL_ANALYTICS_TOKEN`, salen las visitas (o `select public.trafico_web_disparar();` para no esperar). Sin token, la página lo dice.
+- *Super Admin › Logs*: abre la web, usa la calculadora y pulsa WhatsApp; en unos segundos sale la sesión en *Sesiones* (`curl -X POST https://<ref>.supabase.co/functions/v1/registrar-actividad-web -H 'Origin: https://ejemplo.com' -d '{}'` debe responder 403).
 - *Facturas › Cargar*: sube una factura de prueba (PDF o foto). Debe leerse sola y salir en *Compras › Documentos* con su original al lado; en *Super Admin › Servicios* aparece el coste de la lectura. Un usuario con solo «Facturas · Subida» ve únicamente *Cargar*.

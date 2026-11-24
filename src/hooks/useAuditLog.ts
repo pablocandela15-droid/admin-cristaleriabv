@@ -466,12 +466,14 @@ export const TABLA_LABEL: Record<string, string> = {
   admin_feature_toggles: "Secciones activas del panel",
   // Peticiones de los usuarios (Tickets en el Super Admin) y avisos.
   peticiones: "Tickets",
-  web_logs_config: "Configuración de Linear",
+  web_logs_config: "Configuración de Logs web",
   web_linear_prueba: "Pruebas de envío a Linear",
   notificaciones_dashboard: "Avisos",
   avisos_telegram_config: "Avisos por Telegram",
   avisos_telegram_envios: "Envíos de avisos por Telegram",
   fallos_internos: "Fallos internos",
+  // Tráfico web (Admin Panel): lo único editable son los pesos por página; lo demás lo escribe la sincronización.
+  peso_paginas: "Pesos por página (Tráfico web)",
   // Servicios, costes e IA.
   costes_fijos: "Costes fijos",
   servicios_contratados: "Servicios contratados",

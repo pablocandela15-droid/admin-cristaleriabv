@@ -34,6 +34,7 @@ const SuperAdminAuditoria = lazy(() => import("./pages/SuperAdminAuditoria"));
 const SuperAdminServicios = lazy(() => import("./pages/SuperAdminServicios"));
 const SuperAdminInformes = lazy(() => import("./pages/SuperAdminInformes"));
 const SuperAdminTickets = lazy(() => import("./pages/SuperAdminTickets"));
+const SuperAdminLogs = lazy(() => import("./pages/SuperAdminLogs"));
 
 /**
  * Valores por defecto pensados para redes lentas (móvil o wifi del local):
@@ -169,6 +170,8 @@ const App = () => (
                   <Route path="/super-admin/informes" element={paginaSuperAdmin(<SuperAdminInformes />)} />
                   {/* Tickets: las peticiones de los usuarios con el análisis de la IA. */}
                   <Route path="/super-admin/tickets" element={paginaSuperAdmin(<SuperAdminTickets />)} />
+                  {/* Logs de la web: actividad, errores agrupados en incidencias (tickets en Linear) y estadísticas. */}
+                  <Route path="/super-admin/logs" element={paginaSuperAdmin(<SuperAdminLogs />)} />
                   <Route path="*" element={bajoDemanda(<NotFound />)} />
                 </Routes>
               </RouteErrorBoundary>

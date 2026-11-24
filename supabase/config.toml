@@ -67,6 +67,20 @@ verify_jwt = false
 [functions.sync-trafico-web]
 verify_jwt = false
 
+# Logs web › ingesta (20261124120000_logs_web.sql): la llama el navegador de cualquier visitante de la web con
+# sendBeacon / fetch keepalive y text/plain, SIN cabeceras (con `true` la pasarela la rechazaría). Pública a propósito,
+# con su propia protección: solo orígenes de la web (cristaleriabv), tope de 64 KB, saneado, bots, límite por IP (HMAC
+# con sal diaria, nunca la IP) y cupo diario en la RPC web_logs_ingerir (solo service role). Ver
+# supabase/functions/registrar-actividad-web/ingesta.ts y docs/LOGS-WEB.md.
+[functions.registrar-actividad-web]
+verify_jwt = false
+
+# Logs web › proceso en segundo plano: pg_cron cada 5 min (logs_web_disparar, pg_net sin JWT, x-ocr-secret en tiempo
+# constante y fail-closed) o el botón «Procesar ahora» / «Probar conexión con Linear» de un SUPER ADMIN con su JWT
+# (exigirSuperAdmin). Ver supabase/functions/procesar-logs-web/index.ts.
+[functions.procesar-logs-web]
+verify_jwt = false
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — autenticación propia REAL + filtro barato encima
@@ -160,3 +174,7 @@ verify_jwt = true
 [functions.procesar-factura]
 verify_jwt = true
 
+# Logs web y Tráfico web › resumen del periodo con IA (solo cifras agregadas): JWT de usuario + «Ver» en Tráfico web
+# o super admin (exigirPermiso('trafico_web', 'view')). Ver supabase/functions/resumen-logs-web/index.ts.
+[functions.resumen-logs-web]
+verify_jwt = true

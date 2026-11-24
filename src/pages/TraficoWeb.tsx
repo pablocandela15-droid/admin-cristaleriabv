@@ -23,6 +23,7 @@ import { TopPaginas } from "@/components/trafico-web/TopPaginas";
 import { Desgloses } from "@/components/trafico-web/Desgloses";
 import { EditorPesoPaginas } from "@/components/trafico-web/EditorPesoPaginas";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { SeccionComportamiento } from "@/components/trafico-web/comportamiento/SeccionComportamiento";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { BotonAyuda } from "@/components/ayuda/BotonAyuda";
 
@@ -195,6 +196,9 @@ export default function TraficoWeb() {
 
               <TopPaginas proyecto={proyecto} desde={desde} hasta={hasta} />
               <Desgloses proyecto={proyecto} desde={desde} hasta={hasta} />
+              {/* Comportamiento (eventos propios de la web, Super Admin › Logs): mismo periodo y mismas
+                  definiciones que Logs › Estadísticas. */}
+              <SeccionComportamiento desde={desde} hasta={hasta} />
             </>
           )}
         </div>
