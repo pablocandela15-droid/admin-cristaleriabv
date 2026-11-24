@@ -6,12 +6,17 @@
 //  fotos van al bucket público web-fotos; borrar una foto borra también su
 //  fichero, y borrar un book, los de todas sus fotos.
 //
+//  Las fotos de cada tipo de trabajo van a su book de tipo
+//  (`trabajos-<servicio>`, ver src/lib/web/fotosPorTipo.ts): lo crea
+//  `asegurarAlbumTipo` al subir la primera.
+//
 //  Cualquier cambio invalida ['web-fotos'].
 // ============================================================================
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { BUCKET_FOTOS_WEB, mensajeErrorWeb, rutaFotoWeb, siguienteOrden, urlFotoWeb } from "@/lib/web/fotos";
+import { BUCKET_FOTOS_WEB, mensajeErrorWeb, nombreServicio, rutaFotoWeb, siguienteOrden, urlFotoWeb, type SlugServicioWeb } from "@/lib/web/fotos";
+import { slugAlbumTipo, tituloDesdeArchivo } from "@/lib/web/fotosPorTipo";
 import { prepararFotoWeb } from "@/lib/web/prepararFoto";
 
 export const CLAVE_WEB_FOTOS = "web-fotos";
@@ -180,6 +185,48 @@ export const useBorrarFoto = () =>
     if (error) throw error;
   }, "Foto borrada");
 
+/** Lo que usa `asegurarAlbumTipo` del cliente de Supabase (para probarlo sin red). */
+type ClienteAlbumes = Pick<typeof supabase, "from">;
+type FilaAlbumTipo = { id: string; servicio: string | null; publicado: boolean };
+
+/**
+ * Id del book de un tipo de trabajo (slug `trabajos-<servicio>`), creándolo si aún no existe: título = nombre del
+ * tipo, servicio = el tipo y publicado. Primero lo busca por su slug; si dos personas suben a la vez y la otra lo
+ * crea antes (slug repetido, 23505), lo vuelve a leer. Si existe pero con otro servicio o sin publicar, lo arregla:
+ * lo que se sube a un tipo tiene que salir en la web en ese tipo.
+ */
+export async function asegurarAlbumTipo(
+  servicio: SlugServicioWeb,
+  { ordenes = [], cliente = supabase }: { ordenes?: number[]; cliente?: ClienteAlbumes } = {},
+): Promise<string> {
+  const slug = slugAlbumTipo(servicio);
+  const buscar = async (): Promise<FilaAlbumTipo | null> => {
+    const { data, error } = await cliente.from("web_albumes").select("id, servicio, publicado").eq("slug", slug).maybeSingle();
+    if (error) throw error;
+    return data as FilaAlbumTipo | null;
+  };
+  let album = await buscar();
+  if (!album) {
+    const { data, error } = await cliente
+      .from("web_albumes")
+      .insert({ slug, titulo: nombreServicio(servicio) ?? servicio, servicio, publicado: true, orden: siguienteOrden(ordenes) })
+      .select("id, servicio, publicado")
+      .single();
+    if (error) {
+      if (error.code !== "23505") throw error;
+      album = await buscar();
+      if (!album) throw error;
+    } else {
+      album = data as FilaAlbumTipo;
+    }
+  }
+  if (album.servicio !== servicio || !album.publicado) {
+    const { error } = await cliente.from("web_albumes").update({ servicio, publicado: true }).eq("id", album.id);
+    if (error) throw error;
+  }
+  return album.id;
+}
+
 export type FaseSubida = "preparando" | "subiendo" | "guardando" | "hecha" | "error";
 
 /**
@@ -199,7 +246,8 @@ export async function subirFotoWeb(
     .upload(ruta, foto.blob, { contentType: foto.blob.type || "image/webp", upsert: false, cacheControl: "31536000" });
   if (e1) throw e1;
   alFase?.("guardando");
-  const titulo = archivo.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim().slice(0, 200) || null;
+  // Sin el «IMG_2034» del móvil: sin título, la web pone el del book (en un tipo, su nombre).
+  const titulo = tituloDesdeArchivo(archivo.name);
   const { data, error } = await supabase
     .from("web_fotos")
     .insert({ album_id: albumId, ruta, alt: (alt ?? "").slice(0, 300), titulo, ancho: foto.ancho, alto: foto.alto, orden })

@@ -1,7 +1,7 @@
 /**
  * Pestañas de Web con los datos simulados (sin Supabase): Tarifas (editar un precio cambia «Probar» y aparece
- * «Guardar»; añadir una opción; restaurar), Fotos (lista de books, vacía y en solo lectura) y Contenido (formularios
- * con los textos de la web y guardar lo cambiado).
+ * «Guardar»; añadir una opción; restaurar) y Contenido (formularios con los textos de la web y guardar lo cambiado).
+ * Fotos tiene sus pruebas en TabFotos.test.tsx.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
@@ -10,7 +10,6 @@ import { mergePricing } from "@/lib/web/pricing/tarifas";
 const h = vi.hoisted(() => ({
   guardarTarifas: vi.fn(),
   guardarContenido: vi.fn(),
-  albumes: [] as unknown[],
   contenido: {} as Record<string, unknown>,
 }));
 
@@ -29,7 +28,7 @@ vi.mock("@/hooks/useWebFotos", () => {
   const mut = () => ({ mutate: vi.fn(), isPending: false });
   return {
     urlFoto: (r: string) => `https://x.supabase.co/storage/v1/object/public/web-fotos/${r}`,
-    useAlbumesWeb: () => ({ data: h.albumes, isLoading: false, error: null, refetch: vi.fn() }),
+    useAlbumesWeb: () => ({ data: [], isLoading: false, error: null, refetch: vi.fn() }),
     useFotosWeb: () => SIN_FOTOS,
     useCambiarAlbum: mut,
     useOrdenarWeb: mut,
@@ -43,13 +42,11 @@ vi.mock("@/hooks/useWebFotos", () => {
 });
 
 import { TabTarifas } from "@/components/web/tarifas/TabTarifas";
-import { TabFotos } from "@/components/web/fotos/TabFotos";
 import { TabContenido } from "@/components/web/contenido/TabContenido";
 
 afterEach(() => {
   h.guardarTarifas.mockReset();
   h.guardarContenido.mockReset();
-  h.albumes = [];
   h.contenido = {};
 });
 
@@ -87,30 +84,6 @@ describe("Web › Tarifas", { timeout: 20_000 }, () => {
     expect(screen.getByLabelText("Precio base de la mampara")).toBeDisabled();
     expect(screen.queryByRole("button", { name: /Restaurar valores por defecto/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Guardar tarifas/ })).toBeNull();
-  });
-});
-
-describe("Web › Fotos", () => {
-  it("sin books: lo dice y explica qué hace la web", () => {
-    render(<TabFotos puedeEditar />);
-    expect(screen.getByText("Aún no hay ningún book.")).toBeInTheDocument();
-    expect(screen.getByText(/galería de siempre/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Nuevo book/ })).toBeInTheDocument();
-  });
-
-  it("lista de books con portada, fotos, servicio y publicado", () => {
-    h.albumes = [
-      { id: "a1", slug: "mamparas-elche", titulo: "Mamparas en Elche", descripcion: null, servicio: "mamparas", portada_foto_id: null, orden: 0, publicado: true, creado_en: "", totalFotos: 3, portadaRuta: "albumes/a1/x.webp" },
-      { id: "a2", slug: "obra", titulo: "Obra sin fotos", descripcion: null, servicio: null, portada_foto_id: null, orden: 1, publicado: false, creado_en: "", totalFotos: 0, portadaRuta: null },
-    ];
-    render(<TabFotos puedeEditar={false} />);
-    const lista = screen.getByRole("list", { name: "Books de fotos" });
-    expect(within(lista).getAllByRole("listitem")).toHaveLength(2);
-    expect(screen.getByText("3 fotos")).toBeInTheDocument();
-    expect(screen.getByText("Mamparas")).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Publicar Mamparas en Elche" })).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /Nuevo book/ })).toBeNull();
-    expect(screen.getByText(/el book publicado/)).toBeInTheDocument();
   });
 });
 
