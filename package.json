@@ -13,7 +13,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:nucleo:db": "node scripts/test-nucleo.mjs && node scripts/test-facturas.mjs && node scripts/test-web-presupuestos.mjs",
+    "test:nucleo:db": "node scripts/test-nucleo.mjs && node scripts/test-facturas.mjs && node scripts/test-web-presupuestos.mjs && node scripts/test-trafico-logs-web.mjs",
     "test:migraciones": "node scripts/comprobar-versiones-migraciones.mjs",
     "test:cambios": "node scripts/tests-cambios.mjs",
     "lint:cambios": "node scripts/lint-cambios.mjs"

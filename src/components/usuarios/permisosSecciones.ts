@@ -53,6 +53,8 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
     "cambiar los textos de la web (datos del negocio, servicios y preguntas frecuentes) y sus imágenes, y subir fotos sueltas para ellas. Con solo «Ver» se consultan.",
   presupuestos:
     "crear, modificar, enviar y borrar presupuestos y atender las solicitudes que llegan de la web. Con solo «Ver» se consultan.",
+  trafico_web:
+    "cambiar los pesos por página de la estimación de transferencia. Con solo «Ver» se consultan las visitas de la web y lo que hacen los visitantes (calculadora, solicitudes, WhatsApp…).",
   usuarios:
     "consultar en el admin panel la lista de usuarios y sus permisos. Crear, borrar, bloquear y cambiar permisos es solo del super admin.",
 };

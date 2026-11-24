@@ -83,6 +83,10 @@ export function TabTarifas({ puedeEditar }: { puedeEditar: boolean }) {
               <strong>Suplemento en €</strong>: se suma por pieza. En los extras, <strong>0 € = «se valora en la visita»</strong> (el cliente lo ve
               así y no suma nada); en el resto, 0 € = sin recargo.
             </p>
+            <p>
+              <strong>Todos los precios llevan el IVA incluido</strong>: son lo que paga el cliente. En Presupuestos, la línea se guarda sin IVA y el
+              total con IVA es el de la calculadora.
+            </p>
             <p className="text-muted-foreground">Prueba los cambios a la derecha (o abajo) antes de guardar. La web los usa en un minuto.</p>
           </div>
         </CardContent>

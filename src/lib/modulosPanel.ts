@@ -17,7 +17,7 @@
 // ============================================================================
 import type { ComponentType, SVGProps } from "react";
 import { matchPath } from "react-router-dom";
-import { Bell, FileText, Globe, HelpCircle, LayoutDashboard, MessageSquarePlus, Receipt, Shield, UserRound } from "lucide-react";
+import { Activity, Bell, FileText, Globe, HelpCircle, LayoutDashboard, MessageSquarePlus, Receipt, Shield, UserRound } from "lucide-react";
 import type { SectionKey } from "@/hooks/useUserRole";
 
 export type IconoModulo = ComponentType<SVGProps<SVGSVGElement>>;
@@ -113,6 +113,17 @@ export const MODULOS_PANEL: readonly ModuloPanel[] = [
     icono: FileText,
     grupo: "web",
     secciones: ["presupuestos"],
+    desactivable: true,
+    enMenu: true,
+  },
+  {
+    clave: "trafico_web",
+    nombre: "Tráfico web",
+    descripcion: "Visitas de la web (Vercel Web Analytics), tendencia y páginas más vistas, y lo que hacen los visitantes: calculadora, solicitudes de presupuesto, WhatsApp y teléfono.",
+    rutas: ["/trafico-web"],
+    icono: Activity,
+    grupo: "web",
+    secciones: ["trafico_web"],
     desactivable: true,
     enMenu: true,
   },

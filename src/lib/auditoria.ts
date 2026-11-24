@@ -23,6 +23,7 @@ const ENTIDADES: Record<string, string> = {
   "auth.users": "usuario",
   "storage.objects": "archivo",
   web_linear_prueba: "envío de prueba a Linear",
+  peso_paginas: "peso por página de Tráfico web",
   fallos_internos: "fallo interno",
   costes_fijos: "coste fijo",
   servicios_contratados: "servicio contratado",
@@ -45,7 +46,7 @@ const CONFIGURACIONES: Record<string, string> = {
   oficiososia_facturacion_config: "la emisión de facturas",
   servicios_config: "Servicios",
   avisos_telegram_config: "los avisos por Telegram",
-  web_logs_config: "Linear para los tickets",
+  web_logs_config: "Logs web (Linear, fuentes y avisos)",
 };
 const CAMPOS: Record<string, string> = {
   nombre: "Nombre",

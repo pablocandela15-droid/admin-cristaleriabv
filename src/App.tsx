@@ -22,6 +22,7 @@ const Usuarios = lazy(CARGADORES_SECCION["/usuarios"]);
 const Facturas = lazy(CARGADORES_SECCION["/facturas"]);
 const Web = lazy(CARGADORES_SECCION["/web"]);
 const Presupuestos = lazy(CARGADORES_SECCION["/presupuestos"]);
+const TraficoWeb = lazy(CARGADORES_SECCION["/trafico-web"]);
 const Ayuda = lazy(CARGADORES_SECCION["/ayuda"]);
 const Avisos = lazy(CARGADORES_SECCION["/avisos"]);
 const Peticiones = lazy(CARGADORES_SECCION["/peticiones"]);
@@ -33,6 +34,7 @@ const SuperAdminAuditoria = lazy(() => import("./pages/SuperAdminAuditoria"));
 const SuperAdminServicios = lazy(() => import("./pages/SuperAdminServicios"));
 const SuperAdminInformes = lazy(() => import("./pages/SuperAdminInformes"));
 const SuperAdminTickets = lazy(() => import("./pages/SuperAdminTickets"));
+const SuperAdminLogs = lazy(() => import("./pages/SuperAdminLogs"));
 
 /**
  * Valores por defecto pensados para redes lentas (móvil o wifi del local):
@@ -147,6 +149,8 @@ const App = () => (
                     <Route path="/web" element={pagina(<Web />, ["web_fotos", "web_tarifas", "web_contenido"])} />
                     {/* Gestor de presupuestos (y solicitudes de la calculadora de la web): «Ver» lee, «Editar» todo. */}
                     <Route path="/presupuestos" element={pagina(<Presupuestos />, "presupuestos")} />
+                    {/* Visitas de la web (Vercel Web Analytics) y comportamiento de los visitantes: «Ver» lee, «Editar» los pesos. */}
+                    <Route path="/trafico-web" element={pagina(<TraficoWeb />, "trafico_web")} />
                     <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                     {/* Historial de avisos (campana): para todos los roles. */}
                     <Route path="/avisos" element={pagina(<Avisos />)} />
@@ -166,6 +170,8 @@ const App = () => (
                   <Route path="/super-admin/informes" element={paginaSuperAdmin(<SuperAdminInformes />)} />
                   {/* Tickets: las peticiones de los usuarios con el análisis de la IA. */}
                   <Route path="/super-admin/tickets" element={paginaSuperAdmin(<SuperAdminTickets />)} />
+                  {/* Logs de la web: actividad, errores agrupados en incidencias (tickets en Linear) y estadísticas. */}
+                  <Route path="/super-admin/logs" element={paginaSuperAdmin(<SuperAdminLogs />)} />
                   <Route path="*" element={bajoDemanda(<NotFound />)} />
                 </Routes>
               </RouteErrorBoundary>

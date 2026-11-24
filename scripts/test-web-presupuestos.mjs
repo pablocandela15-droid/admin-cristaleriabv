@@ -7,7 +7,9 @@
 // los presupuestos; cada sección del panel («Ver» lee, «Editar» cambia) en tablas y en el bucket web-fotos; Contenido
 // sube solo fotos sueltas; la numeración P-AAAA-NNNN por año (no se cambia ni se reutiliza); los totales con
 // descuento e IVA; la solicitud de la web (service role): presupuesto + línea + aviso para quien ve Presupuestos,
-// auditada como servicio y con límite por huella de IP; y la vuelta atrás no deja rastro y se puede volver a aplicar.
+// auditada como servicio y con límite por huella de IP; el precio de la web lleva IVA (20261124100000: la línea va sin
+// IVA y el total es el precio web; las solicitudes sin atender se ajustan y su vuelta atrás lo deshace); y la vuelta
+// atrás no deja rastro y se puede volver a aplicar.
 import { PGlite } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { unaccent } from "@electric-sql/pglite/contrib/unaccent";
@@ -19,6 +21,8 @@ const NUCLEO = await readFile("supabase/migrations/20261118120000_nucleo_panel.s
 const FACTURAS = await readFile("supabase/migrations/20261121100000_facturas.sql", "utf8");
 const MIGRACION = await readFile("supabase/migrations/20261123100000_web_y_presupuestos.sql", "utf8");
 const ROLLBACK = await readFile("supabase/rollbacks/20261123100000_web_y_presupuestos_ROLLBACK.sql", "utf8");
+const IVA = await readFile("supabase/migrations/20261124100000_presupuestos_iva_incluido.sql", "utf8");
+const IVA_ROLLBACK = await readFile("supabase/rollbacks/20261124100000_presupuestos_iva_incluido_ROLLBACK.sql", "utf8");
 // En Supabase el disparador de eventos pone la auditoría al crear cada tabla y la migración se la quita después a
 // las de datos derivados; aquí se repite eso tras instalar la auditoría a mano.
 const SIN_AUDITORIA = [...MIGRACION.matchAll(/^drop trigger if exists trg_auditoria on public\.\w+;$/gm)].map((m) => m[0]).join("\n");
@@ -83,6 +87,7 @@ async function aplicar() {
   await db.exec(adaptar(MIGRACION));
   await q("select public.instalar_auditoria_panel()");
   await db.exec(SIN_AUDITORIA);
+  await db.exec(adaptar(IVA));
 }
 
 // ─── 1. Se aplica entera encima del núcleo y de Facturas ────────────────────
@@ -266,12 +271,12 @@ const r1 = (await uno("select public.web_solicitud_presupuesto_registrar($1, $2:
 igual([r1.ok, r1.numero], [true, `P-${ANIO}-0004`], "la solicitud se guarda con su número");
 const guardado = await uno("select estado, origen, cliente_nombre, cliente_telefono, cliente_email, cliente_poblacion, notas_cliente, subtotal::float s, total::float t from public.presupuestos where numero = $1", [r1.numero]);
 igual(guardado, { estado: "solicitud", origen: "web", cliente_nombre: "Eva Martínez", cliente_telefono: "650 00 00 00", cliente_email: "eva@example.com",
-  cliente_poblacion: "Elche", notas_cliente: "Mejor por la tarde", s: 515, t: 623.15 }, "como presupuesto «solicitud» de origen web");
+  cliente_poblacion: "Elche", notas_cliente: "Mejor por la tarde", s: 425.62, t: 515 }, "como presupuesto «solicitud» de origen web; el total (con IVA) es el precio web");
 igual(await uno("select categoria, valores->>'ancho' a, descripcion, detalle, cantidad::float c, precio_unitario::float p, precio_calculado::float pc from public.presupuesto_lineas where presupuesto_id = $1", [r1.id]),
-  { categoria: "mamparas", a: "100", descripcion: "Solicitud web · Mampara de ducha", detalle: solicitud.resumen, c: 1, p: 515, pc: 515 },
-  "con una línea de la calculadora (nombre del catálogo, valores y resumen)");
+  { categoria: "mamparas", a: "100", descripcion: "Solicitud web · Mampara de ducha", detalle: solicitud.resumen, c: 1, p: 425.62, pc: 515 },
+  "con una línea de la calculadora (nombre del catálogo, valores y resumen): precio sin IVA (515 / 1,21) y el precio web como calculado");
 const aviso = await uno("select titulo, mensaje, referencia_id, referencia_tipo, origen from public.notificaciones_dashboard where tipo = 'presupuesto_solicitud'");
-igual(aviso, { titulo: "Nueva solicitud de presupuesto", mensaje: `P-${ANIO}-0004 · Eva Martínez · Mampara de ducha · 515,00 €`, referencia_id: r1.id,
+igual(aviso, { titulo: "Nueva solicitud de presupuesto", mensaje: `P-${ANIO}-0004 · Eva Martínez · Mampara de ducha · 515,00 € (IVA incl.)`, referencia_id: r1.id,
   referencia_tipo: "presupuesto", origen: "web-solicitud-presupuesto" }, "y un aviso en la campana");
 igual((await uno("select actor_label, actor_origin from public.audit_log where tabla = 'presupuestos' and registro_id = $1 and accion = 'crear'", [r1.id])),
   { actor_label: "API · service_role · web-solicitud-presupuesto", actor_origin: "servicio" }, "auditada como la Edge Function");
@@ -292,6 +297,36 @@ await comoUsuario(PRES_VER);
 ok(await cuenta("select count(*)::int n from public.notificaciones_dashboard where tipo = 'presupuesto_solicitud'") >= 1, "quien ve Presupuestos ve el aviso");
 await comoUsuario(NADA);
 igual(await cuenta("select count(*)::int n from public.notificaciones_dashboard where tipo = 'presupuesto_solicitud'"), 0, "quien no, no (lleva datos del cliente)");
+
+// ─── 6b. IVA incluido (20261124100000): solicitudes ya guardadas y su vuelta atrás ───
+const lineaDe = async (numero) =>
+  uno("select l.precio_unitario::float p, l.precio_calculado::float pc, pr.total::float t from public.presupuesto_lineas l join public.presupuestos pr on pr.id = l.presupuesto_id where pr.numero = $1", [numero]);
+await comoServidor();
+await db.exec(adaptar(IVA_ROLLBACK));
+await comoFuncion();
+const vieja = (await uno("select public.web_solicitud_presupuesto_registrar($1, $2::jsonb) r", ["d".repeat(64), JSON.stringify({ ...solicitud, total: 560 })])).r;
+const trabajada = (await uno("select public.web_solicitud_presupuesto_registrar($1, $2::jsonb) r", ["d".repeat(64), JSON.stringify({ ...solicitud, total: 300 })])).r;
+igual(await lineaDe(vieja.numero), { p: 560, pc: 560, t: 677.6 }, "vuelta atrás: la función vuelve a poner el precio web como precio de la línea (y suma el IVA)");
+igual((await uno("select mensaje from public.notificaciones_dashboard where referencia_id = $1", [vieja.id])).mensaje.endsWith("560,00 €"), true, "y el aviso de antes");
+await comoUsuario(PRES_EDITA);
+await q("update public.presupuestos set estado = 'borrador' where id = $1", [trabajada.id]);
+await comoServidor();
+await db.exec(adaptar(IVA));
+igual(await lineaDe(vieja.numero), { p: 462.81, pc: 560, t: 560 }, "al aplicarla, las solicitudes sin atender pasan a llevar el precio sin IVA (total = precio web)");
+igual(await lineaDe(trabajada.numero), { p: 300, pc: 300, t: 363 }, "las que ya se trabajan no se tocan");
+await comoUsuario(PRES_EDITA);
+await q("update public.presupuestos set iva_pct = 10 where id = $1", [vieja.id]);
+igual(await lineaDe(vieja.numero), { p: 462.81, pc: 560, t: 509.09 }, "cambiar el IVA del presupuesto no reescribe sus líneas");
+await q("update public.presupuestos set iva_pct = 21 where id = $1", [vieja.id]);
+await comoServidor();
+await db.exec(adaptar(IVA_ROLLBACK));
+igual(await lineaDe(vieja.numero), { p: 560, pc: 560, t: 677.6 }, "su vuelta atrás deshace el ajuste de las solicitudes sin atender");
+igual(await lineaDe(trabajada.numero), { p: 300, pc: 300, t: 363 }, "sin tocar las trabajadas");
+await db.exec(adaptar(IVA));
+await comoFuncion();
+const otraVez = (await uno("select public.web_solicitud_presupuesto_registrar($1, $2::jsonb) r", ["e".repeat(64), JSON.stringify({ ...solicitud, total: 100 })])).r;
+// 100 / 1,21 = 82,64 y 82,64 × 1,21 = 99,99: con precios a céntimos, a veces el total sale un céntimo por debajo o por encima.
+igual(await lineaDe(otraVez.numero), { p: 82.64, pc: 100, t: 99.99 }, "y se puede volver a aplicar (redondeo a céntimos: ±0,01 €)");
 
 // ─── 7. Vuelta atrás y nueva aplicación ─────────────────────────────────────
 await comoServidor();

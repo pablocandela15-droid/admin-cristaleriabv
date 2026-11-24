@@ -177,7 +177,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
         titulo: "Hacer un presupuesto",
         pasos: [
           "Pulsa «Nuevo presupuesto», escribe el nombre del cliente (y su teléfono si lo tienes) y pulsa «Crear y abrir». El número (P-2026-0001…) lo pone el panel.",
-          "«Añadir desde calculadora»: elige qué es (mampara, espejo, cerramiento…), rellena las medidas y las opciones y pulsa «Añadir al presupuesto». La línea sale con el detalle de lo elegido y el precio de tus tarifas de hoy.",
+          "«Añadir desde calculadora»: elige qué es (mampara, espejo, cerramiento…), rellena las medidas y las opciones y pulsa «Añadir al presupuesto». La línea sale con el detalle de lo elegido y el precio de tus tarifas de hoy. Los precios de la calculadora llevan el IVA incluido: la línea lo guarda sin IVA para que el total con IVA sea el precio de la calculadora.",
           "Lo que no está en la calculadora (desplazamiento, retirar un cristal…) va con «Línea manual».",
           "En cada línea puedes cambiar la descripción, el detalle, la cantidad y el precio; se guarda al salir del campo. Ordénalas arrastrando o con las flechas.",
           "En «Totales» pon el descuento y el IVA (21 % de serie). Revisa las condiciones y la validez y pulsa «Guardar cambios».",
@@ -207,9 +207,9 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
           "No: cada línea guarda su precio. Si con las tarifas de hoy sale otro, la línea lo avisa («Tarifa de hoy») y con «Recalcular» la pones al día si quieres.",
       },
       {
-        pregunta: "¿Por qué el total es más alto que el precio que vio el cliente en la web?",
+        pregunta: "¿El precio de la web lleva IVA?",
         respuesta:
-          "El precio de la web va como precio de la línea y el presupuesto le suma el IVA. Si ese precio ya llevaba el IVA, cambia el precio de la línea o pon el IVA que corresponda.",
+          "Sí: el precio de la calculadora de la web lleva el IVA incluido. La línea lo guarda sin IVA (sale «Precio web (IVA incl.)» al lado) y el presupuesto le suma el IVA, así el total es el precio que vio el cliente. Si cambias el IVA del presupuesto, las líneas no cambian solas: usa «Recalcular» en las que quieras ajustar.",
       },
       {
         pregunta: "¿Qué significa «Caducado»?",
@@ -218,6 +218,64 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         pregunta: "No puedo cambiar nada, ¿por qué?",
         respuesta: "Tienes permiso para ver los presupuestos pero no para cambiarlos (sale «Solo lectura»). Pídeselo al encargado.",
+      },
+    ],
+  },
+  {
+    seccion: "trafico_web",
+    titulo: "Tráfico web",
+    ruta: "/trafico-web",
+    queEs:
+      "Aquí ves cuánta gente entra en la web de la cristalería y qué hace en ella: las visitas de cada día, las páginas más vistas, de dónde llegan y cuántos usan la calculadora, piden presupuesto, pulsan WhatsApp o llaman. Las cifras se ponen al día solas cada noche.",
+    grupos: [
+      {
+        titulo: "Las visitas",
+        pasos: [
+          "Arriba elige el periodo (30, 90, 180 o 365 días). Todo lo de la página cambia a ese periodo.",
+          "Las cifras de arriba son las visitas y los visitantes del periodo, comparados con el periodo anterior, y la tendencia (si suben o bajan). Si aún hay pocos días, la página lo avisa.",
+          "La gráfica enseña las visitas día a día y marca los días raros: muchas más o muchas menos visitas de lo normal para ese día de la semana. Debajo están las páginas más vistas y de dónde llegan (Google, Instagram, un enlace…), qué dispositivos usan y de qué país son.",
+        ],
+      },
+      {
+        titulo: "Qué hacen los visitantes",
+        pasos: [
+          "En «Comportamiento de los visitantes» ves cuántos han usado la calculadora, cuántos han pedido presupuesto desde la web, cuántos han pulsado WhatsApp o el teléfono y cuántos han enviado el formulario de contacto.",
+          "Los recorridos («embudos») dicen cuántos empiezan a pedir un presupuesto y cuántos lo terminan; así sabes si algo de la web les frena.",
+          "También ves qué servicios y qué trabajos miran más. Las solicitudes que llegan aparecen además en Presupuestos › Solicitudes.",
+        ],
+      },
+      {
+        titulo: "La transferencia",
+        pasos: [
+          "La web está en el plan gratuito de Vercel, que tiene un límite de transferencia al mes. «Transferencia del mes» estima cuánto lleva gastado y cuánto gastará a final de mes; si se acerca al límite, avisa.",
+          "«Pesos por página» es lo que pesa de media cada página al abrirla. Solo cambia si sabes lo que haces: si no, déjalo como está.",
+        ],
+      },
+    ],
+    preguntas: [
+      {
+        pregunta: "Hoy no sale nada de hoy, ¿por qué?",
+        respuesta:
+          "Las visitas se copian cada noche (a las 03:30 UTC) con los días ya cerrados: lo de hoy aparece mañana. El comportamiento de los visitantes, en cambio, se pone al día cada pocos minutos.",
+      },
+      {
+        pregunta: "¿Por qué no coinciden del todo las visitas con lo que hacen los visitantes?",
+        respuesta:
+          "Son dos cuentas distintas: las visitas las cuenta Vercel y el comportamiento lo cuenta la propia web. Además, quien tiene puesto en su navegador «No rastrear» no se cuenta en el comportamiento. Las cifras se parecen, pero no son exactamente iguales.",
+      },
+      {
+        pregunta: "¿La web usa cookies para esto?",
+        respuesta:
+          "No. Ni las visitas ni el comportamiento usan cookies ni guardan nada en el móvil o el ordenador del visitante, y no se sabe quién es cada uno: solo se cuenta lo que pasa.",
+      },
+      {
+        pregunta: "Pone «Aún no hay datos», ¿qué hago?",
+        respuesta:
+          "Si la web acaba de ponerse en marcha, espera a mañana. Si sigue igual, la página te dice qué falta configurar: díselo a quien lleva la parte técnica del panel.",
+      },
+      {
+        pregunta: "No puedo cambiar los pesos por página, ¿por qué?",
+        respuesta: "Tienes permiso para ver el tráfico pero no para cambiarlo. Pídeselo al encargado si lo necesitas.",
       },
     ],
   },

@@ -18,7 +18,10 @@ import {
   lineaDesdeCalculadora,
   mover,
   ordenesNuevos,
+  precioConIva,
   precioConTarifasDeHoy,
+  precioFueraDelPrecioWeb,
+  precioSinIva,
   precioWeb,
   siguienteOrdenLinea,
 } from "../lineas";
@@ -183,12 +186,19 @@ describe("filtros de la lista", () => {
 describe("líneas desde la calculadora", () => {
   const { categorias, precios } = resolverTarifas(categories, null);
 
-  it("mampara: nombre de la categoría, lo elegido y el desglose; cantidad 1 y el total como precio", () => {
+  it("mampara: nombre de la categoría, lo elegido y el desglose; cantidad 1 y el total (IVA incluido) sin IVA como precio", () => {
     const valores = { ...categorias.mamparas.defaults, ancho: 100 };
     const calculo = categorias.mamparas.quote(valores, precios);
     expect(calculo.ready).toBe(true);
+    expect(calculo.total).toBe(500);
     const l = lineaDesdeCalculadora(categorias.mamparas, valores, calculo);
-    expect(l).toMatchObject({ categoria: "mamparas", descripcion: "Mampara a medida", cantidad: 1, precio_unitario: calculo.total, precio_calculado: calculo.total });
+    // 500 / 1,21 = 413,2231… → 413,22; el precio web (IVA incluido) se queda en precio_calculado.
+    expect(l).toMatchObject({ categoria: "mamparas", descripcion: "Mampara a medida", cantidad: 1, precio_unitario: 413.22, precio_calculado: 500 });
+    // Y el total del presupuesto con el 21 % vuelve a ser el precio web.
+    expect(calcularTotales([l], 0, 21).total).toBe(500);
+    // Con otro IVA en el presupuesto, la línea se calcula con ese.
+    expect(lineaDesdeCalculadora(categorias.mamparas, valores, calculo, 10).precio_unitario).toBe(454.55);
+    expect(lineaDesdeCalculadora(categorias.mamparas, valores, calculo, 0).precio_unitario).toBe(500);
     expect(l.valores).toEqual(valores);
     expect(l.valores).not.toBe(valores);
     expect(l.detalle).toMatch(/Ancho: 100 cm/);
@@ -207,20 +217,34 @@ describe("líneas desde la calculadora", () => {
     const guardada = linea({ ...antes, id: "l1", importe: antes.precio_unitario });
     // Sube el precio base de la mampara en Web › Tarifas.
     const caras = mergePricing({ mamparas: { ...DEFAULT_PRICING.mamparas, base: DEFAULT_PRICING.mamparas.base + 50 } });
-    expect(precioConTarifasDeHoy(guardada, categorias, caras)).toBe(antes.precio_unitario + 50);
+    expect(precioConTarifasDeHoy(guardada, categorias, caras)).toBe(antes.precio_calculado! + 50);
     expect(precioConTarifasDeHoy(linea(), categorias, caras)).toBeNull();
 
     const nuevoCalculo = categorias.mamparas.quote(valores, caras);
     expect(cambiosAlRecalcular(guardada, categorias.mamparas, valores, nuevoCalculo, categorias)).toMatchObject({
       descripcion: "Mampara a medida",
-      precio_unitario: antes.precio_unitario + 50,
-      precio_calculado: antes.precio_unitario + 50,
+      precio_unitario: precioSinIva(550, 21),
+      precio_calculado: 550,
     });
+    expect(cambiosAlRecalcular(guardada, categorias.mamparas, valores, nuevoCalculo, categorias, 10)).toMatchObject({ precio_unitario: 500, precio_calculado: 550 });
     const aMano = { ...guardada, descripcion: "Mampara del baño de arriba" };
     expect(descripcionAutomatica(aMano, categorias)).toBe(false);
     expect(cambiosAlRecalcular(aMano, categorias.mamparas, valores, nuevoCalculo, categorias)).not.toHaveProperty("descripcion");
     // La de una solicitud de la web se pone al día.
     expect(descripcionAutomatica({ ...guardada, descripcion: "Solicitud web · Mampara a medida" }, categorias)).toBe(true);
+  });
+
+  it("precio sin y con IVA, y líneas que ya no dan su precio web con el IVA de ahora", () => {
+    expect(precioSinIva(560)).toBe(462.81);
+    expect(precioConIva(462.81)).toBe(560);
+    expect(precioSinIva(100, 0)).toBe(100);
+    // IVA no válido: el de serie.
+    expect(precioSinIva(121, Number.NaN)).toBe(100);
+    expect(precioFueraDelPrecioWeb({ precio_unitario: 462.81, precio_calculado: 560 }, 21)).toBe(false);
+    expect(precioFueraDelPrecioWeb({ precio_unitario: 462.81, precio_calculado: 560 }, 10)).toBe(true);
+    // Las de antes del cambio (precio web como precio de la línea) y las manuales.
+    expect(precioFueraDelPrecioWeb({ precio_unitario: 560, precio_calculado: 560 }, 21)).toBe(true);
+    expect(precioFueraDelPrecioWeb({ precio_unitario: 45, precio_calculado: null }, 21)).toBe(false);
   });
 
   it("orden, mover, copiar y precio que vio el cliente en la web", () => {

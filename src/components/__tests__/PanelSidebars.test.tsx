@@ -133,7 +133,7 @@ function renderSuperAdmin(ruta = "/super-admin", { defaultOpen = true } = {}) {
 }
 
 describe("menú del Super Admin", () => {
-  it("los módulos agrupados: «Administración» y «Costes», sin «Más módulos»", () => {
+  it("los módulos agrupados: «Administración», «Costes» y «Web», sin «Más módulos»", () => {
     renderSuperAdmin();
     expect(screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"))).toEqual([
       "Control del Panel", "Usuarios", "Auditoría",
@@ -142,6 +142,8 @@ describe("menú del Super Admin", () => {
       "Tickets",
       // «Costes» es una pestaña de Servicios desde el 2026-11-04: ya no tiene entrada propia.
       "Gestor Gasto", "Servicios",
+      // Logs (24/11/2026): actividad de la web, errores e incidencias.
+      "Logs",
     ]);
     expect(
       within(screen.getByRole("list", { name: "Administración" })).getAllByRole("link").map((l) => l.getAttribute("aria-label")),
@@ -149,6 +151,8 @@ describe("menú del Super Admin", () => {
     expect(
       within(screen.getByRole("list", { name: "Costes" })).getAllByRole("link").map((l) => l.getAttribute("aria-label")),
     ).toEqual(["Gestor Gasto", "Servicios"]);
+    const logs = within(screen.getByRole("list", { name: "Web" })).getByRole("link", { name: "Logs" });
+    expect(logs).toHaveAttribute("href", "/super-admin/logs");
     expect(screen.queryByTestId("mas-modulos")).not.toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Web y clientes" })).not.toBeInTheDocument();
   });
@@ -312,7 +316,7 @@ describe("menú del panel normal · cabecera con el negocio", () => {
       </MemoryRouter>,
     );
     expect(screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"))).toEqual([
-      "Dashboard", "Facturas", "Web", "Presupuestos", "Usuarios", "Nueva petición", "Ayuda",
+      "Dashboard", "Facturas", "Web", "Presupuestos", "Tráfico web", "Usuarios", "Nueva petición", "Ayuda",
     ]);
   });
 });

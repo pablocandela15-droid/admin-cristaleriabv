@@ -7,6 +7,7 @@ import {
   ScrollText,
   Server,
   FileBarChart2,
+  FileSearch,
   Ticket,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
@@ -61,6 +62,14 @@ const gruposMenuSuperAdmin: { etiqueta: string; items: ItemMenu[] }[] = [
       { title: "Gestor Gasto", url: "/super-admin/gestor-gasto", icon: Wallet },
       // «Costes» es una pestaña de Servicios desde el 04/11/2026.
       { title: "Servicios", url: "/super-admin/servicios", icon: Server },
+    ],
+  },
+  {
+    etiqueta: "Web",
+    items: [
+      // Logs (24/11/2026): actividad de la web, errores e incidencias con Linear, estadísticas de comportamiento.
+      // Tráfico web es del Admin Panel (sección trafico_web): se llega desde Logs › Estadísticas.
+      { title: "Logs", url: "/super-admin/logs", icon: FileSearch },
     ],
   },
 ];
