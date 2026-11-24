@@ -81,6 +81,33 @@ verify_jwt = false
 [functions.procesar-logs-web]
 verify_jwt = false
 
+# Newsletter › alta desde la web (20261124173700_newsletter.sql): la llama el bloque de suscripción de la web
+# (cristaleriabv) desde el navegador de cualquier visitante, con la clave publicable (no es un JWT: con `true` la
+# pasarela la rechazaría). Pública a propósito, con su propia protección: solo orígenes de la web (CORS y Origin),
+# campo trampa, consentimiento obligatorio, límite por huella de IP (HMAC con sal) en newsletter_alta_web (solo
+# service role). Doble opt-in: el alta queda pendiente hasta pulsar «Confirmar» desde el correo. Ver
+# supabase/functions/newsletter-alta/alta.ts y docs/NEWSLETTER.md. Con GET (sin Origin) solo dice si se puede apuntar
+# alguien: lo pregunta el servidor de la web para enseñar o no el bloque del pie.
+[functions.newsletter-alta]
+verify_jwt = false
+
+# Newsletter › baja: la abren los suscriptores desde el enlace del pie (la página de la web la llama en JSON) y el
+# botón nativo «Cancelar suscripción» de Gmail/Outlook (RFC 8058) hace POST sin cabeceras. La autenticación es el token
+# aleatorio de cada suscriptor (newsletter_baja_por_token); un GET nunca da de baja. Ver newsletter-baja/baja.ts.
+[functions.newsletter-baja]
+verify_jwt = false
+
+# Newsletter › eventos de Resend (entregas, aperturas, rebotes, quejas…): los manda Resend sin JWT. Firma svix real
+# con RESEND_WEBHOOK_SECRET, en tiempo constante y fail-closed. Ver resend-webhook/firma.ts.
+[functions.resend-webhook]
+verify_jwt = false
+
+# Newsletter › estado de la configuración y lista de envío de Resend (canal Broadcast): pg_cron una vez al día
+# (newsletter_disparar_sync, pg_net sin JWT, x-ocr-secret en tiempo constante y fail-closed) o el panel con el JWT de un
+# usuario con «Ver» (estado) o «Editar» (sincronizar) en Newsletter. Ver newsletter-sync-resend/index.ts.
+[functions.newsletter-sync-resend]
+verify_jwt = false
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — autenticación propia REAL + filtro barato encima
@@ -177,4 +204,14 @@ verify_jwt = true
 # Logs web y Tráfico web › resumen del periodo con IA (solo cifras agregadas): JWT de usuario + «Ver» en Tráfico web
 # o super admin (exigirPermiso('trafico_web', 'view')). Ver supabase/functions/resumen-logs-web/index.ts.
 [functions.resumen-logs-web]
+verify_jwt = true
+
+# Newsletter › enviar (a todos, prueba o confirmaciones pendientes): JWT de usuario + «Editar» en Newsletter
+# (exigirPermiso). Sin RESEND_API_KEY o sin remitente no envía nada. Ver enviar-newsletter/index.ts.
+[functions.enviar-newsletter]
+verify_jwt = true
+
+# Newsletter › «Crear con IA»: JWT de usuario + «Editar» en Newsletter, tope de 40 propuestas por usuario y día.
+# Secreto OPENAI_API_KEY (sin él responde 503 «ia_no_disponible»). Ver newsletter-ia/ia.ts.
+[functions.newsletter-ia]
 verify_jwt = true

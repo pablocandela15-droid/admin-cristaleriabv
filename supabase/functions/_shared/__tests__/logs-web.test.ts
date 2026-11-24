@@ -2,7 +2,7 @@
  * Super Admin › Logs: saneado, huella, clasificación, catálogo y registro de
  * errores del servidor (supabase/functions/_shared/logs-web/*).
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { hostDe, pareceDatoPersonal, sanearPila, sanearPropiedades, sanearRuta, sanearTexto } from "../logs-web/saneado";
@@ -130,8 +130,15 @@ describe("clasificación", () => {
 
 describe("catálogo: el código y la migración dicen lo mismo", () => {
   const todo = readFileSync(resolve(__dirname, "../../../migrations/20261124120000_logs_web.sql"), "utf8");
-  const sql = todo.slice(todo.indexOf("insert into public.web_eventos_catalogo"), todo.indexOf("-- ─── 3. Incidencias"));
-  const filas = [...sql.matchAll(/\('([a-z0-9_]+)',\s+'(actividad|operacion|tecnico|error)',\s+'([a-z_]+)',/g)].map((m) => ({ tipo: m[1], categoria: m[2], fuente: m[3] }));
+  const base = todo.slice(todo.indexOf("insert into public.web_eventos_catalogo"), todo.indexOf("-- ─── 3. Incidencias"));
+  // Y los tipos que añaden migraciones posteriores (p. ej. newsletter_alta en 20261124173700_newsletter.sql).
+  const carpeta = resolve(__dirname, "../../../migrations");
+  const anadidos = readdirSync(carpeta)
+    .filter((f) => f > "20261124120000_logs_web.sql" && f.endsWith(".sql"))
+    .flatMap((f) => readFileSync(resolve(carpeta, f), "utf8").split("insert into public.web_eventos_catalogo").slice(1).map((t) => t.slice(0, t.indexOf(";"))));
+  const filas = [base, ...anadidos].flatMap((sql) =>
+    [...sql.matchAll(/\('([a-z0-9_]+)',\s+'(actividad|operacion|tecnico|error)',\s+'([a-z_]+)',/g)].map((m) => ({ tipo: m[1], categoria: m[2], fuente: m[3] })),
+  );
   it("mismos tipos del navegador con la misma categoría", () => {
     const delNavegador = filas.filter((f) => f.fuente === "navegador");
     expect(delNavegador.map((f) => f.tipo).sort()).toEqual(Object.keys(CATALOGO_NAVEGADOR).sort());
@@ -149,6 +156,19 @@ describe("catálogo: el código y la migración dicen lo mismo", () => {
 describe("normalizarLote", () => {
   const ctx = { entorno: "produccion" as const, proyecto: "cristaleriabv", esBot: false, dispositivo: "movil", navegador: "Safari", so: "iOS", ahora: new Date("2026-11-08T12:00:00Z") };
   const id = () => crypto.randomUUID();
+  it("newsletter_alta: operación con su origen; nunca el email", async () => {
+    const r = await normalizarLote({
+      contexto: { consentimiento: true },
+      eventos: [
+        { id: id(), tipo: "newsletter_alta", accion: "ok", ruta: "/", sesion: id(), props: { origen: "web_formulario", email: "ana@example.com" } },
+        { id: id(), tipo: "newsletter_alta", accion: "rechazada", ruta: "/", sesion: id(), props: { origen: "web_formulario", status: 429 } },
+      ],
+    }, ctx);
+    expect(r.eventos).toHaveLength(2);
+    expect(r.eventos[0]).toMatchObject({ tipo: "newsletter_alta", categoria: "operacion", accion: "ok", propiedades: { origen: "web_formulario" } });
+    expect(JSON.stringify(r.eventos)).not.toContain("example.com");
+    expect(r.eventos[1].propiedades).toMatchObject({ status: 429 });
+  });
   it("sin consentimiento: solo errores y sin visitante", async () => {
     const r = await normalizarLote({
       contexto: { consentimiento: false },

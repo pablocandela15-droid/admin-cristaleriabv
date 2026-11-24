@@ -60,14 +60,15 @@ Despliega todas las de `supabase/functions/` (la configuración de `verify_jwt` 
 ```bash
 for f in admin-create-user admin-delete-user admin-set-super-admin admin-set-user-access admin-update-user-password \
          analizar-peticion auditoria-revertir avisos-telegram cambiar-mi-contrasena clasificar-productos control-excel \
-         ia-modelos-openai leer-metricas list-users ocr-trabajo panel-auth procesar-factura procesar-logs-web \
-         registrar-actividad-web registrar-metrica resumen-logs-web servicios-uso sincronizar-costes-openai \
+         enviar-newsletter ia-modelos-openai leer-metricas list-users newsletter-alta newsletter-baja newsletter-ia \
+         newsletter-sync-resend ocr-trabajo panel-auth procesar-factura procesar-logs-web registrar-actividad-web \
+         registrar-metrica resend-webhook resumen-logs-web servicios-uso sincronizar-costes-openai \
          sync-trafico-web web-solicitud-presupuesto; do
   npx supabase functions deploy "$f" --project-ref <ref>
 done
 ```
 
-`web-solicitud-presupuesto` y `registrar-actividad-web` son las públicas (las llama la web, `verify_jwt = false`): no necesitan ningún secreto propio. Usan los de Supabase (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, que además es la sal de la huella de IP de los límites) y en el bucket `web-fotos` no hay que configurar nada (lo crea la migración). `registrar-actividad-web` solo acepta la web publicada (producción), sus previews de Vercel (demo) y `localhost` (local); otro dominio, con `LOGS_WEB_ORIGENES_EXTRA`. `sync-trafico-web` y `procesar-logs-web` también llevan `verify_jwt = false`: las protege `OCR_TRABAJOS_SECRET` (y, en «Procesar ahora», la sesión de super admin).
+`web-solicitud-presupuesto` y `registrar-actividad-web` son las públicas (las llama la web, `verify_jwt = false`): no necesitan ningún secreto propio. Las de la newsletter (`newsletter-alta`, `newsletter-baja`, `resend-webhook`) también son públicas y se explican en [NEWSLETTER.md](NEWSLETTER.md). Usan los de Supabase (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, que además es la sal de la huella de IP de los límites) y en el bucket `web-fotos` no hay que configurar nada (lo crea la migración). `registrar-actividad-web` solo acepta la web publicada (producción), sus previews de Vercel (demo) y `localhost` (local); otro dominio, con `LOGS_WEB_ORIGENES_EXTRA`. `sync-trafico-web` y `procesar-logs-web` también llevan `verify_jwt = false`: las protege `OCR_TRABAJOS_SECRET` (y, en «Procesar ahora», la sesión de super admin).
 
 Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extra (usa los de Supabase). El resto activa cada parte:
 
@@ -76,7 +77,7 @@ Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extr
 | `OCR_TRABAJOS_SECRET` | Que pg_cron pueda llamar a las funciones (mismo valor que en Vault) | Las tareas programadas no funcionan |
 | `SUPABASE_REF_PRODUCCION`, `SUPABASE_REF_DEMO` | Saber en qué entorno corre cada función | Todo se trata como «local» |
 | `PANEL_URL` (y `PANEL_URL_DEMO`) | Enlaces al panel en Telegram y en los tickets enviados a Linear | Sin enlaces |
-| `OPENAI_API_KEY` | Análisis de los tickets con IA, explicaciones y resúmenes de Logs y Tráfico web (y, si no hay `OPENAI_API_KEY_OCR`, la lectura de facturas) | El análisis no se hace |
+| `OPENAI_API_KEY` | Análisis de los tickets con IA, «Crear con IA» de la newsletter, explicaciones y resúmenes de Logs y Tráfico web (y, si no hay `OPENAI_API_KEY_OCR`, la lectura de facturas) | El análisis no se hace |
 | `OPENAI_API_KEY_OCR` | Facturas: leer los documentos y clasificar productos (proceso «ocr»; si falta, usa `OPENAI_API_KEY`) | Facturas no lee nada: la subida falla con «falta la clave» |
 | `OCR_MODELO`, `OCR_MODELO_PIEZAS`, `OCR_DETALLE` | Facturas: modelo de lectura (todo / solo las piezas de documentos largos) y `detail` de las imágenes (`high` o el de por defecto). Opcionales: manda el modelo elegido en *Super Admin › Servicios › Modelos* | `gpt-5.6-luna` con `detail` «original» |
 | `CLASIFICAR_PRODUCTOS_MODELO` | Facturas: modelo de la clasificación de productos. Opcional (igual que arriba) | `gpt-5.6-luna` |
@@ -95,7 +96,10 @@ Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extr
 | `SERVICIOS_VERCEL_TOKEN` + `SERVICIOS_VERCEL_TEAM_ID` | Consumo de Vercel en Servicios | La tarjeta pide el secreto |
 | `SERVICIOS_SUPABASE_TOKEN` | Uso detallado de Supabase en Servicios | Solo BD, Storage y usuarios |
 | `SERVICIOS_GITHUB_TOKEN` (+ `SERVICIOS_GITHUB_OWNER`, `SERVICIOS_GITHUB_REPOS`) | Minutos de GitHub Actions | La tarjeta pide el secreto |
-| `RESEND_API_KEY`, `STRIPE_SECRET_KEY`, `SERVICIOS_HOSTINGER_TOKEN` | Consumo de esos proveedores en Servicios (si se usan) | La tarjeta pide el secreto |
+| `RESEND_API_KEY` | Newsletter: enviar los correos (y el consumo de Resend en Servicios). Ver [NEWSLETTER.md](NEWSLETTER.md#puesta-en-marcha) | No sale ningún correo de la newsletter; la web dice que la suscripción no está disponible |
+| `RESEND_WEBHOOK_SECRET` | Newsletter: firma del webhook de Resend (estadísticas y bajas por rebote o spam) | El webhook rechaza todo: sin estadísticas ni bajas automáticas |
+| `RESEND_NEWSLETTER_SEGMENT_ID`, `NEWSLETTER_LIMITE_CONTACTOS`, `NEWSLETTER_IA_MODEL` | Newsletter, opcionales: Segment del canal Broadcast, contactos del plan y modelo de «Crear con IA» | Segment «Newsletter Cristalería BV», 1.000 contactos y `gpt-4.1-mini` |
+| `STRIPE_SECRET_KEY`, `SERVICIOS_HOSTINGER_TOKEN` | Consumo de esos proveedores en Servicios (si se usan) | La tarjeta pide el secreto |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `CONTROL_EXCEL_FILE_ID`, `CONTROL_EXCEL_CLIENTE` | Excel de control del Gestor Gasto ([CONTROL-EXCEL.md](CONTROL-EXCEL.md)) | La pestaña lo dice |
 
 ## 6. Vercel

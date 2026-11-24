@@ -24,6 +24,9 @@ const ENTIDADES: Record<string, string> = {
   "storage.objects": "archivo",
   web_linear_prueba: "envío de prueba a Linear",
   peso_paginas: "peso por página de Tráfico web",
+  newsletter_suscriptores: "suscriptor de la newsletter",
+  newsletter_envios: "envío de la newsletter",
+  newsletter_plantillas: "plantilla de la newsletter",
   fallos_internos: "fallo interno",
   costes_fijos: "coste fijo",
   servicios_contratados: "servicio contratado",
@@ -47,6 +50,7 @@ const CONFIGURACIONES: Record<string, string> = {
   servicios_config: "Servicios",
   avisos_telegram_config: "los avisos por Telegram",
   web_logs_config: "Logs web (Linear, fuentes y avisos)",
+  newsletter_config: "la newsletter (remitente, canal y envío)",
 };
 const CAMPOS: Record<string, string> = {
   nombre: "Nombre",
@@ -313,6 +317,9 @@ export function resumenEntrada(entrada: AuditLogEntry): string {
       "sincronizar-costes-openai": "sincronizar costes de IA",
       "leer-metricas": "consultar las métricas del panel",
       "registrar-metrica": "registrar una métrica del panel",
+      "enviar-newsletter": "enviar la newsletter (o una prueba o confirmaciones)",
+      "newsletter-ia": "redactar una newsletter con la IA",
+      "newsletter-sync-resend": "actualizar la lista de envío de la newsletter",
     };
     const operacion = String(d.operacion ?? d.origen ?? "").split("/")[0];
     const descripcion = operaciones[operacion];

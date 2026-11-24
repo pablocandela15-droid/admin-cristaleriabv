@@ -23,10 +23,14 @@ const AUTENTICACION_PROPIA: Record<string, { mecanismo: string; patrones: RegExp
   "sync-trafico-web": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (solo pg_cron)", patrones: [/x-ocr-secret/, /compararTiempoConstante/] },
   "procesar-logs-web": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (pg_cron) o JWT de super admin", patrones: [/x-ocr-secret/, /compararTiempoConstante/, /exigirSuperAdmin/] },
   "registrar-actividad-web": { mecanismo: "pública: origen permitido, tope de tamaño, límite por IP con HMAC y cupo diario en la RPC", patrones: [/entornoDeOrigen/, /MAX_BYTES_LOTE/, /hmacHex/] },
+  "newsletter-alta": { mecanismo: "pública: origen permitido, campo trampa, consentimiento obligatorio y límite por huella de IP (HMAC) en la RPC", patrones: [/entornoDeOrigen/, /esBot/, /huellaIp/, /consentimiento !== true/] },
+  "newsletter-baja": { mecanismo: "token aleatorio por suscriptor comprobado en la RPC; un GET nunca da de baja", patrones: [/TOKEN_RE/, /newsletter_baja_por_token/] },
+  "resend-webhook": { mecanismo: "firma svix de Resend en tiempo constante, fail-closed", patrones: [/verificarWebhookResend/, /compararEnTiempoConstante/] },
+  "newsletter-sync-resend": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (pg_cron) o JWT con la sección Newsletter", patrones: [/x-ocr-secret/, /compararTiempoConstante/, /exigirPermiso/] },
 };
 
 /** Funciones del panel que actúan en nombre de un usuario: nunca pueden estar en la lista. */
-const DE_USUARIO = ["analizar-peticion", "procesar-factura", "servicios-uso", "control-excel", "admin-create-user", "admin-set-super-admin", "auditoria-revertir", "cambiar-mi-contrasena"];
+const DE_USUARIO = ["analizar-peticion", "procesar-factura", "servicios-uso", "control-excel", "admin-create-user", "admin-set-super-admin", "auditoria-revertir", "cambiar-mi-contrasena", "enviar-newsletter", "newsletter-ia"];
 
 function fuentes(dir: string): string {
   let total = "";
@@ -43,10 +47,10 @@ function fuentes(dir: string): string {
 }
 
 describe("ADMITE_INTEGRACION", () => {
-  it("son los procesos programados (costes de OpenAI, modelos de IA, avisos por Telegram, lectura de facturas, Tráfico web y Logs) y la ingesta de la web", () => {
+  it("son los procesos programados (costes de OpenAI, modelos de IA, avisos por Telegram, lectura de facturas, Tráfico web, Logs y newsletter), la ingesta de la web y el newsletter público", () => {
     expect([...ADMITE_INTEGRACION].sort()).toEqual([
-      "avisos-telegram", "clasificar-productos", "ia-modelos-openai", "ocr-trabajo", "procesar-logs-web", "registrar-actividad-web",
-      "sincronizar-costes-openai", "sync-trafico-web",
+      "avisos-telegram", "clasificar-productos", "ia-modelos-openai", "newsletter-alta", "newsletter-baja", "newsletter-sync-resend",
+      "ocr-trabajo", "procesar-logs-web", "registrar-actividad-web", "resend-webhook", "sincronizar-costes-openai", "sync-trafico-web",
     ]);
   });
 
