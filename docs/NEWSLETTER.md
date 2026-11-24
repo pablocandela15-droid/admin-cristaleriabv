@@ -4,7 +4,7 @@ Marketing › **Newsletter** del panel (`/newsletter`): una lista de suscriptore
 
 Portado del panel de referencia y adaptado: nada de restaurante; plantillas de novedades, ofertas, temporada, trabajos realizados, consejos y avisos.
 
-**Mientras falten la clave de Resend o el remitente no sale ningún correo y nada se rompe**: el panel dice qué falta (Newsletter › Configuración), «Enviar» y «Enviar prueba» salen desactivados, y la web, si se apunta alguien, le dice que la suscripción no está disponible ahora mismo (no guarda nada). Sin la clave de OpenAI, «Crear con IA» sale desactivado y lo explica.
+**Mientras falten la clave de Resend o el remitente no sale ningún correo y nada se rompe**: el panel dice qué falta (Newsletter › Configuración), «Enviar» y «Enviar prueba» salen desactivados, y la web no enseña el bloque de suscripción del pie ni la casilla del presupuesto (el servidor de la web pregunta a `newsletter-alta` si se puede apuntar alguien y lo guarda un minuto; si la función no está desplegada, tampoco). Si aun así llega un alta, la función responde que no está disponible y no guarda nada. Sin la clave de OpenAI, «Crear con IA» sale desactivado y lo explica.
 
 ## Puesta en marcha
 
@@ -20,7 +20,7 @@ Primero en la **demo** (proyecto `SUPABASE_REF_DEMO`), y en producción solo des
    ```
 
 3. **Cuenta de Resend** ([resend.com](https://resend.com)): el plan gratuito sirve para empezar (100 correos al día y 3.000 al mes uno a uno; 1.000 contactos en marketing).
-4. **Dominio verificado** en Resend › *Domains* › *Add domain*: Resend da unos registros DNS (SPF, DKIM y, recomendado, DMARC) que se añaden en el proveedor del dominio. Hasta que salga «Verified» no se puede enviar desde él. **Hace falta un dominio propio**: `cristaleriabv.vercel.app` no sirve (no se pueden poner registros DNS en un dominio de Vercel). Conviene un subdominio para los envíos (p. ej. `novedades.tudominio.es`) para no mezclar la reputación con el correo del día a día.
+4. **Dominio verificado** en Resend › *Domains* › *Add domain*: Resend da unos registros DNS (SPF, DKIM y, recomendado, DMARC) que se añaden en el proveedor del dominio. Hasta que salga «Verified» no se puede enviar desde él. Para ver aperturas y clics en Estadísticas, activa *Open tracking* y *Click tracking* en la configuración del dominio. **Hace falta un dominio propio**: `cristaleriabv.vercel.app` no sirve (no se pueden poner registros DNS en un dominio de Vercel). Conviene un subdominio para los envíos (p. ej. `novedades.tudominio.es`) para no mezclar la reputación con el correo del día a día.
 5. **Clave de Resend** en *API Keys* › *Create API key*: «Sending access» basta con el canal «uno a uno»; con el canal Broadcast hace falta «Full access» (gestiona contactos y Segments). Se guarda en Supabase › *Edge Functions › Secrets* como `RESEND_API_KEY`.
 6. **Webhook** en Resend › *Webhooks* › *Add webhook*:
    - Dirección: `https://<ref>.supabase.co/functions/v1/resend-webhook` (el panel la enseña y la copia en Newsletter › Configuración).
@@ -44,7 +44,7 @@ Las tareas programadas usan lo de siempre del panel (Vault `project_url` y `ocr_
 | `NEWSLETTER_LIMITE_CONTACTOS` | Opcional: contactos del plan de marketing de Resend | Supabase › Edge Functions › Secrets | 1.000 (plan gratuito) |
 | `OCR_TRABAJOS_SECRET` + Vault | Los de siempre del panel | Supabase (Secrets y Vault) | No se limpian solas las altas sin confirmar ni se actualiza la lista de envío cada mañana |
 | `LOGS_WEB_ORIGENES_EXTRA` | Opcional: otro dominio de la web (`https://dominio=produccion`) | Supabase › Edge Functions › Secrets | Solo la web publicada, sus previews de Vercel y `localhost` pueden apuntar a alguien |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase › Project Settings › API (los de la web, que ya usa la calculadora) | Vercel, proyecto de la web | La web no enseña el bloque de suscripción |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase › Project Settings › API Keys (los mismos que ya usa la web para la calculadora; en producción ya están puestos) | Vercel, proyecto de la web | La web no enseña el bloque de suscripción ni la casilla del presupuesto, y las páginas de confirmar y de baja dicen que no está disponible. Con ellos, el bloque sale solo cuando la newsletter está lista (ver arriba) |
 
 Ningún valor de un secreto sale nunca en el panel: Configuración solo dice si está o falta.
 
@@ -91,11 +91,15 @@ Tareas programadas (pg_cron):
 | `newsletter-sync-resend` | 05:20 UTC cada día | Con el canal Broadcast, actualiza la lista de envío de Resend (`newsletter_disparar_sync`) |
 | `newsletter-purgar` | 04:10 UTC cada día | Borra pendientes de más de 30 días, el registro del límite de altas (1 día), las peticiones a la IA (90 días) y los eventos de correo (13 meses) |
 
+## Logs de la web
+
+La web apunta en Logs el evento `newsletter_alta` (aceptada, pendiente de confirmar, o rechazada con su código), con el origen (pie de página o presupuesto) y nunca el email. La migración lo añade al catálogo (`web_eventos_catalogo`) y está en `supabase/functions/_shared/logs-web/eventos.ts`. La llamada a `newsletter-alta` también sale como `peticion` (código y duración).
+
 ## Funciones
 
 | Función | Quién la llama | Qué hace |
 |---|---|---|
-| `newsletter-alta` | La web (pública, `verify_jwt = false`) | Alta con doble opt-in y correo de confirmación |
+| `newsletter-alta` | La web (pública, `verify_jwt = false`) | Alta con doble opt-in y correo de confirmación; con GET, si se puede apuntar alguien (para enseñar o no el bloque del pie) |
 | `newsletter-baja` | La web y la cabecera de baja de un clic (pública) | Confirmar la suscripción, consultar y darse de baja con el token |
 | `enviar-newsletter` | El panel («Editar») | Prueba, envío a todos y correos de confirmación |
 | `newsletter-ia` | El panel («Editar») | Propuesta de correo con IA (no guarda ni envía) |

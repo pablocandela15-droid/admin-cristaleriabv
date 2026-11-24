@@ -90,7 +90,20 @@ describe("manejarAlta: protección", () => {
     expect((await manejarAlta(peticion("{no-json"), deps())).status).toBe(400);
     expect((await manejarAlta(peticion({ ...ALTA, relleno: "x".repeat(5000) }), deps())).status).toBe(400);
     expect((await manejarAlta(peticion({ ...ALTA, accion: "borrar" }), deps())).status).toBe(400);
-    expect((await manejarAlta(peticion(null, WEB, "GET"), deps())).status).toBe(405);
+    expect((await manejarAlta(peticion(null, WEB, "PUT"), deps())).status).toBe(405);
+  });
+
+  it("GET (el servidor de la web, sin Origin): solo si se puede apuntar alguien, sin guardar nada", async () => {
+    const d = deps();
+    const r = await manejarAlta(peticion(null, null, "GET"), d);
+    expect([r.status, await r.json()]).toEqual([200, { ok: true, disponible: true }]);
+    expect(r.headers.get("Cache-Control")).toBe("public, max-age=60");
+    expect(d.registrar).not.toHaveBeenCalled();
+    expect(await (await manejarAlta(peticion(null, null, "GET"), deps({ apiKey: false }))).json()).toEqual({ ok: true, disponible: false });
+    const sinRemitente = deps({ leerConfig: vi.fn(async () => ({ config: CONFIG_POR_DEFECTO, negocio: negocioPorDefecto(WEB) })) });
+    expect(await (await manejarAlta(peticion(null, null, "GET"), sinRemitente)).json()).toEqual({ ok: true, disponible: false });
+    const falla = deps({ leerConfig: vi.fn(async () => { throw new Error("sin base"); }) });
+    expect(await (await manejarAlta(peticion(null, null, "GET"), falla)).json()).toEqual({ ok: true, disponible: false });
   });
 
   it("sin RESEND_API_KEY o sin remitente: 503 «no disponible» y no se guarda nada", async () => {

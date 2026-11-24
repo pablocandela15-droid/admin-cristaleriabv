@@ -86,7 +86,8 @@ verify_jwt = false
 # pasarela la rechazaría). Pública a propósito, con su propia protección: solo orígenes de la web (CORS y Origin),
 # campo trampa, consentimiento obligatorio, límite por huella de IP (HMAC con sal) en newsletter_alta_web (solo
 # service role). Doble opt-in: el alta queda pendiente hasta pulsar «Confirmar» desde el correo. Ver
-# supabase/functions/newsletter-alta/alta.ts y docs/NEWSLETTER.md.
+# supabase/functions/newsletter-alta/alta.ts y docs/NEWSLETTER.md. Con GET (sin Origin) solo dice si se puede apuntar
+# alguien: lo pregunta el servidor de la web para enseñar o no el bloque del pie.
 [functions.newsletter-alta]
 verify_jwt = false
 

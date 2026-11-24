@@ -62,6 +62,13 @@ do $$ begin
   end if;
 end $$;
 
+-- Logs de la web: fuera el evento «newsletter_alta» del catálogo (los eventos ya recibidos se conservan).
+do $$ begin
+  if to_regclass('public.web_eventos_catalogo') is not null then
+    delete from public.web_eventos_catalogo where tipo = 'newsletter_alta';
+  end if;
+end $$;
+
 -- La lista de exclusión de la auditoría vuelve a la de antes.
 do $$
 declare

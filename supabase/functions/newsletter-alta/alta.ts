@@ -22,6 +22,9 @@
 //    200 { ok: true, mensaje }   ·  400 { error }  ·  403 origen  ·  429 límite  ·  503 sin configurar
 //  POST { accion: "confirmar", t }
 //    200 { ok, estado: confirmada | ya_confirmada | caducado | invalido, email (a medias) }
+//  GET (sin Origin: lo consulta el servidor de la web, en caché un minuto)
+//    200 { ok: true, disponible } · ¿se puede apuntar alguien? (clave de Resend y remitente). La web solo enseña el
+//    bloque del pie y la casilla del presupuesto si es que sí. No dice nada más.
 // ============================================================================
 
 import { entornoDeOrigen } from "../_shared/logs-web/clasificacion.ts";
@@ -148,6 +151,18 @@ export async function manejarAlta(req: Request, deps: DependenciasAlta): Promise
   const permitido = entornoDeOrigen(origen, deps.origenesExtra ?? "") !== null;
   const cors = cabecerasCors(origen, permitido);
   if (req.method === "OPTIONS") return new Response(null, { status: permitido ? 204 : 403, headers: cors });
+  if (req.method === "GET") {
+    let disponible = false;
+    try {
+      disponible = deps.apiKey && faltaParaEnviar({ apiKey: deps.apiKey, config: (await deps.leerConfig()).config }).length === 0;
+    } catch {
+      disponible = false;
+    }
+    return new Response(JSON.stringify({ ok: true, disponible }), {
+      status: 200,
+      headers: { ...cors, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=60" },
+    });
+  }
   if (req.method !== "POST") return json(405, { ok: false, error: "Método no permitido." }, cors);
   if (!permitido) return json(403, { ok: false, error: "origen_no_permitido" }, cors);
 

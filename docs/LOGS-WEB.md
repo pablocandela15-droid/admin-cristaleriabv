@@ -33,7 +33,7 @@ Funciones: `registrar-actividad-web` (pública, `verify_jwt = false`, con protec
 | Qué | Dónde | Ejemplo |
 |---|---|---|
 | **Actividad** | `web_eventos.categoria = 'actividad'` | `pagina_vista`, `pagina_salida`, `scroll`, `clic`, `contacto` (WhatsApp, teléfono, correo, mapa, redes), `calculadora` (inicio, categoría, paso, calculado), `formulario` (inicio, avance, envío, error de validación, abandono), `media` (galería de trabajos), `chat` |
-| **Operaciones completadas** | `categoria = 'operacion'` | `presupuesto_solicitado` (la función respondió con el número), `presupuesto_rechazado`, `contacto_enviado` (formulario de contacto o de visita); desde la BD, `presupuesto_solicitado_bd` y `presupuesto_aceptado_bd` |
+| **Operaciones completadas** | `categoria = 'operacion'` | `presupuesto_solicitado` (la función respondió con el número), `presupuesto_rechazado`, `contacto_enviado` (formulario de contacto o de visita), `newsletter_alta` (alta en la newsletter aceptada, pendiente de confirmar, o rechazada; añadido por la migración de la newsletter, ver [NEWSLETTER.md](NEWSLETTER.md)); desde la BD, `presupuesto_solicitado_bd` y `presupuesto_aceptado_bd` |
 | **Técnico** | `categoria = 'tecnico'` | `carga_pagina` (TTFB, LCP, CLS), `peticion` (endpoint, código) |
 | **Errores** | `categoria = 'error'` | JavaScript, promesas, recursos, peticiones fallidas, React, 404, funciones del servidor, integraciones, despliegues |
 | **Incidencias agrupadas** | `web_incidencias` | Una por entorno y huella, con frecuencia, sesiones y ticket |

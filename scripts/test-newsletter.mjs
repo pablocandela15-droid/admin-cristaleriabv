@@ -129,6 +129,8 @@ igual((await q("select jobname, schedule from cron.job where jobname like 'newsl
   [{ jobname: "newsletter-purgar", schedule: "10 4 * * *" }, { jobname: "newsletter-sync-resend", schedule: "20 5 * * *" }], "tareas programadas");
 igual((await uno("select funcion, activo from public.ia_funciones where funcion = 'newsletter-ia'")), { funcion: "newsletter-ia", activo: true },
   "«Crear con IA» registrada en las funciones de IA");
+igual((await uno("select categoria, fuente, requiere_consentimiento from public.web_eventos_catalogo where tipo = 'newsletter_alta'")),
+  { categoria: "operacion", fuente: "navegador", requiere_consentimiento: true }, "el evento newsletter_alta de la web, en el catálogo de Logs");
 
 // ─── 2. Auditoría ───────────────────────────────────────────────────────────
 for (const fn of ["instalar_auditoria_panel", "fn_audit_nueva_tabla"]) {
@@ -422,6 +424,7 @@ igual((await uno("select permissions from public.user_role_presets where name = 
   "ni en los roles preconfigurados");
 igual((await uno("select seccion_inicio s from public.user_roles where user_id = $1", [NL_EDITA])).s, null, "ni como sección de inicio");
 igual(await cuenta("select count(*)::int n from public.admin_feature_toggles where section_key = 'newsletter'"), 0, "ni su interruptor");
+igual(await cuenta("select count(*)::int n from public.web_eventos_catalogo where tipo = 'newsletter_alta'"), 0, "ni el evento newsletter_alta del catálogo de Logs");
 ok(await cuenta("select count(*)::int n from public.web_eventos") >= 0 && await cuenta("select count(*)::int n from public.web_contenido") === 4, "Logs web y la web siguen");
 await aplicar(MIGRACION);
 igual((await q("select tablename from pg_tables where schemaname = 'public' and tablename = any($1)", [TABLAS])).rows.length, TABLAS.length, "se vuelve a aplicar");

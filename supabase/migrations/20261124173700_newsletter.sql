@@ -1086,6 +1086,21 @@ begin
 end;
 $$;
 
+-- ─── 13b. Logs de la web: el evento «newsletter_alta» ───────────────────────
+-- La web apunta en Logs si el servidor aceptó un alta (pendiente de confirmar) o la rechazó, nunca el email.
+-- Espejo de CATALOGO_NAVEGADOR (supabase/functions/_shared/logs-web/eventos.ts); un test comprueba que coinciden.
+do $$
+begin
+  if to_regclass('public.web_eventos_catalogo') is not null then
+    insert into public.web_eventos_catalogo (tipo, categoria, fuente, operacion, etapa_embudo, requiere_consentimiento, descripcion, orden) values
+      ('newsletter_alta', 'operacion', 'navegador', null, null, true, 'Alta en la newsletter desde la web (pie de página o solicitud de presupuesto): el servidor la aceptó y queda pendiente de confirmar por correo, o la rechazó (con su código). Nunca el email.', 63)
+    on conflict (tipo) do update set categoria = excluded.categoria, fuente = excluded.fuente, operacion = excluded.operacion,
+      etapa_embudo = excluded.etapa_embudo, requiere_consentimiento = excluded.requiere_consentimiento,
+      descripcion = excluded.descripcion, orden = excluded.orden;
+  end if;
+end;
+$$;
+
 -- ─── 14. Tareas pg_cron ─────────────────────────────────────────────────────
 do $$
 begin
