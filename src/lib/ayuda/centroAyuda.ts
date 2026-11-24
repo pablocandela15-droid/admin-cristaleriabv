@@ -279,6 +279,65 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       },
     ],
   },
+  {
+    seccion: "newsletter",
+    titulo: "Newsletter",
+    ruta: "/newsletter",
+    queEs:
+      "Aquí preparas y envías por correo las novedades y ofertas de la cristalería a los clientes que se han apuntado, ves quién está suscrito y cómo funcionan los envíos. La gente se apunta en la web (al pie de cada página o al pedir presupuesto) y solo recibe correos después de confirmar su dirección.",
+    grupos: [
+      {
+        titulo: "Preparar y enviar",
+        pasos: [
+          "En «Crear y enviar», elige una plantilla (novedades, oferta, temporada, trabajos, consejos o aviso) o pulsa «Crear con IA» y cuéntale qué quieres comunicar, con fechas y precios reales.",
+          "Cambia el asunto, la etiqueta y los bloques (texto, foto, lista de productos, fechas, botón…). Completa lo que va entre [corchetes]. A la derecha ves cómo queda en el ordenador y en el móvil.",
+          "Pulsa «Enviar prueba a mi correo» y revísala en tu buzón. Si te gusta el diseño, «Guardar como plantilla».",
+          "Pulsa «Enviar» y confírmalo: le llega solo a los suscriptores activos. Cada correo lleva el enlace para darse de baja y los datos del negocio.",
+        ],
+      },
+      {
+        titulo: "Suscriptores",
+        pasos: [
+          "En «Suscriptores» ves los activos, los pendientes (se apuntaron pero no han pulsado el enlace del correo de confirmación) y los dados de baja. Puedes buscar y filtrar.",
+          "«Añadir» apunta a alguien que te lo ha pedido en persona: escribe cómo te dio su permiso. Le llega un correo para confirmar y hasta entonces no recibe nada.",
+          "«Importar CSV» sube una lista (una columna con el correo y, si quieres, otra con el nombre); «Exportar CSV» la descarga.",
+          "En el menú «⋯» de cada persona: reenviar la confirmación, darla de baja o borrar sus datos si te lo pide (supresión RGPD).",
+        ],
+      },
+      {
+        titulo: "Estadísticas y configuración",
+        pasos: [
+          "«Estadísticas» enseña cuántos correos se entregaron, se abrieron y tuvieron clic, y los que rebotaron o se marcaron como spam; debajo, cada envío.",
+          "«Configuración» dice qué falta para poder enviar y guarda el remitente, a quién se responde, la dirección de pruebas y cómo se envía.",
+        ],
+      },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿Por qué hay gente «pendiente»?",
+        respuesta:
+          "Porque la ley pide que cada persona confirme que su correo es suyo antes de mandarle publicidad. Al apuntarse le llega un correo con un enlace; hasta que lo pulsa no recibe nada. Si en 30 días no lo confirma, se borra solo.",
+      },
+      {
+        pregunta: "Pone que falta configurar, ¿qué hago?",
+        respuesta:
+          "Hace falta una cuenta de Resend (el servicio que envía los correos) con un dominio propio verificado, su clave en Supabase y el remitente en «Configuración». Díselo a quien lleva la parte técnica: los pasos están en la guía del panel.",
+      },
+      {
+        pregunta: "¿Puedo volver a apuntar a alguien que se dio de baja?",
+        respuesta: "No desde el panel: la baja se respeta. Solo vuelve si se apunta él mismo en la web y confirma su correo.",
+      },
+      {
+        pregunta: "Alguien quiere que borremos sus datos, ¿cómo lo hago?",
+        respuesta:
+          "En «Suscriptores», menú «⋯» de esa persona, «Borrar sus datos (RGPD)». Se borran su suscripción, sus estadísticas y su correo del registro del panel.",
+      },
+      {
+        pregunta: "No veo «Crear y enviar», ¿por qué?",
+        respuesta: "Tienes permiso para ver la newsletter pero no para enviarla. Pídeselo al encargado si lo necesitas.",
+      },
+    ],
+  },
 ];
 
 /** ¿Es un archivo de vídeo (se enseña con <video>) y no un enlace de inserción (<iframe>)? */

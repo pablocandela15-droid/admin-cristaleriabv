@@ -1,7 +1,8 @@
 // ============================================================================
 //  Logs web · catálogo de eventos del navegador y validación de un lote
 // ----------------------------------------------------------------------------
-//  Espejo de public.web_eventos_catalogo (20261124120000_logs_web.sql); un test
+//  Espejo de public.web_eventos_catalogo (20261124120000_logs_web.sql y los añadidos de migraciones
+//  posteriores, como newsletter_alta en 20261124173700_newsletter.sql); un test
 //  comprueba que los dos dicen lo mismo. Todo lo que no esté aquí se rechaza.
 //
 //  «consentimiento» (contexto del lote) = el navegador deja medir: la web de la
@@ -53,6 +54,10 @@ export const CATALOGO_NAVEGADOR: Record<string, DefinicionTipo> = {
   presupuesto_rechazado: { categoria: "operacion", consentimiento: true, props: ["status", "categoria"] },
   // Formulario de contacto o de visita técnica enviado (abre WhatsApp con el mensaje, o al servidor si lo hay).
   contacto_enviado: { categoria: "operacion", consentimiento: true, props: ["formulario"], acciones: ["whatsapp", "servidor"] },
+  // Alta en la newsletter (newsletter-alta): «ok» = aceptada, pendiente de confirmar por correo; «rechazada» con su
+  // código (datos no válidos, demasiadas seguidas, sin configurar). origen: web_formulario o web_presupuesto. Nunca el
+  // email. En el catálogo lo añade 20261124173700_newsletter.sql.
+  newsletter_alta: { categoria: "operacion", consentimiento: true, props: ["origen", "status"], acciones: ["ok", "rechazada"] },
   carga_pagina: { categoria: "tecnico", consentimiento: true, props: ["ttfb", "dom", "carga", "lcp", "cls", "navegacion"] },
   peticion: { categoria: "tecnico", consentimiento: true, props: ["endpoint", "metodo", "status"] },
   // recargado/origen/despliegue_anterior/build_anterior: el error de «versión antigua» que la web manda DESPUÉS de

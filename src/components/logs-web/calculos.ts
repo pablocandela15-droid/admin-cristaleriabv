@@ -120,6 +120,7 @@ export const NOMBRE_TIPO: Record<string, string> = {
   presupuesto_solicitado: "Solicitud de presupuesto",
   presupuesto_rechazado: "Solicitud rechazada",
   contacto_enviado: "Contacto enviado",
+  newsletter_alta: "Alta en la newsletter",
   carga_pagina: "Carga de página",
   peticion: "Petición",
   error_js: "Error de JavaScript",
@@ -177,6 +178,9 @@ export function describirEvento(e: Pick<EventoWeb, "tipo" | "accion" | "ruta" | 
     case "presupuesto_solicitado": return `✔ Solicitud de presupuesto guardada por el servidor${obj ? ` (${obj})` : ""}`;
     case "presupuesto_rechazado": return `Solicitud de presupuesto rechazada por el servidor (${p.status ?? e.accion ?? "?"})`;
     case "contacto_enviado": return `✔ Formulario ${obj} enviado${e.accion === "whatsapp" ? " (abre WhatsApp con el mensaje)" : ""}`.replace(/\s+/g, " ");
+    case "newsletter_alta": return e.accion === "ok"
+      ? `✔ Alta en la newsletter${p.origen === "web_presupuesto" ? " (al pedir presupuesto)" : ""}, pendiente de confirmar por correo`
+      : `Alta en la newsletter rechazada por el servidor (${p.status ?? "?"})`;
     case "carga_pagina": return `Carga: ${p.carga ?? "?"} ms${p.lcp ? ` · LCP ${p.lcp} ms` : ""}`;
     case "peticion": return `Petición ${p.endpoint ?? "?"} → ${p.status ?? "?"} en ${Math.round(e.valor ?? 0)} ms`;
     default:

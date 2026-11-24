@@ -26,6 +26,7 @@ const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   "/web": ["web_fotos", "web_tarifas", "web_contenido"],
   "/presupuestos": "presupuestos",
   "/trafico-web": "trafico_web",
+  "/newsletter": "newsletter",
   "/usuarios": "usuarios",
 };
 // Las páginas de /super-admin/* no tienen ruta aquí: las protege SuperAdminRoute.

@@ -16,7 +16,7 @@
 // Texto: para el dueño y el personal; llano, de tú, sin palabras técnicas.
 // ---------------------------------------------------------------------------
 
-export type SeccionAyuda = "facturas" | "peticiones" | "presupuestos" | "trafico_web" | "usuarios";
+export type SeccionAyuda = "facturas" | "peticiones" | "presupuestos" | "trafico_web" | "newsletter" | "usuarios";
 
 export type LadoPaso = "top" | "right" | "bottom" | "left";
 
@@ -56,6 +56,10 @@ const P_NUEVA = "peticiones-pestana-nueva";
 const P_MIAS = "peticiones-pestana-mias";
 const F_COMPRAS = "facturas-pestana-compras";
 const F_CARGAR = "facturas-pestana-cargar";
+const N_CREAR = "newsletter-pestana-crear";
+const N_SUSCRIPTORES = "newsletter-pestana-suscriptores";
+const N_ESTADISTICAS = "newsletter-pestana-estadisticas";
+const N_CONFIGURACION = "newsletter-pestana-configuracion";
 
 export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
   facturas: [
@@ -288,6 +292,89 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       texto:
         "Sirve para estimar cuánta transferencia gasta la web al mes (el plan gratuito de Vercel tiene un límite). Si no sabes qué poner, déjalo como está.",
       opcional: true,
+      lado: "bottom",
+    },
+    PASO_FINAL,
+  ],
+  newsletter: [
+    {
+      titulo: "Newsletter",
+      texto:
+        "Aquí preparas y envías la newsletter por correo a los clientes que se han apuntado (en la web o contigo), ves quién está suscrito y cómo funcionan los envíos. Te lo enseñamos en un momento: el recorrido abre cada pestaña solo.",
+    },
+    {
+      elemento: N_CREAR,
+      pestana: N_CREAR,
+      titulo: "1. Crear y enviar",
+      texto: "Aquí se prepara el correo. Solo la ves si puedes enviar newsletters.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "newsletter-plantillas",
+      pestana: N_CREAR,
+      titulo: "Plantillas",
+      texto:
+        "Empieza por una plantilla (novedades, oferta, temporada, trabajos, consejos o aviso) o por las que hayas guardado. Lo que va entre [corchetes] hay que completarlo antes de enviar.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "newsletter-ia",
+      pestana: N_CREAR,
+      titulo: "Crear con IA",
+      texto:
+        "Cuéntale a la IA qué quieres comunicar (con fechas y precios reales) y te propone el correo entero. Es un borrador: lo revisas y lo cambias. No se envía nada sin que lo confirmes.",
+      opcional: true,
+      lado: "left",
+    },
+    {
+      elemento: "newsletter-bloques",
+      pestana: N_CREAR,
+      titulo: "El contenido",
+      texto: "El correo va por bloques: texto, foto, lista de productos, fechas, botón… Súbelos, bájalos o quítalos. A la derecha ves cómo queda en el ordenador y en el móvil.",
+      opcional: true,
+      lado: "top",
+    },
+    {
+      elemento: "newsletter-enviar",
+      pestana: N_CREAR,
+      titulo: "Prueba y envío",
+      texto:
+        "Mándate primero una prueba: solo te llega a ti. Cuando esté bien, «Enviar» se lo manda a los suscriptores activos, siempre después de confirmarlo. Cada correo lleva el enlace para darse de baja.",
+      opcional: true,
+      lado: "top",
+    },
+    {
+      elemento: N_SUSCRIPTORES,
+      pestana: N_SUSCRIPTORES,
+      titulo: "2. Suscriptores",
+      texto:
+        "Quién está apuntado. «Activo» recibe la newsletter; «Pendiente» se apuntó pero aún no ha pulsado el enlace del correo de confirmación; «De baja» ya no recibe nada.",
+      lado: "bottom",
+    },
+    {
+      elemento: "newsletter-filtros",
+      pestana: N_SUSCRIPTORES,
+      titulo: "Buscar, añadir e importar",
+      texto:
+        "Busca por correo o nombre y filtra por estado u origen. Puedes añadir a alguien que te lo pida (apuntando cómo te dio su permiso), importar una lista en CSV y exportarla. Nadie se activa hasta que confirma desde su correo.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: N_ESTADISTICAS,
+      pestana: N_ESTADISTICAS,
+      titulo: "3. Estadísticas",
+      texto: "Cuántos correos se entregaron, se abrieron y tuvieron clic, y cuáles rebotaron o se marcaron como spam. Debajo, el historial de cada envío.",
+      lado: "bottom",
+    },
+    {
+      elemento: N_CONFIGURACION,
+      pestana: N_CONFIGURACION,
+      titulo: "4. Configuración",
+      texto:
+        "Qué hace falta para poder enviar (la cuenta de Resend y el remitente) y los ajustes: remitente, a quién se responde, dirección de pruebas y cómo se envía.",
       lado: "bottom",
     },
     PASO_FINAL,
