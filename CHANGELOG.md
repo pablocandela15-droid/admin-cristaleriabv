@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-cristaleriabv. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración empieza en 1.0.0.
 
+## [1.6.0] - 2026-11-25
+
+Objetivo: Marketing › RRSS: Instagram y Facebook con programador, IA y métricas
+
+### Añadido
+- Marketing › RRSS: Instagram y Facebook con programador, IA y métricas ([#13](https://github.com/oficiososia/admin-cristaleriabv/pull/13))
+
 ## [1.5.0] - 2026-11-25
 
 Objetivo: Marketing › Newsletter con doble opt-in, Resend y baja RGPD
