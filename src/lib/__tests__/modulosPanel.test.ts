@@ -36,7 +36,7 @@ describe("catálogo completo: cada ruta de App.tsx está en un módulo o fuera c
   it("lee las rutas de App.tsx (si cambia la forma de escribirlas, hay que cambiar esta prueba)", () => {
     expect(App).toBeTypeOf("function");
     expect(rutasApp.length).toBeGreaterThan(10);
-    expect(paginasEquipo).toEqual(["/", "/dashboard", "/facturas", "/web", "/presupuestos", "/trafico-web", "/newsletter", "/usuarios", "/avisos", "/ayuda", "/peticiones"]);
+    expect(paginasEquipo).toEqual(["/", "/dashboard", "/facturas", "/web", "/presupuestos", "/trafico-web", "/newsletter", "/rrss", "/usuarios", "/avisos", "/ayuda", "/peticiones"]);
   });
 
   it.each(rutasApp)("%s", (ruta) => {
@@ -97,7 +97,8 @@ describe("forma del catálogo", () => {
   });
 
   it("los módulos del restaurante ya no están en el catálogo (Facturas sí, sin albaranes)", () => {
-    for (const clave of ["reservas", "gestion_web", "marketing", "rrss", "cheques", "tienda", "albaranes"]) {
+    // RRSS volvió el 25/11/2026 como módulo de la cristalería (Instagram y Facebook, sin nada de restaurante).
+    for (const clave of ["reservas", "gestion_web", "marketing", "cheques", "tienda", "albaranes"]) {
       expect(moduloPorClave(clave), clave).toBeUndefined();
     }
   });
@@ -113,7 +114,7 @@ describe("forma del catálogo", () => {
   });
 
   it("el menú lateral, en el orden de siempre", () => {
-    expect(MODULOS_MENU.map((m) => m.nombre)).toEqual(["Dashboard", "Facturas", "Web", "Presupuestos", "Tráfico web", "Newsletter", "Usuarios", "Nueva petición", "Ayuda"]);
+    expect(MODULOS_MENU.map((m) => m.nombre)).toEqual(["Dashboard", "Facturas", "Web", "Presupuestos", "Tráfico web", "Newsletter", "RRSS", "Usuarios", "Nueva petición", "Ayuda"]);
   });
 
   it("Facturas: se puede apagar y sale con «Ver» en Facturas o con solo «Facturas · Subida»", () => {
@@ -159,6 +160,15 @@ describe("forma del catálogo", () => {
     expect(tienePermisoModulo(n, [], true)).toBe(true);
   });
 
+  it("RRSS: se puede apagar, va tras Newsletter en su grupo «Marketing» y sale con «Ver» en RRSS", () => {
+    const r = moduloPorClave("rrss")!;
+    expect(r).toMatchObject({ rutas: ["/rrss"], desactivable: true, enMenu: true, grupo: "marketing", secciones: ["rrss"] });
+    expect(MODULOS_PANEL.map((m) => m.clave).indexOf("rrss")).toBe(MODULOS_PANEL.map((m) => m.clave).indexOf("newsletter") + 1);
+    expect(tienePermisoModulo(r, [{ section_key: "rrss", can_view: true }], false)).toBe(true);
+    expect(tienePermisoModulo(r, [{ section_key: "newsletter", can_view: true }], false)).toBe(false);
+    expect(tienePermisoModulo(r, [], true)).toBe(true);
+  });
+
   it("los permisos de cada módulo existen", () => {
     const secciones = SECTIONS.map((s) => s.key) as string[];
     for (const m of MODULOS_PANEL) for (const s of m.secciones ?? []) expect(secciones, `${m.clave}: ${s}`).toContain(s);
@@ -186,6 +196,7 @@ describe("moduloDeRuta", () => {
     ["/presupuestos", "presupuestos"],
     ["/trafico-web", "trafico_web"],
     ["/newsletter", "newsletter"],
+    ["/rrss", "rrss"],
     ["/peticiones", "peticiones"],
     ["/avisos", "avisos"],
     ["/ayuda", "ayuda"],

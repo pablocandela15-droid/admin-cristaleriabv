@@ -27,6 +27,11 @@ const ENTIDADES: Record<string, string> = {
   newsletter_suscriptores: "suscriptor de la newsletter",
   newsletter_envios: "envío de la newsletter",
   newsletter_plantillas: "plantilla de la newsletter",
+  rrss_piezas: "publicación de RRSS",
+  rrss_medios: "foto o vídeo de una publicación de RRSS",
+  rrss_programaciones: "publicación programada de RRSS",
+  rrss_campanas: "campaña de RRSS",
+  rrss_fechas: "fecha señalada de RRSS",
   fallos_internos: "fallo interno",
   costes_fijos: "coste fijo",
   servicios_contratados: "servicio contratado",
@@ -51,6 +56,8 @@ const CONFIGURACIONES: Record<string, string> = {
   avisos_telegram_config: "los avisos por Telegram",
   web_logs_config: "Logs web (Linear, fuentes y avisos)",
   newsletter_config: "la newsletter (remitente, canal y envío)",
+  rrss_ajustes: "el estilo de RRSS (tono, guía, hashtags y llamadas a la acción)",
+  rrss_meta_cuenta: "la conexión de RRSS con Instagram y Facebook",
 };
 const CAMPOS: Record<string, string> = {
   nombre: "Nombre",
@@ -320,6 +327,12 @@ export function resumenEntrada(entrada: AuditLogEntry): string {
       "enviar-newsletter": "enviar la newsletter (o una prueba o confirmaciones)",
       "newsletter-ia": "redactar una newsletter con la IA",
       "newsletter-sync-resend": "actualizar la lista de envío de la newsletter",
+      "rrss-conexion": "conectar, comprobar o desconectar Instagram y Facebook",
+      "rrss-oauth": "volver de Facebook al conectar RRSS",
+      "rrss-publicar": "publicar en Instagram o Facebook",
+      "rrss-programador": "publicar lo programado en RRSS",
+      "rrss-metricas": "actualizar las métricas de RRSS",
+      "rrss-ia": "pedir textos, ideas o campañas a la IA de RRSS",
     };
     const operacion = String(d.operacion ?? d.origen ?? "").split("/")[0];
     const descripcion = operaciones[operacion];

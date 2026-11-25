@@ -338,6 +338,63 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       },
     ],
   },
+  {
+    seccion: "rrss",
+    titulo: "RRSS",
+    ruta: "/rrss",
+    queEs:
+      "Aquí publicas en Instagram y en la página de Facebook de la cristalería: fotos de los trabajos, carruseles, reels e historias, al momento o programadas. La IA te ayuda con los textos, las ideas y las campañas, y ves qué funciona mejor.",
+    grupos: [
+      {
+        titulo: "Crear y publicar",
+        pasos: [
+          "En «Crear», marca Instagram, Facebook o las dos y elige el formato: foto, carrusel (de 2 a 10), reel (vídeo) o historia.",
+          "Sube las fotos o el vídeo del móvil, o pulsa «Elegir de Web › Fotos» para usar las de cada tipo de trabajo. Con el botón del recorte eliges qué parte se ve.",
+          "Escribe el texto o pulsa «Ayuda de la IA»: cuéntale qué se hizo (sin datos del cliente) y te propone tres textos con hashtags. Elige uno y revísalo.",
+          "Mira a la derecha cómo queda en el móvil. Si falta algo, sale en la lista de encima de los botones.",
+          "«Publicar ahora» (te pide confirmarlo) o «Programar…» para elegir día y hora. También puedes «Guardar borrador» y terminarlo otro día.",
+        ],
+      },
+      {
+        titulo: "Calendario y publicaciones",
+        pasos: [
+          "En «Calendario» ves lo programado, lo publicado y los borradores con fecha. Pulsa uno para moverlo, cancelarlo o abrirlo en «Crear».",
+          "En «Publicaciones» está todo lo creado con su estado. Si algo falla, se explica por qué y cómo arreglarlo, y puedes reintentarlo.",
+        ],
+      },
+      {
+        titulo: "Ideas, campañas y métricas",
+        pasos: [
+          "En «Ideas y campañas», pide ideas para la semana (con cómo grabarlas) o una campaña de 2 a 4 semanas. Al aceptarla, sus publicaciones quedan como borradores en el calendario: añade la foto y prográmalas.",
+          "«Métricas» enseña seguidores, alcance e interacciones, las publicaciones que más llegan y qué funciona mejor. Se actualizan solas cada noche.",
+          "En «Conexión y estilo» ves la cuenta conectada y cuándo caduca el permiso, y cambias el estilo de los textos. «Aprender de lo publicado» propone mejoras a partir de las métricas.",
+        ],
+      },
+    ],
+    preguntas: [
+      {
+        pregunta: "Pone «sin conectar», ¿qué hago?",
+        respuesta:
+          "Hace falta una app de Meta (la crea quien lleva la parte técnica, con los pasos de la guía del panel) y que la cuenta de Instagram sea profesional y esté vinculada a la página de Facebook. Después, en «Conexión y estilo», pulsa «Conectar con Facebook».",
+      },
+      {
+        pregunta: "Me avisa de que la conexión caduca, ¿qué hago?",
+        respuesta: "Entra en «Conexión y estilo» y pulsa «Renovar conexión»: entras en Facebook, aceptas los permisos y listo. No se pierde nada de lo programado.",
+      },
+      {
+        pregunta: "Un vídeo se queda «procesando», ¿está mal?",
+        respuesta: "No: Instagram tarda unos minutos en preparar los vídeos. El panel lo termina de publicar solo. Si en un día no sale, te avisa con el motivo.",
+      },
+      {
+        pregunta: "¿La IA publica sola?",
+        respuesta: "No. La IA solo propone textos, ideas y campañas. Nada se publica ni se programa sin que tú lo pulses.",
+      },
+      {
+        pregunta: "No veo «Crear», ¿por qué?",
+        respuesta: "Tienes permiso para ver RRSS pero no para publicar. Pídeselo al encargado si lo necesitas.",
+      },
+    ],
+  },
 ];
 
 /** ¿Es un archivo de vídeo (se enseña con <video>) y no un enlace de inserción (<iframe>)? */

@@ -479,6 +479,14 @@ export const TABLA_LABEL: Record<string, string> = {
   newsletter_envios: "Envíos de la newsletter",
   newsletter_plantillas: "Plantillas de la newsletter",
   newsletter_config: "Ajustes de la newsletter",
+  // RRSS: publicaciones, sus ficheros y programaciones, campañas, fechas, estilo y la conexión con Meta (sin tokens).
+  rrss_piezas: "Publicaciones de RRSS",
+  rrss_medios: "Fotos y vídeos de RRSS",
+  rrss_programaciones: "Programación de RRSS",
+  rrss_campanas: "Campañas de RRSS",
+  rrss_fechas: "Fechas señaladas de RRSS",
+  rrss_ajustes: "Estilo de RRSS",
+  rrss_meta_cuenta: "Conexión de RRSS con Meta",
   // Servicios, costes e IA.
   costes_fijos: "Costes fijos",
   servicios_contratados: "Servicios contratados",

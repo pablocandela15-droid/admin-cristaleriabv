@@ -57,6 +57,8 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
     "cambiar los pesos por página de la estimación de transferencia. Con solo «Ver» se consultan las visitas de la web y lo que hacen los visitantes (calculadora, solicitudes, WhatsApp…).",
   newsletter:
     "crear y enviar newsletters (también la prueba y «Crear con IA»), guardar plantillas, añadir, importar, dar de baja y borrar suscriptores y cambiar los ajustes de envío. Con solo «Ver» se consultan los suscriptores, los envíos y las estadísticas, y se exportan.",
+  rrss:
+    "crear, publicar y programar en Instagram y Facebook (también con las fotos de la web y la ayuda de la IA), aceptar campañas, conectar o desconectar la cuenta de Meta y cambiar el estilo de los textos. Con solo «Ver» se consultan las publicaciones, el calendario, las métricas y la conexión.",
   usuarios:
     "consultar en el admin panel la lista de usuarios y sus permisos. Crear, borrar, bloquear y cambiar permisos es solo del super admin.",
 };
