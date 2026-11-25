@@ -23,6 +23,7 @@ const Facturas = lazy(CARGADORES_SECCION["/facturas"]);
 const Web = lazy(CARGADORES_SECCION["/web"]);
 const Presupuestos = lazy(CARGADORES_SECCION["/presupuestos"]);
 const TraficoWeb = lazy(CARGADORES_SECCION["/trafico-web"]);
+const Newsletter = lazy(CARGADORES_SECCION["/newsletter"]);
 const Ayuda = lazy(CARGADORES_SECCION["/ayuda"]);
 const Avisos = lazy(CARGADORES_SECCION["/avisos"]);
 const Peticiones = lazy(CARGADORES_SECCION["/peticiones"]);
@@ -151,6 +152,8 @@ const App = () => (
                     <Route path="/presupuestos" element={pagina(<Presupuestos />, "presupuestos")} />
                     {/* Visitas de la web (Vercel Web Analytics) y comportamiento de los visitantes: «Ver» lee, «Editar» los pesos. */}
                     <Route path="/trafico-web" element={pagina(<TraficoWeb />, "trafico_web")} />
+                    {/* Marketing › Newsletter: «Ver» consulta suscriptores, envíos y estadísticas; «Editar» crea, envía y cambia. */}
+                    <Route path="/newsletter" element={pagina(<Newsletter />, "newsletter")} />
                     <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                     {/* Historial de avisos (campana): para todos los roles. */}
                     <Route path="/avisos" element={pagina(<Avisos />)} />

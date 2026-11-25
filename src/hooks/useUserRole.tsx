@@ -52,6 +52,9 @@ export const SECTIONS = [
   // Visitas de la web (Vercel Web Analytics) y comportamiento de los visitantes (migraciones 20261124110000_trafico_web
   // y 20261124120000_logs_web, página /trafico-web). «Ver» consulta; «Editar» además cambia los pesos por página.
   { key: "trafico_web", label: "Tráfico web" },
+  // Marketing › Newsletter (migración 20261124173700_newsletter, página /newsletter). «Ver» consulta suscriptores,
+  // envíos, estadísticas y ajustes; «Editar» además crea y envía, da de alta y de baja y cambia los ajustes.
+  { key: "newsletter", label: "Newsletter" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
 // Nota: lo del Super Admin (Control del Panel, Auditoría, Servicios, Gestor Gasto…) no forma parte del

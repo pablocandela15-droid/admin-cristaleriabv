@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-cristaleriabv. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración empieza en 1.0.0.
 
+## [1.5.0] - 2026-11-25
+
+Objetivo: Marketing › Newsletter con doble opt-in, Resend y baja RGPD
+
+### Añadido
+- Marketing › Newsletter con doble opt-in, Resend y baja RGPD ([#11](https://github.com/oficiososia/admin-cristaleriabv/pull/11))
+
 ## [1.4.0] - 2026-11-24
 
 Objetivo: Web › Fotos por tipo de trabajo

@@ -96,6 +96,9 @@ describe("recorrido", () => {
     expect(describirEvento(ev({ tipo: "presupuesto_solicitado", categoria: "operacion", objetivo: "Mamparas" }))).toBe("✔ Solicitud de presupuesto guardada por el servidor («Mamparas»)");
     expect(describirEvento(ev({ tipo: "calculadora", accion: "calculado", objetivo: "Mamparas", valor: 519.6 }))).toBe("Calculadora: calculado «Mamparas» · 520 € (IVA incl.)");
     expect(describirEvento(ev({ tipo: "contacto_enviado", categoria: "operacion", accion: "whatsapp", objetivo: "visita" }))).toBe("✔ Formulario «visita» enviado (abre WhatsApp con el mensaje)");
+    expect(describirEvento(ev({ tipo: "newsletter_alta", categoria: "operacion", accion: "ok", propiedades: { origen: "web_presupuesto" } })))
+      .toBe("✔ Alta en la newsletter (al pedir presupuesto), pendiente de confirmar por correo");
+    expect(describirEvento(ev({ tipo: "newsletter_alta", categoria: "operacion", accion: "rechazada", propiedades: { status: 429 } }))).toBe("Alta en la newsletter rechazada por el servidor (429)");
     expect(describirEvento(ev({ tipo: "pagina_vista", ruta: "/trabajos", propiedades: { origen_tipo: "qr", campana: "furgoneta" } }))).toBe("Abre /trabajos (entra por qr: furgoneta)");
   });
   it("línea de tiempo en orden, con tiempos relativos y el error resaltado", () => {

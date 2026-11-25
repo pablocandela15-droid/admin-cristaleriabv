@@ -48,6 +48,7 @@ describe("SECCIONES_CONFIGURABLES", () => {
       ["web_contenido", "Web · Contenido"],
       ["presupuestos", "Presupuestos"],
       ["trafico_web", "Tráfico web"],
+      ["newsletter", "Newsletter"],
       ["usuarios", "Usuarios"],
     ]);
   });
@@ -93,6 +94,7 @@ describe("permisosParaEditar", () => {
       permiso("web_contenido", false, false),
       permiso("presupuestos", false, false),
       permiso("trafico_web", false, false),
+      permiso("newsletter", false, false),
       permiso("usuarios", false, false),
     ]);
   });
@@ -109,7 +111,7 @@ describe("permisosParaEditar", () => {
       permiso("trabajadores", true, true),
     ]);
     expect(permisos.map((p) => p.section_key)).toEqual([
-      "dashboard", "facturas", "facturas_subida", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "trafico_web", "usuarios",
+      "dashboard", "facturas", "facturas_subida", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "trafico_web", "newsletter", "usuarios",
     ]);
     expect(permisos.every((p) => !p.can_view && !p.can_edit)).toBe(true);
   });
@@ -125,8 +127,8 @@ describe("«Usuarios» y «Facturas · Subida»: un solo interruptor (en can_vie
   });
 
   it("Facturas: «Puede editar» cuenta para el rol; «Facturas · Subida» no", () => {
-    // Admin si edita en todas las que cuentan (Facturas, las tres de Web, Presupuestos y Tráfico web); en alguna, manager.
-    expect(rolSegunPermisos(["facturas", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "trafico_web"].map((k) => permiso(k, true, true)))).toBe("admin");
+    // Admin si edita en todas las que cuentan (Facturas, las tres de Web, Presupuestos, Tráfico web y Newsletter); en alguna, manager.
+    expect(rolSegunPermisos(["facturas", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "trafico_web", "newsletter"].map((k) => permiso(k, true, true)))).toBe("admin");
     expect(rolSegunPermisos([permiso("facturas", true, true)])).toBe("manager");
     expect(rolSegunPermisos([permiso("facturas", true, false), permiso("facturas_subida", true, false)])).toBe("staff");
     expect(AYUDA_EDICION.facturas_subida).toMatch(/Cargar/);
@@ -278,5 +280,15 @@ describe("Tráfico web (migración 20261124110000_trafico_web)", () => {
     expect(AYUDA_EDICION.trafico_web).toMatch(/pesos por página/i);
     expect(rolSegunPermisos([permiso("trafico_web", true, true)])).toBe("manager");
     expect(rolSegunPermisos([permiso("trafico_web", true, false)])).toBe("staff");
+  });
+});
+
+describe("Newsletter (migración 20261124173700_newsletter)", () => {
+  it("«Ver» consulta y exporta; «Puede editar» crea, envía, da de alta y de baja y cambia los ajustes", () => {
+    expect(interruptorUnico("newsletter")).toBeNull();
+    expect(AYUDA_EDICION.newsletter).toMatch(/Con solo «Ver»/);
+    expect(AYUDA_EDICION.newsletter).toMatch(/enviar newsletters/);
+    expect(rolSegunPermisos([permiso("newsletter", true, true)])).toBe("manager");
+    expect(rolSegunPermisos([permiso("newsletter", true, false)])).toBe("staff");
   });
 });

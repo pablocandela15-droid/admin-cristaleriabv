@@ -17,7 +17,7 @@
 // ============================================================================
 import type { ComponentType, SVGProps } from "react";
 import { matchPath } from "react-router-dom";
-import { Activity, Bell, FileText, Globe, HelpCircle, LayoutDashboard, MessageSquarePlus, Receipt, Shield, UserRound } from "lucide-react";
+import { Activity, Bell, FileText, Globe, HelpCircle, LayoutDashboard, Mail, MessageSquarePlus, Receipt, Shield, UserRound } from "lucide-react";
 import type { SectionKey } from "@/hooks/useUserRole";
 
 export type IconoModulo = ComponentType<SVGProps<SVGSVGElement>>;
@@ -27,6 +27,7 @@ export const GRUPOS_MODULOS = [
   { id: "dia", titulo: "Día a día" },
   { id: "compras", titulo: "Compras" },
   { id: "web", titulo: "Web y clientes" },
+  { id: "marketing", titulo: "Marketing" },
   { id: "gestion", titulo: "Equipo" },
   { id: "ayuda", titulo: "Ayuda y cuenta" },
 ] as const;
@@ -124,6 +125,17 @@ export const MODULOS_PANEL: readonly ModuloPanel[] = [
     icono: Activity,
     grupo: "web",
     secciones: ["trafico_web"],
+    desactivable: true,
+    enMenu: true,
+  },
+  {
+    clave: "newsletter",
+    nombre: "Newsletter",
+    descripcion: "Newsletter por correo: suscriptores con doble opt-in (se apuntan en la web), creador con plantillas e IA, prueba, envío, estadísticas y bajas automáticas.",
+    rutas: ["/newsletter"],
+    icono: Mail,
+    grupo: "marketing",
+    secciones: ["newsletter"],
     desactivable: true,
     enMenu: true,
   },

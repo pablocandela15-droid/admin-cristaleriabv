@@ -21,8 +21,16 @@ describe("tours de ayuda", () => {
     }
   });
 
-  it("hay tours de Facturas, Peticiones, Presupuestos, Tráfico web y Usuarios", () => {
-    expect(Object.keys(TOURS).sort()).toEqual(["facturas", "peticiones", "presupuestos", "trafico_web", "usuarios"]);
+  it("hay tours de Facturas, Peticiones, Presupuestos, Tráfico web, Newsletter y Usuarios", () => {
+    expect(Object.keys(TOURS).sort()).toEqual(["facturas", "newsletter", "peticiones", "presupuestos", "trafico_web", "usuarios"]);
+  });
+
+  it("el tour de Newsletter recorre Crear y enviar (solo con «Editar»: pasos opcionales), Suscriptores, Estadísticas y Configuración", () => {
+    expect(pestanasDelTour(TOURS.newsletter)).toEqual([
+      "newsletter-pestana-crear", "newsletter-pestana-suscriptores", "newsletter-pestana-estadisticas", "newsletter-pestana-configuracion",
+    ]);
+    expect(TOURS.newsletter.filter((p) => p.pestana === "newsletter-pestana-crear").every((p) => p.opcional)).toBe(true);
+    expect(TOURS.newsletter.find((p) => p.elemento === "newsletter-pestana-suscriptores")?.texto).toMatch(/Pendiente.*confirmación/);
   });
 
   it("el tour de Tráfico web enseña el periodo, las cifras, la gráfica, el comportamiento y los pesos (sin pestañas)", () => {

@@ -36,7 +36,7 @@ describe("catálogo completo: cada ruta de App.tsx está en un módulo o fuera c
   it("lee las rutas de App.tsx (si cambia la forma de escribirlas, hay que cambiar esta prueba)", () => {
     expect(App).toBeTypeOf("function");
     expect(rutasApp.length).toBeGreaterThan(10);
-    expect(paginasEquipo).toEqual(["/", "/dashboard", "/facturas", "/web", "/presupuestos", "/trafico-web", "/usuarios", "/avisos", "/ayuda", "/peticiones"]);
+    expect(paginasEquipo).toEqual(["/", "/dashboard", "/facturas", "/web", "/presupuestos", "/trafico-web", "/newsletter", "/usuarios", "/avisos", "/ayuda", "/peticiones"]);
   });
 
   it.each(rutasApp)("%s", (ruta) => {
@@ -113,7 +113,7 @@ describe("forma del catálogo", () => {
   });
 
   it("el menú lateral, en el orden de siempre", () => {
-    expect(MODULOS_MENU.map((m) => m.nombre)).toEqual(["Dashboard", "Facturas", "Web", "Presupuestos", "Tráfico web", "Usuarios", "Nueva petición", "Ayuda"]);
+    expect(MODULOS_MENU.map((m) => m.nombre)).toEqual(["Dashboard", "Facturas", "Web", "Presupuestos", "Tráfico web", "Newsletter", "Usuarios", "Nueva petición", "Ayuda"]);
   });
 
   it("Facturas: se puede apagar y sale con «Ver» en Facturas o con solo «Facturas · Subida»", () => {
@@ -150,6 +150,15 @@ describe("forma del catálogo", () => {
     expect(moduloDeRuta("/super-admin/logs")).toBeUndefined();
   });
 
+  it("Newsletter: se puede apagar, va tras Tráfico web en su grupo «Marketing» y sale con «Ver» en Newsletter", () => {
+    const n = moduloPorClave("newsletter")!;
+    expect(n).toMatchObject({ rutas: ["/newsletter"], desactivable: true, enMenu: true, grupo: "marketing", secciones: ["newsletter"] });
+    expect(MODULOS_PANEL.map((m) => m.clave).indexOf("newsletter")).toBe(MODULOS_PANEL.map((m) => m.clave).indexOf("trafico_web") + 1);
+    expect(tienePermisoModulo(n, [{ section_key: "newsletter", can_view: true }], false)).toBe(true);
+    expect(tienePermisoModulo(n, [{ section_key: "trafico_web", can_view: true }], false)).toBe(false);
+    expect(tienePermisoModulo(n, [], true)).toBe(true);
+  });
+
   it("los permisos de cada módulo existen", () => {
     const secciones = SECTIONS.map((s) => s.key) as string[];
     for (const m of MODULOS_PANEL) for (const s of m.secciones ?? []) expect(secciones, `${m.clave}: ${s}`).toContain(s);
@@ -176,6 +185,7 @@ describe("moduloDeRuta", () => {
     ["/web", "web"],
     ["/presupuestos", "presupuestos"],
     ["/trafico-web", "trafico_web"],
+    ["/newsletter", "newsletter"],
     ["/peticiones", "peticiones"],
     ["/avisos", "avisos"],
     ["/ayuda", "ayuda"],
