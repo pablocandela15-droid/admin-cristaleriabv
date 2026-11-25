@@ -49,6 +49,7 @@ describe("SECCIONES_CONFIGURABLES", () => {
       ["presupuestos", "Presupuestos"],
       ["trafico_web", "Tráfico web"],
       ["newsletter", "Newsletter"],
+      ["rrss", "RRSS"],
       ["usuarios", "Usuarios"],
     ]);
   });
@@ -95,6 +96,7 @@ describe("permisosParaEditar", () => {
       permiso("presupuestos", false, false),
       permiso("trafico_web", false, false),
       permiso("newsletter", false, false),
+      permiso("rrss", false, false),
       permiso("usuarios", false, false),
     ]);
   });
@@ -111,7 +113,7 @@ describe("permisosParaEditar", () => {
       permiso("trabajadores", true, true),
     ]);
     expect(permisos.map((p) => p.section_key)).toEqual([
-      "dashboard", "facturas", "facturas_subida", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "trafico_web", "newsletter", "usuarios",
+      "dashboard", "facturas", "facturas_subida", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "trafico_web", "newsletter", "rrss", "usuarios",
     ]);
     expect(permisos.every((p) => !p.can_view && !p.can_edit)).toBe(true);
   });
@@ -127,8 +129,8 @@ describe("«Usuarios» y «Facturas · Subida»: un solo interruptor (en can_vie
   });
 
   it("Facturas: «Puede editar» cuenta para el rol; «Facturas · Subida» no", () => {
-    // Admin si edita en todas las que cuentan (Facturas, las tres de Web, Presupuestos, Tráfico web y Newsletter); en alguna, manager.
-    expect(rolSegunPermisos(["facturas", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "trafico_web", "newsletter"].map((k) => permiso(k, true, true)))).toBe("admin");
+    // Admin si edita en todas las que cuentan (Facturas, las tres de Web, Presupuestos, Tráfico web, Newsletter y RRSS); en alguna, manager.
+    expect(rolSegunPermisos(["facturas", "web_fotos", "web_tarifas", "web_contenido", "presupuestos", "trafico_web", "newsletter", "rrss"].map((k) => permiso(k, true, true)))).toBe("admin");
     expect(rolSegunPermisos([permiso("facturas", true, true)])).toBe("manager");
     expect(rolSegunPermisos([permiso("facturas", true, false), permiso("facturas_subida", true, false)])).toBe("staff");
     expect(AYUDA_EDICION.facturas_subida).toMatch(/Cargar/);
@@ -290,5 +292,15 @@ describe("Newsletter (migración 20261124173700_newsletter)", () => {
     expect(AYUDA_EDICION.newsletter).toMatch(/enviar newsletters/);
     expect(rolSegunPermisos([permiso("newsletter", true, true)])).toBe("manager");
     expect(rolSegunPermisos([permiso("newsletter", true, false)])).toBe("staff");
+  });
+});
+
+describe("RRSS (migración 20261125100000_rrss)", () => {
+  it("«Ver» consulta; «Puede editar» publica, programa, conecta la cuenta de Meta y cambia el estilo", () => {
+    expect(interruptorUnico("rrss")).toBeNull();
+    expect(AYUDA_EDICION.rrss).toMatch(/Con solo «Ver»/);
+    expect(AYUDA_EDICION.rrss).toMatch(/publicar y programar en Instagram y Facebook/);
+    expect(rolSegunPermisos([permiso("rrss", true, true)])).toBe("manager");
+    expect(rolSegunPermisos([permiso("rrss", true, false)])).toBe("staff");
   });
 });

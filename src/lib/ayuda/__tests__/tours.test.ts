@@ -21,8 +21,8 @@ describe("tours de ayuda", () => {
     }
   });
 
-  it("hay tours de Facturas, Peticiones, Presupuestos, Tráfico web, Newsletter y Usuarios", () => {
-    expect(Object.keys(TOURS).sort()).toEqual(["facturas", "newsletter", "peticiones", "presupuestos", "trafico_web", "usuarios"]);
+  it("hay tours de Facturas, Peticiones, Presupuestos, Tráfico web, Newsletter, RRSS y Usuarios", () => {
+    expect(Object.keys(TOURS).sort()).toEqual(["facturas", "newsletter", "peticiones", "presupuestos", "rrss", "trafico_web", "usuarios"]);
   });
 
   it("el tour de Newsletter recorre Crear y enviar (solo con «Editar»: pasos opcionales), Suscriptores, Estadísticas y Configuración", () => {
@@ -31,6 +31,15 @@ describe("tours de ayuda", () => {
     ]);
     expect(TOURS.newsletter.filter((p) => p.pestana === "newsletter-pestana-crear").every((p) => p.opcional)).toBe(true);
     expect(TOURS.newsletter.find((p) => p.elemento === "newsletter-pestana-suscriptores")?.texto).toMatch(/Pendiente.*confirmación/);
+  });
+
+  it("el tour de RRSS recorre Crear (solo con «Editar»: pasos opcionales), Calendario, Publicaciones, Ideas, Métricas y Conexión", () => {
+    expect(pestanasDelTour(TOURS.rrss)).toEqual([
+      "rrss-pestana-crear", "rrss-pestana-calendario", "rrss-pestana-publicaciones", "rrss-pestana-ideas", "rrss-pestana-metricas", "rrss-pestana-conexion",
+    ]);
+    expect(TOURS.rrss.filter((p) => p.pestana === "rrss-pestana-crear").every((p) => p.opcional)).toBe(true);
+    expect(TOURS.rrss.find((p) => p.elemento === "rrss-medios")?.texto).toMatch(/Web › Fotos/);
+    expect(TOURS.rrss.map((p) => p.texto).join(" ")).not.toMatch(/restaurante|carta|tapas|reserva/i);
   });
 
   it("el tour de Tráfico web enseña el periodo, las cifras, la gráfica, el comportamiento y los pesos (sin pestañas)", () => {

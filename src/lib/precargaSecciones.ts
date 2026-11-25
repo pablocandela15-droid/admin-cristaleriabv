@@ -10,6 +10,7 @@ export const CARGADORES_SECCION = {
   "/presupuestos": () => import("@/pages/Presupuestos"),
   "/trafico-web": () => import("@/pages/TraficoWeb"),
   "/newsletter": () => import("@/pages/Newsletter"),
+  "/rrss": () => import("@/pages/RRSS"),
   "/usuarios": () => import("@/pages/Usuarios"),
   "/avisos": () => import("@/pages/Avisos"),
   "/ayuda": () => import("@/pages/Ayuda"),
