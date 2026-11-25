@@ -17,7 +17,7 @@
 // ============================================================================
 import type { ComponentType, SVGProps } from "react";
 import { matchPath } from "react-router-dom";
-import { Activity, Bell, FileText, Globe, HelpCircle, LayoutDashboard, Mail, MessageSquarePlus, Receipt, Shield, UserRound } from "lucide-react";
+import { Activity, Bell, FileText, Globe, HelpCircle, LayoutDashboard, Mail, MessageSquarePlus, Receipt, Share2, Shield, UserRound } from "lucide-react";
 import type { SectionKey } from "@/hooks/useUserRole";
 
 export type IconoModulo = ComponentType<SVGProps<SVGSVGElement>>;
@@ -136,6 +136,17 @@ export const MODULOS_PANEL: readonly ModuloPanel[] = [
     icono: Mail,
     grupo: "marketing",
     secciones: ["newsletter"],
+    desactivable: true,
+    enMenu: true,
+  },
+  {
+    clave: "rrss",
+    nombre: "RRSS",
+    descripcion: "Instagram y Facebook: publicar y programar fotos, carruseles, reels e historias (también con las fotos de la web), textos con IA, ideas y campañas, y métricas.",
+    rutas: ["/rrss"],
+    icono: Share2,
+    grupo: "marketing",
+    secciones: ["rrss"],
     desactivable: true,
     enMenu: true,
   },

@@ -63,6 +63,9 @@ const SIN_EVENTO_PROPIO = new Set([
   // Newsletter: el panel pide el estado de la configuración al abrir la página (cada visita no es una acción); las
   // sincronizaciones quedan en newsletter_sincronizaciones_resend con quién las lanzó. Los fallos sí se registran.
   "newsletter-sync-resend",
+  // RRSS: el panel pide el estado de la conexión al abrir la página; conectar y desconectar quedan en la auditoría de
+  // rrss_meta_cuenta (sin tokens). Los fallos sí se registran.
+  "rrss-conexion",
 ]);
 
 // Funciones que pueden ejecutarse SIN usuario ni service role porque tienen
@@ -89,6 +92,9 @@ export const ADMITE_INTEGRACION: ReadonlySet<string> = new Set([
   // RPC), la baja (token aleatorio por suscriptor; también el botón one-click, sin cabeceras), los eventos de Resend
   // (firma svix) y la lista de envío (pg_cron con x-ocr-secret o un usuario con la sección).
   "newsletter-alta", "newsletter-baja", "resend-webhook", "newsletter-sync-resend",
+  // RRSS: la vuelta del OAuth de Meta (state aleatorio de un solo uso ligado al usuario que lo pidió), el programador
+  // (pg_cron con x-ocr-secret o service role) y las métricas (pg_cron con x-ocr-secret o un usuario con «Editar»).
+  "rrss-oauth", "rrss-programador", "rrss-metricas",
 ]);
 
 /** La autenticación y autorización de negocio siguen en cada handler. */

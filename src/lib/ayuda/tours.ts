@@ -16,7 +16,7 @@
 // Texto: para el dueño y el personal; llano, de tú, sin palabras técnicas.
 // ---------------------------------------------------------------------------
 
-export type SeccionAyuda = "facturas" | "peticiones" | "presupuestos" | "trafico_web" | "newsletter" | "usuarios";
+export type SeccionAyuda = "facturas" | "peticiones" | "presupuestos" | "trafico_web" | "newsletter" | "rrss" | "usuarios";
 
 export type LadoPaso = "top" | "right" | "bottom" | "left";
 
@@ -60,6 +60,12 @@ const N_CREAR = "newsletter-pestana-crear";
 const N_SUSCRIPTORES = "newsletter-pestana-suscriptores";
 const N_ESTADISTICAS = "newsletter-pestana-estadisticas";
 const N_CONFIGURACION = "newsletter-pestana-configuracion";
+const R_CREAR = "rrss-pestana-crear";
+const R_CALENDARIO = "rrss-pestana-calendario";
+const R_PUBLICACIONES = "rrss-pestana-publicaciones";
+const R_IDEAS = "rrss-pestana-ideas";
+const R_METRICAS = "rrss-pestana-metricas";
+const R_CONEXION = "rrss-pestana-conexion";
 
 export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
   facturas: [
@@ -375,6 +381,93 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       titulo: "4. Configuración",
       texto:
         "Qué hace falta para poder enviar (la cuenta de Resend y el remitente) y los ajustes: remitente, a quién se responde, dirección de pruebas y cómo se envía.",
+      lado: "bottom",
+    },
+    PASO_FINAL,
+  ],
+  rrss: [
+    {
+      titulo: "RRSS",
+      texto:
+        "Aquí preparas y publicas en Instagram y en la página de Facebook de la cristalería: fotos de los trabajos, carruseles, reels e historias, ahora o programadas. Te lo enseñamos en un momento: el recorrido abre cada pestaña solo.",
+    },
+    {
+      elemento: R_CREAR,
+      pestana: R_CREAR,
+      titulo: "1. Crear",
+      texto: "Aquí se prepara cada publicación. Solo la ves si puedes publicar.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "rrss-redes",
+      pestana: R_CREAR,
+      titulo: "Dónde y cómo",
+      texto: "Marca Instagram, Facebook o las dos, y elige el formato: una foto, un carrusel (de 2 a 10), un reel (vídeo) o una historia (dura 24 horas).",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "rrss-medios",
+      pestana: R_CREAR,
+      titulo: "Las fotos",
+      texto:
+        "Sube fotos o un vídeo del móvil, o elige las de Web › Fotos (las de cada tipo de trabajo). Con el botón del recorte eliges qué parte se ve; el texto alternativo describe la foto para personas ciegas.",
+      opcional: true,
+      lado: "top",
+    },
+    {
+      elemento: "rrss-texto",
+      pestana: R_CREAR,
+      titulo: "El texto",
+      texto:
+        "Escribe qué se hizo y qué problema resuelve, o pulsa «Ayuda de la IA»: mira las fotos y te propone tres textos con sus hashtags. Tú eliges y lo cambias a tu gusto. Nunca publica sola.",
+      opcional: true,
+      lado: "top",
+    },
+    {
+      elemento: "rrss-acciones",
+      pestana: R_CREAR,
+      titulo: "Publicar o programar",
+      texto: "«Publicar ahora» lo sube ya (después de confirmarlo). «Programar…» elige día y hora y el panel lo publica solo. Si falta algo, la lista de encima te dice qué.",
+      opcional: true,
+      lado: "left",
+    },
+    {
+      elemento: "rrss-calendario",
+      pestana: R_CALENDARIO,
+      titulo: "2. Calendario",
+      texto: "Lo programado, lo publicado y los borradores de las campañas, por semana o por mes. Pulsa una para moverla, cancelarla o abrirla.",
+      lado: "top",
+    },
+    {
+      elemento: "rrss-historial",
+      pestana: R_PUBLICACIONES,
+      titulo: "3. Publicaciones",
+      texto: "Todo lo creado, con su estado en cada red. Si algo falla, aquí se explica por qué y cómo arreglarlo, y puedes reintentarlo.",
+      lado: "top",
+    },
+    {
+      elemento: "rrss-ideas",
+      pestana: R_IDEAS,
+      titulo: "4. Ideas y campañas",
+      texto:
+        "La IA propone ideas para la semana (con cómo grabarlas con el móvil) y campañas de 2 a 4 semanas pensadas para la cristalería. Al aceptar una campaña, sus publicaciones quedan como borradores en el calendario.",
+      lado: "top",
+    },
+    {
+      elemento: "rrss-metricas",
+      pestana: R_METRICAS,
+      titulo: "5. Métricas",
+      texto: "Seguidores, alcance e interacciones, qué publicaciones llegan más y qué funciona mejor (formato, tipo de trabajo, día y hora). Se actualizan solas cada noche.",
+      lado: "bottom",
+    },
+    {
+      elemento: "rrss-conexion",
+      pestana: R_CONEXION,
+      titulo: "6. Conexión y estilo",
+      texto:
+        "La cuenta de Instagram y la página de Facebook conectadas, cuándo caduca el permiso y «Comprobar conexión». Debajo, el estilo de los textos (tono, hashtags que van siempre, llamadas a la acción) que usa la IA.",
       lado: "bottom",
     },
     PASO_FINAL,

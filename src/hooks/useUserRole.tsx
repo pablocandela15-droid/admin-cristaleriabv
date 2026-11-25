@@ -55,6 +55,10 @@ export const SECTIONS = [
   // Marketing › Newsletter (migración 20261124173700_newsletter, página /newsletter). «Ver» consulta suscriptores,
   // envíos, estadísticas y ajustes; «Editar» además crea y envía, da de alta y de baja y cambia los ajustes.
   { key: "newsletter", label: "Newsletter" },
+  // Marketing › RRSS (migración 20261125100000_rrss, página /rrss): Instagram, Facebook y métricas. «Ver» consulta
+  // publicaciones, calendario, métricas y la conexión; «Editar» además crea, publica, programa, usa la IA, conecta la
+  // cuenta de Meta y cambia el estilo.
+  { key: "rrss", label: "RRSS" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
 // Nota: lo del Super Admin (Control del Panel, Auditoría, Servicios, Gestor Gasto…) no forma parte del

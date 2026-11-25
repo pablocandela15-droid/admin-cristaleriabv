@@ -72,6 +72,9 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   subida_precio: TrendingUp,
   // Solicitud de presupuesto desde la calculadora de la web (web-solicitud-presupuesto): solo quien ve Presupuestos.
   presupuesto_solicitud: FileText,
+  // RRSS: la conexión con Meta caduca pronto o ya no vale, y lo programado que no se pudo publicar (rrss-programador).
+  rrss_conexion: AlertTriangle,
+  rrss_publicacion_error: AlertTriangle,
 };
 
 /** Avisos con caducidad ya pasada: no se enseñan. `ahora` inyectable para pruebas. */

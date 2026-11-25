@@ -50,6 +50,7 @@ export const OPCIONES_INICIO: readonly OpcionInicio[] = [
   { clave: "presupuestos", titulo: "Presupuestos", ruta: "/presupuestos", secciones: ["presupuestos"] },
   { clave: "trafico_web", titulo: "Tráfico web", ruta: "/trafico-web", secciones: ["trafico_web"] },
   { clave: "newsletter", titulo: "Newsletter", ruta: "/newsletter", secciones: ["newsletter"] },
+  { clave: "rrss", titulo: "RRSS", ruta: "/rrss", secciones: ["rrss"] },
   { clave: "usuarios", titulo: "Usuarios", ruta: "/usuarios", secciones: ["usuarios"] },
   { clave: "ayuda", titulo: "Ayuda", ruta: "/ayuda" },
 ];

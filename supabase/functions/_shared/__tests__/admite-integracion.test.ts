@@ -27,10 +27,13 @@ const AUTENTICACION_PROPIA: Record<string, { mecanismo: string; patrones: RegExp
   "newsletter-baja": { mecanismo: "token aleatorio por suscriptor comprobado en la RPC; un GET nunca da de baja", patrones: [/TOKEN_RE/, /newsletter_baja_por_token/] },
   "resend-webhook": { mecanismo: "firma svix de Resend en tiempo constante, fail-closed", patrones: [/verificarWebhookResend/, /compararEnTiempoConstante/] },
   "newsletter-sync-resend": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (pg_cron) o JWT con la sección Newsletter", patrones: [/x-ocr-secret/, /compararTiempoConstante/, /exigirPermiso/] },
+  "rrss-oauth": { mecanismo: "pública: state aleatorio de un solo uso y 15 minutos (solo su sha256 en la BD) ligado al usuario con «Editar» que lo pidió; sin state válido no canjea nada ni redirige", patrones: [/rrss_oauth_usar_estado/, /sha256Hex/, /RE_STATE/] },
+  "rrss-programador": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (pg_cron) o service role", patrones: [/x-ocr-secret/, /compararTiempoConstante/, /esServiceRole/] },
+  "rrss-metricas": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (pg_cron), service role o JWT con «Editar» en RRSS", patrones: [/x-ocr-secret/, /compararTiempoConstante/, /exigirPermiso/] },
 };
 
 /** Funciones del panel que actúan en nombre de un usuario: nunca pueden estar en la lista. */
-const DE_USUARIO = ["analizar-peticion", "procesar-factura", "servicios-uso", "control-excel", "admin-create-user", "admin-set-super-admin", "auditoria-revertir", "cambiar-mi-contrasena", "enviar-newsletter", "newsletter-ia"];
+const DE_USUARIO = ["analizar-peticion", "procesar-factura", "servicios-uso", "control-excel", "admin-create-user", "admin-set-super-admin", "auditoria-revertir", "cambiar-mi-contrasena", "enviar-newsletter", "newsletter-ia", "rrss-conexion", "rrss-publicar", "rrss-ia"];
 
 function fuentes(dir: string): string {
   let total = "";
@@ -47,10 +50,11 @@ function fuentes(dir: string): string {
 }
 
 describe("ADMITE_INTEGRACION", () => {
-  it("son los procesos programados (costes de OpenAI, modelos de IA, avisos por Telegram, lectura de facturas, Tráfico web, Logs y newsletter), la ingesta de la web y el newsletter público", () => {
+  it("son los procesos programados (costes de OpenAI, modelos de IA, avisos por Telegram, lectura de facturas, Tráfico web, Logs, newsletter y RRSS), la ingesta de la web, el newsletter público y la vuelta del OAuth de Meta", () => {
     expect([...ADMITE_INTEGRACION].sort()).toEqual([
       "avisos-telegram", "clasificar-productos", "ia-modelos-openai", "newsletter-alta", "newsletter-baja", "newsletter-sync-resend",
-      "ocr-trabajo", "procesar-logs-web", "registrar-actividad-web", "resend-webhook", "sincronizar-costes-openai", "sync-trafico-web",
+      "ocr-trabajo", "procesar-logs-web", "registrar-actividad-web", "resend-webhook", "rrss-metricas", "rrss-oauth", "rrss-programador",
+      "sincronizar-costes-openai", "sync-trafico-web",
     ]);
   });
 

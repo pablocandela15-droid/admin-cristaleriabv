@@ -120,7 +120,7 @@ describe("menú del super admin", () => {
 
   it("ve los módulos apagados, marcados «Desactivado para el equipo»; los demás, sin marca", () => {
     h.apagados = ["usuarios", "peticiones"];
-    expect(menu()).toEqual(["/dashboard", "/facturas", "/web", "/presupuestos", "/trafico-web", "/newsletter", "/usuarios", "/peticiones", "/ayuda"]);
+    expect(menu()).toEqual(["/dashboard", "/facturas", "/web", "/presupuestos", "/trafico-web", "/newsletter", "/rrss", "/usuarios", "/peticiones", "/ayuda"]);
     const usuarios = screen.getByRole("link", { name: "Usuarios (desactivado para el equipo)" });
     expect(usuarios).toHaveAttribute("data-desactivado", "true");
     expect(within(usuarios).getByText("Desactivado")).toHaveAttribute("title", "Desactivado para el equipo");
