@@ -53,6 +53,8 @@ Tareas de Facturas (las instala su migración si hay pg_cron): `reanudar-trabajo
 
 Tareas de la web (las instalan sus migraciones si hay pg_cron): `sync-trafico-web` (3:30 UTC cada día: copia las visitas del día anterior desde Vercel) y `procesar-logs-web` (cada 5 minutos: agrupa los errores de la web, abre o actualiza tickets y purga lo antiguo). Para lanzarlas a mano: `select public.trafico_web_disparar();` y `select public.logs_web_disparar();` (devuelven `llamada` o `sin_vault`).
 
+Tareas de RRSS (las instala su migración si hay pg_cron): `rrss-programador` (cada 5 minutos, solo si hay algo vencido: publica lo programado en Instagram y Facebook), `rrss-metricas` (5:10 UTC: copia las métricas; sin conexión no llama a Meta) y `rrss-mantenimiento` (3:50 UTC: purga, limpia el cubo `rrss` y avisa si la conexión con Meta va a caducar). A mano: `select public.rrss_disparar('programar');` (o `'metricas'`, `'mantenimiento'`). Ver [RRSS.md](RRSS.md#tareas-programadas).
+
 ## 5. Edge Functions
 
 Despliega todas las de `supabase/functions/` (la configuración de `verify_jwt` está en `supabase/config.toml`):
@@ -62,13 +64,14 @@ for f in admin-create-user admin-delete-user admin-set-super-admin admin-set-use
          analizar-peticion auditoria-revertir avisos-telegram cambiar-mi-contrasena clasificar-productos control-excel \
          enviar-newsletter ia-modelos-openai leer-metricas list-users newsletter-alta newsletter-baja newsletter-ia \
          newsletter-sync-resend ocr-trabajo panel-auth procesar-factura procesar-logs-web registrar-actividad-web \
-         registrar-metrica resend-webhook resumen-logs-web servicios-uso sincronizar-costes-openai \
-         sync-trafico-web web-solicitud-presupuesto; do
+         registrar-metrica resend-webhook resumen-logs-web rrss-conexion rrss-ia rrss-metricas rrss-oauth \
+         rrss-programador rrss-publicar servicios-uso sincronizar-costes-openai sync-trafico-web \
+         web-solicitud-presupuesto; do
   npx supabase functions deploy "$f" --project-ref <ref>
 done
 ```
 
-`web-solicitud-presupuesto` y `registrar-actividad-web` son las públicas (las llama la web, `verify_jwt = false`): no necesitan ningún secreto propio. Las de la newsletter (`newsletter-alta`, `newsletter-baja`, `resend-webhook`) también son públicas y se explican en [NEWSLETTER.md](NEWSLETTER.md). Usan los de Supabase (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, que además es la sal de la huella de IP de los límites) y en el bucket `web-fotos` no hay que configurar nada (lo crea la migración). `registrar-actividad-web` solo acepta la web publicada (producción), sus previews de Vercel (demo) y `localhost` (local); otro dominio, con `LOGS_WEB_ORIGENES_EXTRA`. `sync-trafico-web` y `procesar-logs-web` también llevan `verify_jwt = false`: las protege `OCR_TRABAJOS_SECRET` (y, en «Procesar ahora», la sesión de super admin).
+`web-solicitud-presupuesto` y `registrar-actividad-web` son las públicas (las llama la web, `verify_jwt = false`): no necesitan ningún secreto propio. Las de la newsletter (`newsletter-alta`, `newsletter-baja`, `resend-webhook`) también son públicas y se explican en [NEWSLETTER.md](NEWSLETTER.md). Usan los de Supabase (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, que además es la sal de la huella de IP de los límites) y en el bucket `web-fotos` no hay que configurar nada (lo crea la migración). `registrar-actividad-web` solo acepta la web publicada (producción), sus previews de Vercel (demo) y `localhost` (local); otro dominio, con `LOGS_WEB_ORIGENES_EXTRA`. `sync-trafico-web` y `procesar-logs-web` también llevan `verify_jwt = false`: las protege `OCR_TRABAJOS_SECRET` (y, en «Procesar ahora», la sesión de super admin). Las de RRSS con `verify_jwt = false` (`rrss-oauth`, a la que vuelve Facebook, y `rrss-programador` y `rrss-metricas`, que llama pg_cron) se explican en [RRSS.md](RRSS.md#1-migración-y-funciones).
 
 Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extra (usa los de Supabase). El resto activa cada parte:
 
@@ -77,7 +80,7 @@ Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extr
 | `OCR_TRABAJOS_SECRET` | Que pg_cron pueda llamar a las funciones (mismo valor que en Vault) | Las tareas programadas no funcionan |
 | `SUPABASE_REF_PRODUCCION`, `SUPABASE_REF_DEMO` | Saber en qué entorno corre cada función | Todo se trata como «local» |
 | `PANEL_URL` (y `PANEL_URL_DEMO`) | Enlaces al panel en Telegram y en los tickets enviados a Linear | Sin enlaces |
-| `OPENAI_API_KEY` | Análisis de los tickets con IA, «Crear con IA» de la newsletter, explicaciones y resúmenes de Logs y Tráfico web (y, si no hay `OPENAI_API_KEY_OCR`, la lectura de facturas) | El análisis no se hace |
+| `OPENAI_API_KEY` | Análisis de los tickets con IA, «Crear con IA» de la newsletter, la ayuda de la IA de RRSS, explicaciones y resúmenes de Logs y Tráfico web (y, si no hay `OPENAI_API_KEY_OCR`, la lectura de facturas) | El análisis no se hace |
 | `OPENAI_API_KEY_OCR` | Facturas: leer los documentos y clasificar productos (proceso «ocr»; si falta, usa `OPENAI_API_KEY`) | Facturas no lee nada: la subida falla con «falta la clave» |
 | `OCR_MODELO`, `OCR_MODELO_PIEZAS`, `OCR_DETALLE` | Facturas: modelo de lectura (todo / solo las piezas de documentos largos) y `detail` de las imágenes (`high` o el de por defecto). Opcionales: manda el modelo elegido en *Super Admin › Servicios › Modelos* | `gpt-5.6-luna` con `detail` «original» |
 | `CLASIFICAR_PRODUCTOS_MODELO` | Facturas: modelo de la clasificación de productos. Opcional (igual que arriba) | `gpt-5.6-luna` |
@@ -99,6 +102,9 @@ Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extr
 | `RESEND_API_KEY` | Newsletter: enviar los correos (y el consumo de Resend en Servicios). Ver [NEWSLETTER.md](NEWSLETTER.md#puesta-en-marcha) | No sale ningún correo de la newsletter; la web dice que la suscripción no está disponible |
 | `RESEND_WEBHOOK_SECRET` | Newsletter: firma del webhook de Resend (estadísticas y bajas por rebote o spam) | El webhook rechaza todo: sin estadísticas ni bajas automáticas |
 | `RESEND_NEWSLETTER_SEGMENT_ID`, `NEWSLETTER_LIMITE_CONTACTOS`, `NEWSLETTER_IA_MODEL` | Newsletter, opcionales: Segment del canal Broadcast, contactos del plan y modelo de «Crear con IA» | Segment «Newsletter Cristalería BV», 1.000 contactos y `gpt-4.1-mini` |
+| `META_APP_ID`, `META_APP_SECRET` | RRSS: la app de Meta con la que se conecta Instagram y la página de Facebook. Ver [RRSS.md](RRSS.md#puesta-en-marcha) | RRSS no publica ni mide nada («Conectar con Facebook» desactivado y explicado) |
+| `META_LOGIN_CONFIG_ID`, `RRSS_CLAVE_TOKENS`, `META_API_VERSION`, `RRSS_IA_MODEL`, `RRSS_DIAS_FICHEROS` | RRSS, opcionales: configuración del inicio de sesión para empresas, clave de cifrado de los tokens (recomendada), versión de la Graph API, modelo de la IA y días que se guardan los ficheros de lo publicado | Permisos por su nombre, clave derivada de `META_APP_SECRET`, `v26.0`, `gpt-4.1-mini` y 30 días |
+| `IG_ACCESS_TOKEN`, `IG_USER_ID`, `FB_PAGE_ID` | RRSS, opcionales: token de usuario del sistema de Meta (no caduca). Si están, mandan sobre la conexión del panel | Se usa la conexión del panel |
 | `STRIPE_SECRET_KEY`, `SERVICIOS_HOSTINGER_TOKEN` | Consumo de esos proveedores en Servicios (si se usan) | La tarjeta pide el secreto |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `CONTROL_EXCEL_FILE_ID`, `CONTROL_EXCEL_CLIENTE` | Excel de control del Gestor Gasto ([CONTROL-EXCEL.md](CONTROL-EXCEL.md)) | La pestaña lo dice |
 
@@ -120,3 +126,4 @@ Secretos (*Edge Functions › Secrets*). Obligatorio para el login: ninguno extr
 - *Tráfico web*: al día siguiente de activar Web Analytics y poner `VERCEL_ANALYTICS_TOKEN`, salen las visitas (o `select public.trafico_web_disparar();` para no esperar). Sin token, la página lo dice.
 - *Super Admin › Logs*: abre la web, usa la calculadora y pulsa WhatsApp; en unos segundos sale la sesión en *Sesiones* (`curl -X POST https://<ref>.supabase.co/functions/v1/registrar-actividad-web -H 'Origin: https://ejemplo.com' -d '{}'` debe responder 403).
 - *Facturas › Cargar*: sube una factura de prueba (PDF o foto). Debe leerse sola y salir en *Compras › Documentos* con su original al lado; en *Super Admin › Servicios* aparece el coste de la lectura. Un usuario con solo «Facturas · Subida» ve únicamente *Cargar*.
+- *RRSS*: sin la app de Meta, *Conexión y estilo* dice qué falta y enseña la dirección de vuelta; con `META_APP_ID` y `META_APP_SECRET`, «Conectar con Facebook» y una historia de prueba (pasos en [RRSS.md](RRSS.md#comprobar)).
