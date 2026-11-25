@@ -215,3 +215,33 @@ verify_jwt = true
 # Secreto OPENAI_API_KEY (sin él responde 503 «ia_no_disponible»). Ver newsletter-ia/ia.ts.
 [functions.newsletter-ia]
 verify_jwt = true
+
+# RRSS › conexión con Meta (20261125100000_rrss.sql): JWT de usuario + «Ver» en RRSS (estado, comprobar) o «Editar»
+# (conectar, elegir la página, desconectar) con exigirPermiso. Los tokens nunca salen. Ver rrss-conexion/conexion.ts.
+[functions.rrss-conexion]
+verify_jwt = true
+
+# RRSS › vuelta del «Conectar con Facebook» (URL de redirección de la app de Meta): PÚBLICA, la abre el navegador al
+# volver de Facebook. La protege el state aleatorio de un solo uso (rrss_oauth_estados, solo su sha256) que crea
+# rrss-conexion para un usuario con «Editar». Ver rrss-oauth/oauth.ts y docs/RRSS.md.
+[functions.rrss-oauth]
+verify_jwt = false
+
+# RRSS › «Publicar ahora» en Instagram y Facebook: JWT de usuario + «Editar» en RRSS. Ver rrss-publicar/publicar.ts.
+[functions.rrss-publicar]
+verify_jwt = true
+
+# RRSS › programador, procesando y mantenimiento: pg_cron (rrss_disparar) con x-ocr-secret = OCR_TRABAJOS_SECRET
+# (tiempo constante, falla cerrado) o la service role. Ver rrss-programador/programador.ts.
+[functions.rrss-programador]
+verify_jwt = false
+
+# RRSS › métricas: pg_cron con x-ocr-secret (captura diaria) o un usuario con «Editar» en RRSS («Actualizar ahora»).
+# Ver rrss-metricas/metricas.ts.
+[functions.rrss-metricas]
+verify_jwt = false
+
+# RRSS › IA (textos, ideas, campañas, aprender): JWT de usuario + «Editar» en RRSS, tope de 80 peticiones por usuario
+# y día. Secreto OPENAI_API_KEY (sin él responde 503 «ia_no_disponible»). Ver rrss-ia/ia.ts.
+[functions.rrss-ia]
+verify_jwt = true
